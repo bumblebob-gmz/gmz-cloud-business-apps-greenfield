@@ -1,0 +1,15 @@
+checks:
+  - id: nextcloud-https
+    type: http
+    target: https://nextcloud.{tenant}.irongeeks.eu/status.php
+    expectedStatus: 200
+    contains: '"installed":true'
+    intervalSeconds: 30
+    timeoutSeconds: 5
+
+  - id: nextcloud-login
+    type: http
+    target: https://nextcloud.{tenant}.irongeeks.eu/login
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 5

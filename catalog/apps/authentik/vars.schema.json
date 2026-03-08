@@ -1,7 +1,52 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Authentik vars",
+  "title": "Authentik tenant variables",
   "type": "object",
-  "properties": {},
-  "additionalProperties": false
+  "additionalProperties": false,
+  "required": [
+    "BASE_DOMAIN",
+    "AUTHENTIK_HOST",
+    "AUTHENTIK_IMAGE_TAG",
+    "AUTHENTIK_SECRET_KEY",
+    "AUTHENTIK_DB_NAME",
+    "AUTHENTIK_DB_USER",
+    "AUTHENTIK_DB_PASSWORD"
+  ],
+  "properties": {
+    "BASE_DOMAIN": {
+      "type": "string",
+      "const": "irongeeks.eu",
+      "description": "Managed public base domain."
+    },
+    "AUTHENTIK_HOST": {
+      "type": "string",
+      "pattern": "^authentik\\.[a-z0-9-]+\\.irongeeks\\.eu$",
+      "description": "Public hostname generated from hostPattern authentik.{tenant}.irongeeks.eu"
+    },
+    "AUTHENTIK_IMAGE_TAG": {
+      "type": "string",
+      "default": "2026.2.2",
+      "description": "Authentik server image tag"
+    },
+    "AUTHENTIK_SECRET_KEY": {
+      "type": "string",
+      "minLength": 32,
+      "description": "High-entropy secret from tenant secret store"
+    },
+    "AUTHENTIK_DB_NAME": {
+      "type": "string",
+      "default": "authentik",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "AUTHENTIK_DB_USER": {
+      "type": "string",
+      "default": "authentik",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "AUTHENTIK_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "Password from tenant secret store"
+    }
+  }
 }

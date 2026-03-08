@@ -1,11 +1,18 @@
 id: nextcloud
 name: Nextcloud
-version: 0.1.0
-status: draft
+version: 30.0.2
+status: certified-reference
+category: collaboration
+summary: File sync and collaboration suite with SSO support via OIDC/SAML.
+website: https://nextcloud.com/
+docsUrl: https://docs.nextcloud.com/
+requires:
+  - authentik
 supportsBranding: true
 supportsSSO: true
-requires: []
 exposes:
   - service: nextcloud
-    port: 8080
+    component: app
+    protocol: https
+    port: 80
     hostPattern: nextcloud.{tenant}.irongeeks.eu

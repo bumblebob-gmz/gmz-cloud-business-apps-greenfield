@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-mist text-ink antialiased;
+}
+
+.panel {
+  @apply rounded-2xl border border-slate-200 bg-white shadow-soft;
+}
+
+.table-head {
+  @apply text-left text-xs uppercase tracking-wide text-slate-500;
+}

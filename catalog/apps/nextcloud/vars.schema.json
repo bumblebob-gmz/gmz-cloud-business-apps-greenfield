@@ -1,7 +1,79 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Nextcloud vars",
+  "title": "Nextcloud tenant variables",
   "type": "object",
-  "properties": {},
-  "additionalProperties": false
+  "additionalProperties": false,
+  "required": [
+    "NEXTCLOUD_HOST",
+    "NEXTCLOUD_IMAGE_TAG",
+    "NEXTCLOUD_ADMIN_USER",
+    "NEXTCLOUD_ADMIN_PASSWORD",
+    "NEXTCLOUD_DB_NAME",
+    "NEXTCLOUD_DB_USER",
+    "NEXTCLOUD_DB_PASSWORD",
+    "NEXTCLOUD_DB_ROOT_PASSWORD",
+    "TRUSTED_PROXIES"
+  ],
+  "properties": {
+    "NEXTCLOUD_HOST": {
+      "type": "string",
+      "pattern": "^nextcloud\\.[a-z0-9-]+\\.irongeeks\\.eu$",
+      "description": "Public hostname generated from hostPattern nextcloud.{tenant}.irongeeks.eu"
+    },
+    "NEXTCLOUD_IMAGE_TAG": {
+      "type": "string",
+      "default": "30.0-apache",
+      "description": "Nextcloud image tag"
+    },
+    "NEXTCLOUD_ADMIN_USER": {
+      "type": "string",
+      "default": "admin",
+      "pattern": "^[a-zA-Z0-9._-]{3,32}$"
+    },
+    "NEXTCLOUD_ADMIN_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "Admin password from tenant secret store"
+    },
+    "NEXTCLOUD_DEFAULT_PHONE_REGION": {
+      "type": "string",
+      "default": "DE",
+      "pattern": "^[A-Z]{2}$"
+    },
+    "NEXTCLOUD_DB_NAME": {
+      "type": "string",
+      "default": "nextcloud",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "NEXTCLOUD_DB_USER": {
+      "type": "string",
+      "default": "nextcloud",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "NEXTCLOUD_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "DB password from tenant secret store"
+    },
+    "NEXTCLOUD_DB_ROOT_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "Root DB password from tenant secret store"
+    },
+    "NEXTCLOUD_PHP_MEMORY_LIMIT": {
+      "type": "string",
+      "default": "512M",
+      "pattern": "^[0-9]+[MG]$"
+    },
+    "NEXTCLOUD_UPLOAD_LIMIT": {
+      "type": "string",
+      "default": "10G",
+      "pattern": "^[0-9]+[MG]$"
+    },
+    "TRUSTED_PROXIES": {
+      "type": "string",
+      "default": "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16",
+      "description": "Comma-separated CIDR list for reverse proxies"
+    }
+  }
 }

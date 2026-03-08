@@ -1,0 +1,14 @@
+checks:
+  - id: authentik-https
+    type: http
+    target: https://authentik.{tenant}.irongeeks.eu/-/health/live/
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 5
+
+  - id: authentik-ready
+    type: http
+    target: https://authentik.{tenant}.irongeeks.eu/-/health/ready/
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 5

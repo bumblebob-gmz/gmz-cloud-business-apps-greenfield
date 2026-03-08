@@ -1,1 +1,73 @@
-# TODO: compose template for tenant deployment
+services:
+  nextcloud-db:
+    image: mariadb:11
+    restart: unless-stopped
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    environment:
+      MYSQL_DATABASE: ${NEXTCLOUD_DB_NAME}
+      MYSQL_USER: ${NEXTCLOUD_DB_USER}
+      MYSQL_PASSWORD: ${NEXTCLOUD_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${NEXTCLOUD_DB_ROOT_PASSWORD}
+    volumes:
+      - nextcloud_db_data:/var/lib/mysql
+
+  nextcloud-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - nextcloud_redis_data:/data
+
+  nextcloud-app:
+    image: nextcloud:${NEXTCLOUD_IMAGE_TAG}
+    restart: unless-stopped
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
+    environment:
+      NEXTCLOUD_TRUSTED_DOMAINS: ${NEXTCLOUD_HOST}
+      NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER}
+      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD}
+      NEXTCLOUD_DEFAULT_PHONE_REGION: ${NEXTCLOUD_DEFAULT_PHONE_REGION}
+      MYSQL_DATABASE: ${NEXTCLOUD_DB_NAME}
+      MYSQL_USER: ${NEXTCLOUD_DB_USER}
+      MYSQL_PASSWORD: ${NEXTCLOUD_DB_PASSWORD}
+      MYSQL_HOST: nextcloud-db
+      REDIS_HOST: nextcloud-redis
+      OVERWRITEHOST: ${NEXTCLOUD_HOST}
+      OVERWRITEPROTOCOL: https
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES}
+      PHP_MEMORY_LIMIT: ${NEXTCLOUD_PHP_MEMORY_LIMIT}
+      PHP_UPLOAD_LIMIT: ${NEXTCLOUD_UPLOAD_LIMIT}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.nextcloud.rule: Host(`${NEXTCLOUD_HOST}`)
+      traefik.http.routers.nextcloud.entrypoints: websecure
+      traefik.http.routers.nextcloud.tls: "true"
+      traefik.http.services.nextcloud.loadbalancer.server.port: "80"
+    volumes:
+      - nextcloud_html:/var/www/html
+      - nextcloud_data:/var/www/html/data
+
+  nextcloud-cron:
+    image: nextcloud:${NEXTCLOUD_IMAGE_TAG}
+    restart: unless-stopped
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
+    entrypoint: /cron.sh
+    environment:
+      MYSQL_DATABASE: ${NEXTCLOUD_DB_NAME}
+      MYSQL_USER: ${NEXTCLOUD_DB_USER}
+      MYSQL_PASSWORD: ${NEXTCLOUD_DB_PASSWORD}
+      MYSQL_HOST: nextcloud-db
+      REDIS_HOST: nextcloud-redis
+    volumes:
+      - nextcloud_html:/var/www/html
+      - nextcloud_data:/var/www/html/data
+
+volumes:
+  nextcloud_db_data:
+  nextcloud_redis_data:
+  nextcloud_html:
+  nextcloud_data:

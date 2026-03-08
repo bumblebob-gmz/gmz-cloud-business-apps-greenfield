@@ -1,11 +1,17 @@
 id: authentik
 name: Authentik
-version: 0.1.0
-status: draft
+version: 2026.3.0
+status: certified-reference
+category: identity-access
+summary: Central identity provider with SSO and user lifecycle management for tenant apps.
+website: https://goauthentik.io/
+docsUrl: https://docs.goauthentik.io/
+requires: []
 supportsBranding: true
 supportsSSO: true
-requires: []
 exposes:
   - service: authentik
-    port: 8080
+    component: server
+    protocol: https
+    port: 9000
     hostPattern: authentik.{tenant}.irongeeks.eu
