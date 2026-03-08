@@ -1,7 +1,6 @@
-proxmox_endpoint = "https://proxmox.local:8006/api2/json"
-proxmox_username = "gmz-automation@pve"
-proxmox_password = "CHANGE_ME"
-proxmox_insecure = true
+proxmox_endpoint  = "https://proxmox.local:8006/api2/json"
+proxmox_api_token = "gmz-automation@pve!tofu=CHANGE_ME"
+proxmox_insecure  = false # nur im Lab explizit auf true setzen
 
 tenant_name        = "kunde-a"
 node_name          = "pve01"

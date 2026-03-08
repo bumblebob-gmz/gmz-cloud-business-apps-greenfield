@@ -1,12 +1,11 @@
 variable "proxmox_endpoint" { type = string }
-variable "proxmox_username" { type = string }
-variable "proxmox_password" {
+variable "proxmox_api_token" {
   type      = string
   sensitive = true
 }
 variable "proxmox_insecure" {
   type    = bool
-  default = true
+  default = false
 }
 
 variable "tenant_name" { type = string }

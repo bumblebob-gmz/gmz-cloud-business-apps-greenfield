@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gmz.internal/schemas/audit-event.schema.json",
+  "title": "Audit Event Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "timestamp",
+    "correlationId",
+    "actor",
+    "tenantId",
+    "action",
+    "resource",
+    "outcome",
+    "source"
+  ],
+  "properties": {
+    "eventId": { "type": "string", "minLength": 8 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "correlationId": { "type": "string", "minLength": 8 },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "type": "string", "enum": ["user", "service"] },
+        "id": { "type": "string", "minLength": 1 },
+        "role": { "type": "string" }
+      }
+    },
+    "tenantId": { "type": "string", "minLength": 1 },
+    "action": { "type": "string", "minLength": 1 },
+    "resource": { "type": "string", "minLength": 1 },
+    "outcome": { "type": "string", "enum": ["success", "failure", "denied"] },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["service", "operation"],
+      "properties": {
+        "service": { "type": "string", "minLength": 1 },
+        "operation": { "type": "string", "minLength": 1 },
+        "ip": { "type": "string" }
+      }
+    },
+    "details": {
+      "type": "object",
+      "description": "Optional sanitized context. Never include secrets or plaintext credentials."
+    }
+  }
+}

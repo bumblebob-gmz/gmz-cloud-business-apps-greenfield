@@ -83,7 +83,13 @@ Danach Token sicher speichern (für Setup-Wizard / OpenTofu Secrets).
 cd infra/opentofu/environments/prod
 cp terraform.tfvars.example terraform.tfvars
 # terraform.tfvars mit realen Werten befüllen
+# empfohlen: proxmox_api_token via ENV (TF_VAR_proxmox_api_token) statt Klartext
 ```
+
+Security-Default:
+- `proxmox_api_token` statt Username/Passwort
+- `proxmox_insecure = false` (TLS-Verifikation aktiv)
+- Lab-only Override (`true`) nur bewusst und dokumentiert nutzen
 
 Dann:
 
