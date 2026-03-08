@@ -1,16 +1,34 @@
 proxmox_endpoint  = "https://proxmox.local:8006/api2/json"
 proxmox_api_token = "gmz-automation@pve!tofu=CHANGE_ME"
-proxmox_insecure  = false # nur im Lab explizit auf true setzen
+proxmox_insecure  = false # in production must remain false
 
 tenant_name        = "kunde-a"
-node_name          = "pve01"
 vm_id              = 21001
 vlan_id            = 120
 cores              = 4
 memory_mb          = 6144
 disk_gb            = 200
-storage            = "local-lvm"
 debian_template_id = 9000
 bridge             = "vmbr0"
 ci_user            = "debian"
 ssh_public_key     = "ssh-ed25519 AAAA..."
+
+# Wizard-friendly matrix: choose a profile per tenant.
+node_storage_profiles = {
+  pve01-lvmthin = {
+    node_name       = "pve01"
+    storage         = "local-lvm"
+    storage_backend = "lvm-thin"
+  }
+  pve02-ceph = {
+    node_name       = "pve02"
+    storage         = "ceph-vm"
+    storage_backend = "ceph"
+  }
+}
+
+tenant_profile = "pve01-lvmthin"
+
+# Backward-compatible fallback (only needed when tenant_profile is unset):
+# node_name = "pve01"
+# storage   = "local-lvm"

@@ -15,17 +15,23 @@ provider "proxmox" {
   insecure  = var.proxmox_insecure
 }
 
+locals {
+  selected_profile = var.tenant_profile != null ? var.node_storage_profiles[var.tenant_profile] : null
+  effective_node   = local.selected_profile != null ? local.selected_profile.node_name : var.node_name
+  effective_storage = local.selected_profile != null ? local.selected_profile.storage : var.storage
+}
+
 module "tenant_vm" {
   source = "../../modules/tenant-vm"
 
   tenant_name        = var.tenant_name
-  node_name          = var.node_name
+  node_name          = local.effective_node
   vm_id              = var.vm_id
   vlan_id            = var.vlan_id
   cores              = var.cores
   memory_mb          = var.memory_mb
   disk_gb            = var.disk_gb
-  storage            = var.storage
+  storage            = local.effective_storage
   debian_template_id = var.debian_template_id
   bridge             = var.bridge
   ci_user            = var.ci_user

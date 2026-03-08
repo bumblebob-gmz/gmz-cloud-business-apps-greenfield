@@ -2,7 +2,25 @@
 - name: Nightly updates per tenant maintenance window
   hosts: tenant
   become: true
+  vars:
+    # Hook placeholders (can be overridden via inventory/group_vars)
+    pre_update_snapshot_enabled: false
+    pre_update_snapshot_hook_cmd: ""
+
+    post_update_healthcheck_enabled: true
+    post_update_healthcheck_hook_cmd: ""
+
+    rollback_enabled: false
+    rollback_hook_cmd: ""
+
   tasks:
+    - name: Pre-update snapshot hook (placeholder)
+      ansible.builtin.command: "{{ pre_update_snapshot_hook_cmd }}"
+      when:
+        - pre_update_snapshot_enabled | bool
+        - pre_update_snapshot_hook_cmd | length > 0
+      changed_when: true
+
     - name: Pull newest container images
       community.docker.docker_compose_v2:
         project_src: /opt/gmz/apps
@@ -13,6 +31,25 @@
         project_src: /opt/gmz/apps
         state: present
 
-    - name: TODO healthchecks + rollback trigger hook
+    - name: Post-update health check hook (placeholder)
+      ansible.builtin.command: "{{ post_update_healthcheck_hook_cmd }}"
+      register: post_update_healthcheck_result
+      when:
+        - post_update_healthcheck_enabled | bool
+        - post_update_healthcheck_hook_cmd | length > 0
+      changed_when: false
+      failed_when: post_update_healthcheck_result.rc != 0
+
+    - name: Rollback hook on health check failure (placeholder)
+      ansible.builtin.command: "{{ rollback_hook_cmd }}"
+      when:
+        - rollback_enabled | bool
+        - rollback_hook_cmd | length > 0
+        - post_update_healthcheck_result is defined
+        - post_update_healthcheck_result.rc != 0
+      changed_when: true
+
+    - name: Note when no health check hook is configured
       ansible.builtin.debug:
-        msg: "Healthcheck/rollback integration follows in next iteration"
+        msg: "No post-update health check hook configured; set post_update_healthcheck_hook_cmd to enable."
+      when: post_update_healthcheck_hook_cmd | length == 0

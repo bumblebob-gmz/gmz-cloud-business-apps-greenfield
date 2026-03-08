@@ -1,0 +1,3 @@
+---
+# Compatibility wrapper: keep legacy path stable.
+- import_playbook: playbooks/nightly-updates.yml

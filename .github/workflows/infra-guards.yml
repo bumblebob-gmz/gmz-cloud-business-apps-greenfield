@@ -1,0 +1,23 @@
+name: Infra Guards
+
+on:
+  push:
+    paths:
+      - 'infra/opentofu/**'
+      - 'ops/scripts/check_prod_tfvars_secure.sh'
+      - '.github/workflows/infra-guards.yml'
+  pull_request:
+    paths:
+      - 'infra/opentofu/**'
+      - 'ops/scripts/check_prod_tfvars_secure.sh'
+      - '.github/workflows/infra-guards.yml'
+
+jobs:
+  prod-tfvars-security-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate prod tfvars templates stay secure
+        run: bash ops/scripts/check_prod_tfvars_secure.sh
