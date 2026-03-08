@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
 import type { Job, JobStatus } from '@/lib/types';
@@ -140,7 +141,11 @@ export default function JobsPage() {
             <tbody>
               {items.map((job) => (
                 <tr key={job.id} className="bg-slate-50 text-slate-700">
-                  <td className="px-3 py-2 font-mono">{job.id}</td>
+                  <td className="px-3 py-2 font-mono">
+                    <Link className="text-brand underline-offset-2 hover:underline" href={`/jobs/${job.id}`}>
+                      {job.id}
+                    </Link>
+                  </td>
                   <td className="px-3 py-2">{job.tenant}</td>
                   <td className="px-3 py-2">{job.task}</td>
                   <td className="px-3 py-2">

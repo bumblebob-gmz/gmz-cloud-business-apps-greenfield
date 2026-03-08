@@ -2,7 +2,7 @@
 
 import { FormEvent, useMemo, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
-import type { Tenant } from '@/lib/types';
+import type { AuthMode, Tenant } from '@/lib/types';
 
 type FormState = {
   customerName: string;
@@ -11,9 +11,10 @@ type FormState = {
   region: string;
   size: 'S' | 'M' | 'L' | 'XL';
   vlan: string;
-  authMode: 'SAML' | 'OIDC' | 'LDAP';
-  connectorHost: string;
-  connectorToken: string;
+  authMode: AuthMode;
+  entraTenantId: string;
+  ldapUrl: string;
+  localAdminEmail: string;
   apps: string[];
   maintenanceWindow: string;
 };
@@ -25,7 +26,23 @@ type TenantCreateResponse = {
   };
 };
 
-const appOptions = ['CRM', 'Billing', 'Document Hub', 'Analytics'];
+const requiredApp = 'authentik';
+const appCatalogOptions = [
+  requiredApp,
+  'nextcloud',
+  'it-tools',
+  'paperless-ngx',
+  'vaultwarden',
+  'bookstack',
+  'joplin',
+  'libretranslate',
+  'ollama',
+  'openwebui',
+  'searxng',
+  'snipe-it',
+  'wiki-js'
+];
+
 const steps = ['Customer Basics', 'Sizing', 'Network', 'Authentication', 'Apps', 'Maintenance', 'Review'];
 
 export default function NewTenantPage() {
@@ -40,10 +57,11 @@ export default function NewTenantPage() {
     region: 'eu-central-1',
     size: 'M',
     vlan: '140',
-    authMode: 'OIDC',
-    connectorHost: '',
-    connectorToken: '',
-    apps: ['CRM'],
+    authMode: 'EntraID',
+    entraTenantId: '',
+    ldapUrl: '',
+    localAdminEmail: '',
+    apps: [requiredApp],
     maintenanceWindow: 'Sundays 02:00-04:00 CET'
   });
 
@@ -56,6 +74,10 @@ export default function NewTenantPage() {
   }, [form.vlan]);
 
   const toggleApp = (app: string) => {
+    if (app === requiredApp) {
+      return;
+    }
+
     setForm((prev) => ({
       ...prev,
       apps: prev.apps.includes(app) ? prev.apps.filter((a) => a !== app) : [...prev.apps, app]
@@ -77,9 +99,18 @@ export default function NewTenantPage() {
         body: JSON.stringify({
           name: form.tenantName,
           customer: form.customerName,
+          contactEmail: form.contactEmail,
           region: form.region,
           size: form.size,
-          vlan: Number(form.vlan)
+          vlan: Number(form.vlan),
+          authMode: form.authMode,
+          authConfig: {
+            entraTenantId: form.entraTenantId,
+            ldapUrl: form.ldapUrl,
+            localAdminEmail: form.localAdminEmail
+          },
+          apps: Array.from(new Set([requiredApp, ...form.apps])),
+          maintenanceWindow: form.maintenanceWindow
         })
       });
 
@@ -96,8 +127,10 @@ export default function NewTenantPage() {
         customerName: '',
         tenantName: '',
         contactEmail: '',
-        connectorHost: '',
-        connectorToken: ''
+        entraTenantId: '',
+        ldapUrl: '',
+        localAdminEmail: '',
+        apps: [requiredApp]
       }));
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Unknown error');
@@ -162,30 +195,38 @@ export default function NewTenantPage() {
                 <select
                   className="w-full rounded-lg border border-slate-300 px-3 py-2"
                   value={form.authMode}
-                  onChange={(e) => setForm({ ...form, authMode: e.target.value as FormState['authMode'] })}
+                  onChange={(e) => setForm({ ...form, authMode: e.target.value as AuthMode })}
                 >
-                  <option>SAML</option>
-                  <option>OIDC</option>
-                  <option>LDAP</option>
+                  <option value="EntraID">EntraID</option>
+                  <option value="LDAP">LDAP</option>
+                  <option value="Local User">Local User</option>
                 </select>
               </div>
-              <Field label="Connector Host" value={form.connectorHost} onChange={(value) => setForm({ ...form, connectorHost: value })} />
-              <Field label="Connector Token" value={form.connectorToken} onChange={(value) => setForm({ ...form, connectorToken: value })} />
+
+              {form.authMode === 'EntraID' && (
+                <Field label="EntraID Tenant ID" value={form.entraTenantId} onChange={(value) => setForm({ ...form, entraTenantId: value })} />
+              )}
+              {form.authMode === 'LDAP' && <Field label="LDAP URL" value={form.ldapUrl} onChange={(value) => setForm({ ...form, ldapUrl: value })} />}
+              {form.authMode === 'Local User' && (
+                <Field label="Local Admin Email" value={form.localAdminEmail} onChange={(value) => setForm({ ...form, localAdminEmail: value })} />
+              )}
             </div>
           )}
 
           {step === 4 && (
             <div>
-              <p className="mb-2 text-sm text-slate-600">Application selection</p>
+              <p className="mb-2 text-sm text-slate-600">Application catalog IDs</p>
               <div className="flex flex-wrap gap-2">
-                {appOptions.map((app) => (
+                {appCatalogOptions.map((app) => (
                   <button
                     key={app}
                     type="button"
+                    disabled={app === requiredApp}
                     onClick={() => toggleApp(app)}
-                    className={`rounded-lg border px-4 py-2 text-sm ${form.apps.includes(app) ? 'border-brand bg-brand text-white' : 'border-slate-300'}`}
+                    className={`rounded-lg border px-4 py-2 text-sm ${form.apps.includes(app) ? 'border-brand bg-brand text-white' : 'border-slate-300'} ${app === requiredApp ? 'cursor-not-allowed opacity-90' : ''}`}
                   >
                     {app}
+                    {app === requiredApp ? ' (required)' : ''}
                   </button>
                 ))}
               </div>
@@ -200,8 +241,11 @@ export default function NewTenantPage() {
               <p><strong>Contact:</strong> {form.contactEmail || '—'}</p>
               <p><strong>Sizing:</strong> {form.size}</p>
               <p><strong>Network:</strong> {ipPreview}</p>
-              <p><strong>Auth:</strong> {form.authMode} ({form.connectorHost || 'no connector host'})</p>
-              <p><strong>Apps:</strong> {form.apps.join(', ') || '—'}</p>
+              <p><strong>Auth:</strong> {form.authMode}</p>
+              {form.authMode === 'EntraID' && <p><strong>EntraID Tenant ID:</strong> {form.entraTenantId || '—'}</p>}
+              {form.authMode === 'LDAP' && <p><strong>LDAP URL:</strong> {form.ldapUrl || '—'}</p>}
+              {form.authMode === 'Local User' && <p><strong>Local Admin Email:</strong> {form.localAdminEmail || '—'}</p>}
+              <p><strong>Apps:</strong> {Array.from(new Set([requiredApp, ...form.apps])).join(', ')}</p>
               <p><strong>Maintenance:</strong> {form.maintenanceWindow}</p>
             </div>
           )}

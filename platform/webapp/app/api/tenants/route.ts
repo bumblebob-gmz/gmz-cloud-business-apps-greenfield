@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createTenant, listTenants } from '@/lib/data-store';
-import type { CreateTenantInput, TenantSize } from '@/lib/types';
+import type { AuthMode, CreateTenantInput, TenantSize } from '@/lib/types';
 
 export async function GET() {
   const items = await listTenants();
@@ -10,7 +10,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const body = (await request.json()) as Partial<CreateTenantInput>;
 
-  if (!body.name || !body.customer || !body.region || !body.size || body.vlan == null) {
+  if (!body.name || !body.customer || !body.region || !body.size || body.vlan == null || !body.authMode || !body.contactEmail || !body.maintenanceWindow) {
     return NextResponse.json({ error: 'Missing required tenant fields.' }, { status: 400 });
   }
 
@@ -19,9 +19,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid tenant size.' }, { status: 400 });
   }
 
+  const authModes: AuthMode[] = ['EntraID', 'LDAP', 'Local User'];
+  if (!authModes.includes(body.authMode)) {
+    return NextResponse.json({ error: 'Invalid auth mode.' }, { status: 400 });
+  }
+
   const vlan = Number(body.vlan);
   if (!Number.isInteger(vlan) || vlan < 2 || vlan > 4094) {
     return NextResponse.json({ error: 'VLAN must be an integer between 2 and 4094.' }, { status: 400 });
+  }
+
+  const apps = Array.isArray(body.apps) ? body.apps.filter((app): app is string => typeof app === 'string' && app.trim().length > 0) : [];
+  if (!apps.includes('authentik')) {
+    return NextResponse.json({ error: 'authentik is required.' }, { status: 400 });
+  }
+
+  const authConfig = body.authConfig ?? {};
+  if (body.authMode === 'EntraID' && !authConfig.entraTenantId) {
+    return NextResponse.json({ error: 'EntraID Tenant ID is required.' }, { status: 400 });
+  }
+  if (body.authMode === 'LDAP' && !authConfig.ldapUrl) {
+    return NextResponse.json({ error: 'LDAP URL is required.' }, { status: 400 });
+  }
+  if (body.authMode === 'Local User' && !authConfig.localAdminEmail) {
+    return NextResponse.json({ error: 'Local admin email is required.' }, { status: 400 });
   }
 
   const { tenant, job } = await createTenant({
@@ -29,7 +50,16 @@ export async function POST(request: Request) {
     customer: body.customer,
     region: body.region,
     size: body.size,
-    vlan
+    vlan,
+    authMode: body.authMode,
+    authConfig: {
+      entraTenantId: authConfig.entraTenantId,
+      ldapUrl: authConfig.ldapUrl,
+      localAdminEmail: authConfig.localAdminEmail
+    },
+    apps,
+    maintenanceWindow: body.maintenanceWindow,
+    contactEmail: body.contactEmail
   });
 
   return NextResponse.json({ item: tenant, job }, { status: 201 });

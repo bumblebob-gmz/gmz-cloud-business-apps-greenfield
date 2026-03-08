@@ -113,6 +113,16 @@ export async function listJobs(): Promise<Job[]> {
   return data.jobs;
 }
 
+export async function getJobById(id: string): Promise<Job | null> {
+  const data = await readStore();
+  return data.jobs.find((job) => job.id === id) ?? null;
+}
+
+export async function getTenantByName(name: string): Promise<Tenant | null> {
+  const data = await readStore();
+  return data.tenants.find((tenant) => tenant.name === name) ?? null;
+}
+
 export async function listDeployments() {
   const data = await readStore();
   return data.deployments;
@@ -149,7 +159,12 @@ export async function createTenant(input: CreateTenantInput): Promise<{ tenant: 
     status: 'Provisioning',
     size: input.size,
     vlan: input.vlan,
-    ipAddress: `10.${input.vlan}.10.100`
+    ipAddress: `10.${input.vlan}.10.100`,
+    authMode: input.authMode,
+    authConfig: input.authConfig,
+    apps: input.apps,
+    maintenanceWindow: input.maintenanceWindow,
+    contactEmail: input.contactEmail
   };
 
   const job: Job = {

@@ -7,11 +7,12 @@ Next.js + TypeScript + Tailwind MVP scaffold for tenant operations.
 - App Router structure
 - Dashboard with live tenant/job stats loaded from API
 - Customers/Tenants list loaded from API
-- Tenant creation wizard (7-step flow) posting to API
+- Tenant creation wizard (7-step flow) posting to API with catalog-based app selection and auth-mode specific payload
 - Management VM Setup Wizard with dry-run plan generation
 - Deployments page (API-driven)
 - Reports page (API-driven + CSV export)
 - Jobs page (API-driven + quick create form)
+- Job detail page at `/jobs/[id]` with related tenant context
 - Lightweight local JSON persistence (`.data/store.json`)
 - API routes under `app/api/*` with local data-flow behavior
 
@@ -35,6 +36,19 @@ Open: `http://localhost:3000`
 - `GET /api/reports`
 - `GET /api/reports.csv` → downloads reports as CSV
 - `POST /api/setup/plan` → generates a dry-run setup plan (checks, commands, masked credentials)
+
+## Operator flow notes
+
+- Tenant wizard apps are now app catalog IDs:
+  - `authentik` (always selected/required)
+  - `nextcloud`, `it-tools`, `paperless-ngx`, `vaultwarden`, `bookstack`, `joplin`, `libretranslate`, `ollama`, `openwebui`, `searxng`, `snipe-it`, `wiki-js`
+- Authentication step now matches operator requirement:
+  - `EntraID` → sends `authConfig.entraTenantId`
+  - `LDAP` → sends `authConfig.ldapUrl`
+  - `Local User` → sends `authConfig.localAdminEmail`
+- Tenant create API validates required auth fields and requires `authentik` in `apps`
+- Job IDs are clickable from dashboard and jobs table, opening `/jobs/[id]`
+- Job detail page resolves local job + tenant context from `.data/store.json`
 
 ## Data persistence behavior
 

@@ -1,6 +1,8 @@
 export type TenantStatus = 'Active' | 'Provisioning' | 'Paused';
 export type TenantSize = 'S' | 'M' | 'L' | 'XL';
 
+export type AuthMode = 'EntraID' | 'LDAP' | 'Local User';
+
 export type Tenant = {
   id: string;
   name: string;
@@ -10,6 +12,15 @@ export type Tenant = {
   size: TenantSize;
   vlan: number;
   ipAddress: string;
+  authMode?: AuthMode;
+  authConfig?: {
+    entraTenantId?: string;
+    ldapUrl?: string;
+    localAdminEmail?: string;
+  };
+  apps?: string[];
+  maintenanceWindow?: string;
+  contactEmail?: string;
 };
 
 export type JobStatus = 'Queued' | 'Running' | 'Success' | 'Failed';
@@ -55,6 +66,15 @@ export type CreateTenantInput = {
   region: string;
   size: TenantSize;
   vlan: number;
+  authMode: AuthMode;
+  authConfig: {
+    entraTenantId?: string;
+    ldapUrl?: string;
+    localAdminEmail?: string;
+  };
+  apps: string[];
+  maintenanceWindow: string;
+  contactEmail: string;
 };
 
 export type CreateJobInput = {
