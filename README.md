@@ -132,11 +132,14 @@ Danach in CI/Review freigeben, dann deploybar machen.
 
 ## 7) Setup-Wizard / Architektur lesen
 
-- Architektur: `docs/ARCHITECTURE.md`
+- PRD: `docs/PRD.md`
+- Architektur (v1): `docs/ARCHITECTURE.md`
+- Architektur (implementierungsnah): `docs/ARCHITECTURE-V2.md`
 - BMAD Roadmap: `docs/BMAD-ROADMAP.md`
 - Management-VM Wizard: `docs/MANAGEMENT-VM-SETUP-WIZARD.md`
 - App-Katalog-Spec: `docs/APP-CATALOG-SPEC.md`
 - Branding-Seed: `docs/BRANDING-SEED.md`
+- BMAD-Artefakte (Brainstorming → Plan → Review): `docs/bmad/`
 
 ---
 
