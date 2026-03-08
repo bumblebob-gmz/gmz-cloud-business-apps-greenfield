@@ -1,0 +1,18 @@
+---
+- name: Nightly updates per tenant maintenance window
+  hosts: tenant
+  become: true
+  tasks:
+    - name: Pull newest container images
+      community.docker.docker_compose_v2:
+        project_src: /opt/gmz/apps
+        pull: always
+
+    - name: Recreate updated containers
+      community.docker.docker_compose_v2:
+        project_src: /opt/gmz/apps
+        state: present
+
+    - name: TODO healthchecks + rollback trigger hook
+      ansible.builtin.debug:
+        msg: "Healthcheck/rollback integration follows in next iteration"

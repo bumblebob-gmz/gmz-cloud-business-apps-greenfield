@@ -1,0 +1,4 @@
+---
+- name: TODO render selected app templates from GMZ app catalog
+  ansible.builtin.debug:
+    msg: "Catalog render + deploy pipeline follows (includes per-tenant variables and secrets)"

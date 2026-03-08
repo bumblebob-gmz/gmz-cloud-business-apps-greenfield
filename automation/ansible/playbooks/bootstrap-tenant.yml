@@ -1,0 +1,8 @@
+---
+- name: Bootstrap tenant VM
+  hosts: tenant
+  become: true
+  roles:
+    - role: common-hardening
+    - role: docker-runtime
+    - role: authentik-bootstrap

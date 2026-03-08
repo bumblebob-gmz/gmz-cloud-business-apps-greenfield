@@ -1,0 +1,11 @@
+id: authentik
+name: Authentik
+version: 0.1.0
+status: draft
+supportsBranding: true
+supportsSSO: true
+requires: []
+exposes:
+  - service: authentik
+    port: 8080
+    hostPattern: authentik.{tenant}.irongeeks.eu

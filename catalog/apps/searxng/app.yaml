@@ -1,0 +1,11 @@
+id: searxng
+name: SearXNG
+version: 0.1.0
+status: draft
+supportsBranding: true
+supportsSSO: true
+requires: []
+exposes:
+  - service: searxng
+    port: 8080
+    hostPattern: searxng.{tenant}.irongeeks.eu

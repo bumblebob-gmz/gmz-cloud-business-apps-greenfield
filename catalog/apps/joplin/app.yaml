@@ -1,0 +1,11 @@
+id: joplin
+name: Joplin Server
+version: 0.1.0
+status: draft
+supportsBranding: false
+supportsSSO: true
+requires: []
+exposes:
+  - service: joplin
+    port: 8080
+    hostPattern: joplin.{tenant}.irongeeks.eu

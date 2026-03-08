@@ -1,0 +1,11 @@
+id: paperless-ngx
+name: Paperless-ngx
+version: 0.1.0
+status: draft
+supportsBranding: false
+supportsSSO: true
+requires: []
+exposes:
+  - service: paperless-ngx
+    port: 8080
+    hostPattern: paperless-ngx.{tenant}.irongeeks.eu

@@ -1,0 +1,11 @@
+id: wiki-js
+name: Wiki.js
+version: 0.1.0
+status: draft
+supportsBranding: true
+supportsSSO: true
+requires: []
+exposes:
+  - service: wiki-js
+    port: 8080
+    hostPattern: wiki-js.{tenant}.irongeeks.eu

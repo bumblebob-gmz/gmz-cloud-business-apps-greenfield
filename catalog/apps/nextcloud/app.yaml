@@ -1,0 +1,11 @@
+id: nextcloud
+name: Nextcloud
+version: 0.1.0
+status: draft
+supportsBranding: true
+supportsSSO: true
+requires: []
+exposes:
+  - service: nextcloud
+    port: 8080
+    hostPattern: nextcloud.{tenant}.irongeeks.eu

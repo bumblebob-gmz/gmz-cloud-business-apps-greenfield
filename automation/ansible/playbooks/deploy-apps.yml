@@ -1,0 +1,6 @@
+---
+- name: Deploy tenant app stack
+  hosts: tenant
+  become: true
+  roles:
+    - role: catalog-deployer

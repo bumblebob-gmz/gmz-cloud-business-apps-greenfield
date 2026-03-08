@@ -1,0 +1,11 @@
+id: openwebui
+name: OpenWebUI
+version: 0.1.0
+status: draft
+supportsBranding: true
+supportsSSO: true
+requires: []
+exposes:
+  - service: openwebui
+    port: 8080
+    hostPattern: openwebui.{tenant}.irongeeks.eu

@@ -1,0 +1,11 @@
+id: vaultwarden
+name: Vaultwarden
+version: 0.1.0
+status: draft
+supportsBranding: true
+supportsSSO: true
+requires: []
+exposes:
+  - service: vaultwarden
+    port: 8080
+    hostPattern: vaultwarden.{tenant}.irongeeks.eu

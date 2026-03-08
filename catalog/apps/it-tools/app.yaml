@@ -1,0 +1,11 @@
+id: it-tools
+name: IT Tools
+version: 0.1.0
+status: draft
+supportsBranding: false
+supportsSSO: false
+requires: []
+exposes:
+  - service: it-tools
+    port: 8080
+    hostPattern: it-tools.{tenant}.irongeeks.eu

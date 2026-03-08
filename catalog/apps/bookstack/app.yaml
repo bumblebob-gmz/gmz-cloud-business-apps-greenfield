@@ -1,0 +1,11 @@
+id: bookstack
+name: BookStack
+version: 0.1.0
+status: draft
+supportsBranding: true
+supportsSSO: true
+requires: []
+exposes:
+  - service: bookstack
+    port: 8080
+    hostPattern: bookstack.{tenant}.irongeeks.eu

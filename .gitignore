@@ -1,0 +1,25 @@
+# Terraform/OpenTofu
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+
+# Ansible
+*.retry
+
+# Node / webapp
+node_modules/
+.next/
+dist/
+
+# OS/Editor
+.DS_Store
+.vscode/
+.idea/
+
+# Secrets
+.env
+.env.*
+!.env.example

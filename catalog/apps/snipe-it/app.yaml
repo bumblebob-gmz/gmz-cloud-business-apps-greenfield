@@ -1,0 +1,11 @@
+id: snipe-it
+name: Snipe-IT
+version: 0.1.0
+status: draft
+supportsBranding: true
+supportsSSO: true
+requires: []
+exposes:
+  - service: snipe-it
+    port: 8080
+    hostPattern: snipe-it.{tenant}.irongeeks.eu

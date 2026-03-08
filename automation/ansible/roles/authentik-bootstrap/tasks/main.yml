@@ -1,0 +1,10 @@
+---
+- name: Ensure authentik directory exists
+  ansible.builtin.file:
+    path: /opt/gmz/apps/authentik
+    state: directory
+    mode: '0755'
+
+- name: TODO deploy authentik base stack
+  ansible.builtin.debug:
+    msg: "Authentik bootstrap template will be injected from catalog in next iteration"

@@ -1,0 +1,2 @@
+[tenant]
+tenant-kunde-a ansible_host=10.120.10.100 ansible_user=debian

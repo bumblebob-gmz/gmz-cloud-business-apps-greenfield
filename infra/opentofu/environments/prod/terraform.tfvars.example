@@ -1,0 +1,17 @@
+proxmox_endpoint = "https://proxmox.local:8006/api2/json"
+proxmox_username = "gmz-automation@pve"
+proxmox_password = "CHANGE_ME"
+proxmox_insecure = true
+
+tenant_name        = "kunde-a"
+node_name          = "pve01"
+vm_id              = 21001
+vlan_id            = 120
+cores              = 4
+memory_mb          = 6144
+disk_gb            = 200
+storage            = "local-lvm"
+debian_template_id = 9000
+bridge             = "vmbr0"
+ci_user            = "debian"
+ssh_public_key     = "ssh-ed25519 AAAA..."
