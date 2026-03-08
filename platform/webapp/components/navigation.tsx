@@ -9,7 +9,8 @@ const navItems = [
   { href: '/tenants/new', label: 'New Tenant' },
   { href: '/setup', label: 'Setup Wizard' },
   { href: '/deployments', label: 'Deployments' },
-  { href: '/reports', label: 'Reports' }
+  { href: '/reports', label: 'Reports' },
+  { href: '/jobs', label: 'Jobs' }
 ];
 
 export function Navigation() {

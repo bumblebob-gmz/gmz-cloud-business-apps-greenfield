@@ -9,8 +9,9 @@ Next.js + TypeScript + Tailwind MVP scaffold for tenant operations.
 - Customers/Tenants list loaded from API
 - Tenant creation wizard (7-step flow) posting to API
 - Management VM Setup Wizard with dry-run plan generation
-- Deployments page
-- Reports page
+- Deployments page (API-driven)
+- Reports page (API-driven + CSV export)
+- Jobs page (API-driven + quick create form)
 - Lightweight local JSON persistence (`.data/store.json`)
 - API routes under `app/api/*` with local data-flow behavior
 
@@ -29,9 +30,10 @@ Open: `http://localhost:3000`
 - `GET /api/tenants`
 - `POST /api/tenants` → creates tenant and automatically queues provisioning job
 - `GET /api/jobs`
-- `POST /api/jobs`
+- `POST /api/jobs` → creates a job in local JSON store
 - `GET /api/deployments`
 - `GET /api/reports`
+- `GET /api/reports.csv` → downloads reports as CSV
 - `POST /api/setup/plan` → generates a dry-run setup plan (checks, commands, masked credentials)
 
 ## Data persistence behavior
