@@ -5,13 +5,13 @@ Next.js + TypeScript + Tailwind MVP scaffold for tenant operations.
 ## Included
 
 - App Router structure
-- Dashboard with tenant stats + mock jobs table
-- Customers/Tenants list
-- Tenant creation wizard (7-step flow)
+- Dashboard with live tenant/job stats loaded from API
+- Customers/Tenants list loaded from API
+- Tenant creation wizard (7-step flow) posting to API
 - Deployments page
 - Reports page
-- Local mock data (`lib/mock-data.ts`)
-- Mock API routes under `app/api/*`
+- Lightweight local JSON persistence (`.data/store.json`)
+- API routes under `app/api/*` with local data-flow behavior
 
 ## Run locally
 
@@ -26,8 +26,15 @@ Open: `http://localhost:3000`
 ## API endpoints
 
 - `GET /api/tenants`
+- `POST /api/tenants` → creates tenant and automatically queues provisioning job
 - `GET /api/jobs`
+- `POST /api/jobs`
 - `GET /api/deployments`
 - `GET /api/reports`
 
-All endpoints return local mock JSON for MVP development.
+## Data persistence behavior
+
+- Data is stored in `.data/store.json` (auto-created on first request)
+- Initial seed records are written once if the data file does not exist
+- No external database required
+- New tenant creations immediately show up on Dashboard and Customers pages

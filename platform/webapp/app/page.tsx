@@ -1,16 +1,49 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
 import { StatCard } from '@/components/stat-card';
-import { jobs, tenants } from '@/lib/mock-data';
+import type { Job, Tenant } from '@/lib/types';
 
 export default function DashboardPage() {
-  const active = tenants.filter((t) => t.status === 'Active').length;
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [tenantsRes, jobsRes] = await Promise.all([
+          fetch('/api/tenants', { cache: 'no-store' }),
+          fetch('/api/jobs', { cache: 'no-store' })
+        ]);
+
+        if (!tenantsRes.ok || !jobsRes.ok) {
+          throw new Error('Failed to load dashboard data');
+        }
+
+        const tenantsData = (await tenantsRes.json()) as { items: Tenant[] };
+        const jobsData = (await jobsRes.json()) as { items: Job[] };
+
+        setTenants(tenantsData.items);
+        setJobs(jobsData.items);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, []);
+
+  const active = useMemo(() => tenants.filter((t) => t.status === 'Active').length, [tenants]);
+  const provisioning = useMemo(() => tenants.filter((t) => t.status === 'Provisioning').length, [tenants]);
 
   return (
     <PageShell title="Dashboard" subtitle="Multi-tenant platform health and recent execution jobs.">
       <div className="grid gap-4 md:grid-cols-3">
-        <StatCard label="Total Tenants" value={String(tenants.length)} hint="Across all regions" />
-        <StatCard label="Active Tenants" value={String(active)} hint="Running in production" />
-        <StatCard label="Provisioning Queue" value="4" hint="2 require approval" />
+        <StatCard label="Total Tenants" value={loading ? '—' : String(tenants.length)} hint="Across all regions" />
+        <StatCard label="Active Tenants" value={loading ? '—' : String(active)} hint="Running in production" />
+        <StatCard label="Provisioning Queue" value={loading ? '—' : String(provisioning)} hint="Pending setup jobs" />
       </div>
 
       <section className="panel overflow-hidden">

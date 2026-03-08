@@ -2,14 +2,15 @@
 
 import { FormEvent, useMemo, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
+import type { Tenant } from '@/lib/types';
 
 type FormState = {
   customerName: string;
   tenantName: string;
   contactEmail: string;
+  region: string;
   size: 'S' | 'M' | 'L' | 'XL';
   vlan: string;
-  baseIp: string;
   authMode: 'SAML' | 'OIDC' | 'LDAP';
   connectorHost: string;
   connectorToken: string;
@@ -17,19 +18,28 @@ type FormState = {
   maintenanceWindow: string;
 };
 
+type TenantCreateResponse = {
+  item: Tenant;
+  job: {
+    id: string;
+  };
+};
+
 const appOptions = ['CRM', 'Billing', 'Document Hub', 'Analytics'];
 const steps = ['Customer Basics', 'Sizing', 'Network', 'Authentication', 'Apps', 'Maintenance', 'Review'];
 
 export default function NewTenantPage() {
   const [step, setStep] = useState(0);
-  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>({
     customerName: '',
     tenantName: '',
     contactEmail: '',
+    region: 'eu-central-1',
     size: 'M',
     vlan: '140',
-    baseIp: '10.14.0.0/24',
     authMode: 'OIDC',
     connectorHost: '',
     connectorToken: '',
@@ -37,7 +47,13 @@ export default function NewTenantPage() {
     maintenanceWindow: 'Sundays 02:00-04:00 CET'
   });
 
-  const ipPreview = useMemo(() => `VLAN ${form.vlan} → ${form.baseIp}`, [form.vlan, form.baseIp]);
+  const ipPreview = useMemo(() => {
+    const vlan = Number(form.vlan);
+    if (!Number.isInteger(vlan) || vlan < 2 || vlan > 4094) {
+      return 'Invalid VLAN (2-4094 required)';
+    }
+    return `VLAN ${vlan} → 10.${vlan}.10.100`;
+  }, [form.vlan]);
 
   const toggleApp = (app: string) => {
     setForm((prev) => ({
@@ -46,9 +62,48 @@ export default function NewTenantPage() {
     }));
   };
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setSubmitting(true);
+
+    try {
+      const response = await fetch('/api/tenants', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: form.tenantName,
+          customer: form.customerName,
+          region: form.region,
+          size: form.size,
+          vlan: Number(form.vlan)
+        })
+      });
+
+      if (!response.ok) {
+        const body = (await response.json()) as { error?: string };
+        throw new Error(body.error ?? 'Could not create tenant');
+      }
+
+      const payload = (await response.json()) as TenantCreateResponse;
+      setSuccessMessage(`Tenant ${payload.item.name} created. Provisioning job ${payload.job.id} queued.`);
+      setStep(0);
+      setForm((prev) => ({
+        ...prev,
+        customerName: '',
+        tenantName: '',
+        contactEmail: '',
+        connectorHost: '',
+        connectorToken: ''
+      }));
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -64,10 +119,11 @@ export default function NewTenantPage() {
 
         <form className="space-y-6" onSubmit={submit}>
           {step === 0 && (
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
               <Field label="Customer Name" value={form.customerName} onChange={(value) => setForm({ ...form, customerName: value })} />
               <Field label="Tenant Name" value={form.tenantName} onChange={(value) => setForm({ ...form, tenantName: value })} />
               <Field label="Contact Email" value={form.contactEmail} onChange={(value) => setForm({ ...form, contactEmail: value })} />
+              <Field label="Region" value={form.region} onChange={(value) => setForm({ ...form, region: value })} />
             </div>
           )}
 
@@ -92,7 +148,9 @@ export default function NewTenantPage() {
           {step === 2 && (
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="VLAN" value={form.vlan} onChange={(value) => setForm({ ...form, vlan: value })} />
-              <Field label="IP Range" value={form.baseIp} onChange={(value) => setForm({ ...form, baseIp: value })} />
+              <div className="rounded-xl bg-slate-100 p-3 text-sm text-slate-700">
+                VM Static IP (fixed rule): <span className="font-mono">10.&lt;VLAN-ID&gt;.10.100</span>
+              </div>
               <div className="rounded-xl bg-slate-100 p-3 text-sm text-slate-700 md:col-span-2">Preview: {ipPreview}</div>
             </div>
           )}
@@ -149,18 +207,21 @@ export default function NewTenantPage() {
           )}
 
           <div className="flex items-center justify-between">
-            <button type="button" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))} className="rounded-lg border border-slate-300 px-4 py-2 text-sm disabled:opacity-50">Back</button>
+            <button type="button" disabled={step === 0 || submitting} onClick={() => setStep((s) => Math.max(0, s - 1))} className="rounded-lg border border-slate-300 px-4 py-2 text-sm disabled:opacity-50">Back</button>
             <div className="flex gap-2">
               {step < steps.length - 1 && (
-                <button type="button" onClick={() => setStep((s) => Math.min(steps.length - 1, s + 1))} className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white">Next</button>
+                <button type="button" disabled={submitting} onClick={() => setStep((s) => Math.min(steps.length - 1, s + 1))} className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-60">Next</button>
               )}
               {step === steps.length - 1 && (
-                <button type="submit" className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white">Create Tenant</button>
+                <button type="submit" disabled={submitting} className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-60">
+                  {submitting ? 'Creating…' : 'Create Tenant'}
+                </button>
               )}
             </div>
           </div>
 
-          {submitted && <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">Tenant creation request submitted (mock).</p>}
+          {successMessage && <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{successMessage}</p>}
+          {errorMessage && <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{errorMessage}</p>}
         </form>
       </section>
     </PageShell>

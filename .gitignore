@@ -13,6 +13,7 @@
 node_modules/
 .next/
 dist/
+platform/webapp/.data/
 
 # OS/Editor
 .DS_Store

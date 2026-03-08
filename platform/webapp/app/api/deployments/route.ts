@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { deployments } from '@/lib/mock-data';
+import { listDeployments } from '@/lib/data-store';
 
 export async function GET() {
-  return NextResponse.json({ items: deployments });
+  const items = await listDeployments();
+  return NextResponse.json({ items });
 }

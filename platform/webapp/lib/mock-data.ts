@@ -1,38 +1,4 @@
-export type Tenant = {
-  id: string;
-  name: string;
-  customer: string;
-  region: string;
-  status: 'Active' | 'Provisioning' | 'Paused';
-  size: 'S' | 'M' | 'L' | 'XL';
-  vlan: number;
-  ipRange: string;
-};
-
-export type Job = {
-  id: string;
-  tenant: string;
-  task: string;
-  status: 'Queued' | 'Running' | 'Success' | 'Failed';
-  startedAt: string;
-};
-
-export type Deployment = {
-  id: string;
-  tenant: string;
-  version: string;
-  env: 'Staging' | 'Production';
-  status: 'Healthy' | 'Warning' | 'Failed';
-  updatedAt: string;
-};
-
-export type Report = {
-  id: string;
-  title: string;
-  owner: string;
-  period: string;
-  generatedAt: string;
-};
+import type { Deployment, Job, Report, Tenant } from '@/lib/types';
 
 export const tenants: Tenant[] = [
   {
@@ -43,7 +9,7 @@ export const tenants: Tenant[] = [
     status: 'Active',
     size: 'M',
     vlan: 120,
-    ipRange: '10.12.20.0/24'
+    ipAddress: '10.120.10.100'
   },
   {
     id: 'tn-002',
@@ -53,7 +19,7 @@ export const tenants: Tenant[] = [
     status: 'Provisioning',
     size: 'L',
     vlan: 130,
-    ipRange: '10.13.40.0/24'
+    ipAddress: '10.130.10.100'
   },
   {
     id: 'tn-003',
@@ -63,7 +29,7 @@ export const tenants: Tenant[] = [
     status: 'Paused',
     size: 'S',
     vlan: 115,
-    ipRange: '10.11.30.0/24'
+    ipAddress: '10.115.10.100'
   }
 ];
 
