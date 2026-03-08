@@ -8,10 +8,11 @@ Standardisierte, versionierte und erweiterbare App-Definitionen für Tenant-Depl
 catalog/apps/
   authentik/
     app.yaml
-    compose.yaml
+    compose.template.yml
     vars.schema.json
-    branding.schema.json
-    healthchecks.yaml
+    # optional in späteren Sprints:
+    # branding.schema.json
+    # healthchecks.yaml
   nextcloud/
     ...
 ```
