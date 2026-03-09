@@ -20,7 +20,9 @@ export const RBAC_POLICY = {
   'POST /api/provision/tenant': 'technician',
   'POST /api/setup/plan': 'technician',
   'GET /api/audit/events': 'admin',
-  'GET /api/auth/health': 'admin'
+  'GET /api/auth/health': 'admin',
+  'POST /api/auth/rotation/plan': 'admin',
+  'POST /api/auth/rotation/simulate': 'admin'
 };
 
 /** @param {UserRole} role @param {UserRole} minimumRole */

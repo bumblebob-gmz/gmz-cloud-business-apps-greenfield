@@ -40,6 +40,8 @@ Open: `http://localhost:3000`
 - `POST /api/provision/tenant` → creates a provisioning job, returns OpenTofu + Ansible command plan, and supports guarded execution
 - `GET /api/audit/events?limit=50` → returns latest internal audit events from local JSONL store (sanitized)
 - `GET /api/auth/health` → admin-only auth posture summary (mode + safe trusted-token health counts: total/active/expired/expiringSoon + warningDays + dev role switch state)
+- `POST /api/auth/rotation/plan` → admin-only safe rotation checklist with overlap/cutover guidance and current auth health summary (no token secrets)
+- `POST /api/auth/rotation/simulate` → admin-only metadata-only impact simulation (`tokenId`, `userId`, `role`, `expiresAt`), returns expired/expiringSoon/active counts and priority actions; rejects secret-like fields (`token`, `password`, `secret`) with `400`
 
 ## Auth modes + RBAC (current MVP)
 
@@ -74,6 +76,8 @@ RBAC policy:
 - Protected write endpoints require at least `technician`.
 - `GET /api/audit/events` requires `admin`.
 - `GET /api/auth/health` requires `admin`.
+- `POST /api/auth/rotation/plan` requires `admin`.
+- `POST /api/auth/rotation/simulate` requires `admin`.
 - Auth denials (`401`/`403`) emit an audit event (`auth.guard.denied`) with operation, required/effective role, and auth mode.
 - RBAC denials return `403` with role + requiredRole in JSON body.
 

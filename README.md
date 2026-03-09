@@ -197,8 +197,10 @@ RBAC-Rollen:
   - `POST /api/jobs`
   - `POST /api/provision/tenant`
   - `POST /api/setup/plan`
-- `admin`: umfasst aktuell `technician` + Zugriff auf `GET /api/audit/events` und `GET /api/auth/health`
+- `admin`: umfasst aktuell `technician` + Zugriff auf `GET /api/audit/events`, `GET /api/auth/health`, `POST /api/auth/rotation/plan`, `POST /api/auth/rotation/simulate`
   - `/api/auth/health` liefert nur sichere Aggregationen (keine Tokenwerte): `total`, `active`, `expired`, `expiringSoon`, `warningDays`
+  - `/api/auth/rotation/plan` liefert eine sichere Rotation-Checkliste inkl. Overlap-/Cutover-Hinweisen und aktueller Auth-Health-Zusammenfassung
+  - `/api/auth/rotation/simulate` akzeptiert nur Metadaten (`tokenId`, `userId`, `role`, `expiresAt`) und liefert Impact-Counts + Prioritätsaktionen; Payloads mit `token`/`password`/`secret` werden mit `400` abgewiesen
 
 Bei fehlender Rolle liefern Endpoints `403` mit Rolle + benötigter Rolle im Response-Body.
 Auth-Guards schreiben bei `401`/`403` zusätzlich ein `auth.guard.denied`-Audit-Event (inkl. Operation, required/effective role, auth mode).
