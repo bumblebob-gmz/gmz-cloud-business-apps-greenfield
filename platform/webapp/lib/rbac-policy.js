@@ -18,6 +18,7 @@ export const RBAC_POLICY = {
   'GET /api/deployments': 'readonly',
   'GET /api/reports': 'readonly',
   'GET /api/reports.csv': 'readonly',
+  'POST /api/reports/generate': 'admin',
   'GET /api/provision/preflight': 'readonly',
   'POST /api/provision/tenant': 'technician',
   'POST /api/setup/plan': 'technician',

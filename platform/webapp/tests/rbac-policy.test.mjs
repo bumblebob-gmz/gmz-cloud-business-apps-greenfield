@@ -22,6 +22,7 @@ test('policy requirements for protected GET and POST endpoints', () => {
   assert.equal(getRequiredRoleForOperation('GET /api/deployments'), 'readonly');
   assert.equal(getRequiredRoleForOperation('GET /api/reports'), 'readonly');
   assert.equal(getRequiredRoleForOperation('GET /api/reports.csv'), 'readonly');
+  assert.equal(getRequiredRoleForOperation('POST /api/reports/generate'), 'admin');
   assert.equal(getRequiredRoleForOperation('GET /api/provision/preflight'), 'readonly');
   assert.equal(getRequiredRoleForOperation('POST /api/tenants'), 'technician');
   assert.equal(getRequiredRoleForOperation('POST /api/jobs'), 'technician');

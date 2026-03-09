@@ -10,6 +10,7 @@ export const RBAC_POLICY: {
   readonly 'GET /api/deployments': 'readonly';
   readonly 'GET /api/reports': 'readonly';
   readonly 'GET /api/reports.csv': 'readonly';
+  readonly 'POST /api/reports/generate': 'admin';
   readonly 'GET /api/provision/preflight': 'readonly';
   readonly 'POST /api/provision/tenant': 'technician';
   readonly 'POST /api/setup/plan': 'technician';
