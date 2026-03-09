@@ -1,0 +1,44 @@
+name: Gate Artifact Publisher
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-gate-bundle:
+    name: "Build & Upload Gate Evidence Bundle"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build gate evidence bundle
+        env:
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          BUNDLE_OUT_DIR: gate-bundle
+        run: |
+          chmod +x ops/scripts/build-gate-bundle.sh
+          ops/scripts/build-gate-bundle.sh --out-dir gate-bundle
+
+      - name: Upload gate evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: g2-gate-evidence
+          path: gate-bundle/
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Print bundle index
+        if: always()
+        run: |
+          echo "=== Gate Bundle Contents ==="
+          ls -lh gate-bundle/
+          echo ""
+          cat gate-bundle/index.md
