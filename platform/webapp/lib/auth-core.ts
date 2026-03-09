@@ -1,5 +1,5 @@
 export type UserRole = 'readonly' | 'technician' | 'admin';
-export type AuthMode = 'dev-header' | 'trusted-bearer' | 'jwt';
+export type AuthMode = 'dev-header' | 'trusted-bearer' | 'jwt' | 'vault';
 
 export type AuthContext = {
   userId: string;
@@ -76,6 +76,7 @@ function isDevHeaderAllowed(env: NodeJS.ProcessEnv): boolean {
 export function resolveAuthMode(env: NodeJS.ProcessEnv = process.env): AuthMode {
   if (env.WEBAPP_AUTH_MODE === 'trusted-bearer') return 'trusted-bearer';
   if (env.WEBAPP_AUTH_MODE === 'jwt') return 'jwt';
+  if (env.WEBAPP_AUTH_MODE === 'vault') return 'vault';
   if (env.WEBAPP_AUTH_MODE === 'dev-header') {
     if (isDevHeaderAllowed(env)) return 'dev-header';
     // dev-header requested but not permitted — fall through to fail-safe default
@@ -109,6 +110,14 @@ export function assertAuthModeSafe(
     } else {
       logger.warn(msg);
     }
+  }
+
+  // [SEC-005] Guard: vault auth mode is not yet implemented — reject at startup regardless of environment
+  if (env.WEBAPP_AUTH_MODE === 'vault') {
+    const msg =
+      '[SEC-005] Vault auth mode is not yet implemented. Use trusted-bearer or jwt.';
+    logger.error(msg);
+    throw new Error(msg);
   }
 
   // Extra guard: if someone somehow forces dev-header env vars in production, refuse to start

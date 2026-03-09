@@ -52,9 +52,21 @@ export type VaultLeaseInfo = {
 /**
  * Wraps a Vault Kubernetes/AppRole auth response into an AbstractToken.
  *
+ * **DESIGN STUB — NOT WIRED INTO PRODUCTION.**
+ * This function models the intended interface for a future Vault integration
+ * (Kubernetes auth / AppRole login) but is not called by any production code path.
+ * Full Vault SDK wiring is out of scope for the current slice.
+ * Do NOT enable WEBAPP_AUTH_MODE=vault; assertAuthModeSafe() will throw at startup.
+ *
  * In a real integration this would be called after a successful
  * `POST /v1/auth/kubernetes/login` or `POST /v1/auth/approle/login`
  * request to the Vault API.
+ *
+ * @param params.clientToken - Raw Vault client token from the login response
+ * @param params.userId      - Logical identity to associate with the token
+ * @param params.role        - RBAC role resolved from Vault policies
+ * @param params.lease       - Vault lease metadata (ID, duration, renewability)
+ * @param params.now         - Optional epoch ms override for testing
  */
 export function buildVaultToken(params: {
   clientToken: string;
@@ -77,6 +89,17 @@ export function buildVaultToken(params: {
 
 /**
  * Wraps an OIDC JWT result into an AbstractToken.
+ *
+ * **DESIGN STUB — NOT WIRED INTO PRODUCTION.**
+ * This function shapes the interface for wrapping OIDC/JWT tokens into the
+ * common AbstractToken abstraction. The actual JWT validation and claims
+ * extraction are handled by `jwt-oidc.ts`; this builder is a helper stub
+ * for unit tests and future integration plumbing.
+ *
+ * @param params.raw    - Raw JWT string from the Authorization header
+ * @param params.userId - Logical user ID from the `sub` or custom claim
+ * @param params.role   - RBAC role resolved from the JWT claims
+ * @param params.exp    - Optional JWT `exp` claim (seconds since epoch)
  */
 export function buildOidcToken(params: {
   raw: string;
@@ -140,12 +163,16 @@ export type VaultRenewResult = { renewed: true; newExpiresAt: string } | { renew
 /**
  * Stub: renews a Vault token lease via `PUT /v1/sys/leases/renew`.
  *
- * A production implementation would call the Vault HTTP API using the
- * VAULT_ADDR and VAULT_TOKEN environment variables (or Vault Agent socket).
+ * **DESIGN STUB — NOT WIRED INTO PRODUCTION.**
+ * This function is a placeholder for the Vault lease renewal flow. It always
+ * returns `{ renewed: false }` and performs no network calls. A production
+ * implementation would call the Vault HTTP API using the VAULT_ADDR and
+ * VAULT_TOKEN environment variables (or Vault Agent socket).
+ * Do NOT enable WEBAPP_AUTH_MODE=vault; assertAuthModeSafe() will throw at startup.
  *
- * @param token      The abstract token with a Vault lease ID to renew
- * @param vaultAddr  Vault server address (e.g. https://vault.example.com)
- * @param vaultToken Vault management token with `sys/leases/renew` capability
+ * @param token      - The abstract token with a Vault lease ID to renew
+ * @param _vaultAddr  - Vault server address (e.g. https://vault.example.com) — unused in stub
+ * @param _vaultToken - Vault management token with `sys/leases/renew` capability — unused in stub
  */
 export async function renewVaultLease(
   token: AbstractToken,

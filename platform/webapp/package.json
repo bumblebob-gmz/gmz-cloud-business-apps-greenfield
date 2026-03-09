@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:rbac": "node --experimental-strip-types --test tests/rbac-policy.test.mjs tests/rbac-policy-coverage.test.ts tests/auth-context.test.ts tests/token-rotation.test.ts tests/audit-filters.test.ts tests/auth-alerts.test.ts tests/notification-config.test.ts tests/alert-dispatch.test.ts tests/provisioning-sizemap.test.mjs tests/traefik-config.test.mjs tests/audit-emit-provision-deploy.test.ts tests/opentofu-auth.test.mjs tests/tenant-policy-constraints.test.ts tests/rate-limiter.test.ts",
+    "test:rbac": "node --experimental-strip-types --test tests/rbac-policy.test.mjs tests/rbac-policy-coverage.test.ts tests/auth-context.test.ts tests/vault-token.test.ts tests/token-rotation.test.ts tests/audit-filters.test.ts tests/auth-alerts.test.ts tests/notification-config.test.ts tests/alert-dispatch.test.ts tests/provisioning-sizemap.test.mjs tests/traefik-config.test.mjs tests/audit-emit-provision-deploy.test.ts tests/opentofu-auth.test.mjs tests/tenant-policy-constraints.test.ts tests/rate-limiter.test.ts",
     "db:generate": "prisma generate",
     "db:migrate": "node --experimental-strip-types scripts/db-migrate.ts",
     "db:migrate:seed": "node --experimental-strip-types scripts/db-migrate.ts --seed",
