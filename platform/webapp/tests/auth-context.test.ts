@@ -6,6 +6,7 @@ import {
   parseTrustedTokensJson,
   resolveAuthMode,
   getAuthContextFromRequest,
+  getTrustedTokenExpiryWarningDays,
   getTrustedTokenHealthSummary
 } from '../lib/auth-core.ts';
 import { requireProtectedOperation } from '../lib/auth-context.ts';
@@ -75,16 +76,23 @@ test('trusted-bearer mode rejects missing/invalid/expired bearer token auth cont
   );
 });
 
-test('trusted token health summary returns safe counts only', () => {
+test('trusted token health summary returns safe counts with expiringSoon signal', () => {
   const summary = getTrustedTokenHealthSummary(
     JSON.stringify([
       { token: 'a', userId: 'u1', role: 'readonly' },
-      { token: 'b', userId: 'u2', role: 'admin', expiresAt: '2000-01-01T00:00:00.000Z' }
+      { token: 'b', userId: 'u2', role: 'admin', expiresAt: '2026-01-10T00:00:00.000Z' },
+      { token: 'c', userId: 'u3', role: 'admin', expiresAt: '2000-01-01T00:00:00.000Z' }
     ]),
-    Date.parse('2026-01-01T00:00:00.000Z')
+    { now: Date.parse('2026-01-01T00:00:00.000Z'), warningDays: 14 }
   );
 
-  assert.deepEqual(summary, { total: 2, expired: 1, active: 1 });
+  assert.deepEqual(summary, { total: 3, expired: 1, active: 2, expiringSoon: 1, warningDays: 14 });
+});
+
+test('trusted token expiry warning days defaults to 14 and accepts valid env override', () => {
+  assert.equal(getTrustedTokenExpiryWarningDays({} as NodeJS.ProcessEnv), 14);
+  assert.equal(getTrustedTokenExpiryWarningDays({ WEBAPP_TRUSTED_TOKEN_EXPIRY_WARNING_DAYS: '7' } as NodeJS.ProcessEnv), 7);
+  assert.equal(getTrustedTokenExpiryWarningDays({ WEBAPP_TRUSTED_TOKEN_EXPIRY_WARNING_DAYS: '-1' } as NodeJS.ProcessEnv), 14);
 });
 
 test('requireProtectedOperation emits denied audit payload for 401 and 403 decisions', async () => {

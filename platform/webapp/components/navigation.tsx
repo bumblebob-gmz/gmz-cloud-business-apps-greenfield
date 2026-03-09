@@ -11,7 +11,8 @@ const navItems = [
   { href: '/setup', label: 'Setup Wizard' },
   { href: '/deployments', label: 'Deployments' },
   { href: '/reports', label: 'Reports' },
-  { href: '/jobs', label: 'Jobs' }
+  { href: '/jobs', label: 'Jobs' },
+  { href: '/admin/security', label: 'Admin Security' }
 ];
 
 export function Navigation() {

@@ -8,6 +8,7 @@ import {
 } from './rbac-policy.js';
 import {
   getAuthContextFromRequest,
+  getTrustedTokenExpiryWarningDays,
   getTrustedTokenHealthSummary,
   parseTrustedTokensJson,
   resolveAuthMode,
@@ -25,7 +26,15 @@ export type RbacOperation = keyof typeof RBAC_POLICY;
 
 const UNAUTHORIZED_MESSAGE = 'Unauthorized: valid bearer token required for trusted-bearer mode.';
 
-export { getAuthContextFromRequest, parseTrustedTokensJson, resolveAuthMode, hasMinimumRole, getRequiredRoleForOperation, getTrustedTokenHealthSummary };
+export {
+  getAuthContextFromRequest,
+  parseTrustedTokensJson,
+  resolveAuthMode,
+  hasMinimumRole,
+  getRequiredRoleForOperation,
+  getTrustedTokenExpiryWarningDays,
+  getTrustedTokenHealthSummary
+};
 
 export function authorizeOperation(auth: AuthContext, operation: RbacOperation) {
   return authorizeOperationWithPolicy(auth, operation);

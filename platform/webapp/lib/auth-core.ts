@@ -18,11 +18,14 @@ export type TrustedTokenHealthSummary = {
   total: number;
   expired: number;
   active: number;
+  expiringSoon: number;
+  warningDays: number;
 };
 
 const DEFAULT_USER_ID = 'dev-user';
 const DEFAULT_ROLE: UserRole = 'technician';
 const DEFAULT_AUTH_MODE: AuthMode = 'dev-header';
+const DEFAULT_TOKEN_EXPIRY_WARNING_DAYS = 14;
 
 function normalizeRole(input: string | null | undefined): UserRole {
   const role = input?.trim().toLowerCase();
@@ -45,6 +48,21 @@ function normalizeIsoTimestamp(input: unknown): string | null {
 function isTrustedTokenExpired(entry: TrustedTokenEntry, now = Date.now()): boolean {
   if (!entry.expiresAt) return false;
   return Date.parse(entry.expiresAt) <= now;
+}
+
+export function getTrustedTokenExpiryWarningDays(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.WEBAPP_TRUSTED_TOKEN_EXPIRY_WARNING_DAYS;
+  const parsed = Number.parseInt(raw ?? '', 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_TOKEN_EXPIRY_WARNING_DAYS;
+  return parsed;
+}
+
+function isTrustedTokenExpiringSoon(entry: TrustedTokenEntry, warningDays: number, now = Date.now()): boolean {
+  if (!entry.expiresAt) return false;
+  const expiresAtMs = Date.parse(entry.expiresAt);
+  if (expiresAtMs <= now) return false;
+  const warningWindowMs = warningDays * 24 * 60 * 60 * 1000;
+  return expiresAtMs <= now + warningWindowMs;
 }
 
 export function resolveAuthMode(env: NodeJS.ProcessEnv = process.env): AuthMode {
@@ -91,15 +109,20 @@ export function parseTrustedTokensJson(raw: string | undefined): TrustedTokenEnt
 
 export function getTrustedTokenHealthSummary(
   rawTrustedTokensJson: string | undefined,
-  now = Date.now()
+  options: { now?: number; warningDays?: number; env?: NodeJS.ProcessEnv } = {}
 ): TrustedTokenHealthSummary {
+  const now = options.now ?? Date.now();
+  const warningDays = options.warningDays ?? getTrustedTokenExpiryWarningDays(options.env);
   const trustedTokens = parseTrustedTokensJson(rawTrustedTokensJson);
   const expired = trustedTokens.filter((entry) => isTrustedTokenExpired(entry, now)).length;
+  const expiringSoon = trustedTokens.filter((entry) => isTrustedTokenExpiringSoon(entry, warningDays, now)).length;
 
   return {
     total: trustedTokens.length,
     expired,
-    active: trustedTokens.length - expired
+    active: trustedTokens.length - expired,
+    expiringSoon,
+    warningDays
   };
 }
 

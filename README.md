@@ -180,6 +180,8 @@ Die WebApp unterstützt zwei Auth-Modi:
   - Rückwärtskompatibel: Einträge ohne `expiresAt` bleiben gültig.
   - Ignoriert `x-user-id` / `x-user-role` in diesem Modus.
   - Fehlender/ungültiger/abgelaufener Token auf geschützten Endpoints => `401 Unauthorized`.
+  - Optionale Warning-Window-Konfiguration für Token-Rotation in `GET /api/auth/health`:
+    - `WEBAPP_TRUSTED_TOKEN_EXPIRY_WARNING_DAYS` (Default: `14`)
 
 RBAC-Rollen:
 
@@ -196,6 +198,7 @@ RBAC-Rollen:
   - `POST /api/provision/tenant`
   - `POST /api/setup/plan`
 - `admin`: umfasst aktuell `technician` + Zugriff auf `GET /api/audit/events` und `GET /api/auth/health`
+  - `/api/auth/health` liefert nur sichere Aggregationen (keine Tokenwerte): `total`, `active`, `expired`, `expiringSoon`, `warningDays`
 
 Bei fehlender Rolle liefern Endpoints `403` mit Rolle + benötigter Rolle im Response-Body.
 Auth-Guards schreiben bei `401`/`403` zusätzlich ein `auth.guard.denied`-Audit-Event (inkl. Operation, required/effective role, auth mode).

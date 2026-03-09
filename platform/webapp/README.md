@@ -13,6 +13,7 @@ Next.js + TypeScript + Tailwind MVP scaffold for tenant operations.
 - Reports page (API-driven + CSV export)
 - Jobs page (API-driven + quick create form)
 - Job detail page at `/jobs/[id]` with related tenant context
+- Admin Security page at `/admin/security` (auth health + latest audit events with client-side filters)
 - Lightweight local JSON persistence (`.data/store.json`)
 - API routes under `app/api/*` with local data-flow behavior
 
@@ -38,7 +39,7 @@ Open: `http://localhost:3000`
 - `POST /api/setup/plan` → generates a dry-run setup plan (checks, commands, masked credentials)
 - `POST /api/provision/tenant` → creates a provisioning job, returns OpenTofu + Ansible command plan, and supports guarded execution
 - `GET /api/audit/events?limit=50` → returns latest internal audit events from local JSONL store (sanitized)
-- `GET /api/auth/health` → admin-only auth posture summary (mode + safe trusted-token counts + dev role switch state)
+- `GET /api/auth/health` → admin-only auth posture summary (mode + safe trusted-token health counts: total/active/expired/expiringSoon + warningDays + dev role switch state)
 
 ## Auth modes + RBAC (current MVP)
 
@@ -62,6 +63,8 @@ Open: `http://localhost:3000`
   - Backward compatible: entries without `expiresAt` remain valid.
   - In this mode, `x-user-id` / `x-user-role` are ignored.
   - Missing/invalid/expired bearer token on protected endpoints returns `401`.
+  - Optional token-rotation warning window for `/api/auth/health`:
+    - `WEBAPP_TRUSTED_TOKEN_EXPIRY_WARNING_DAYS` (default: `14`)
 
 RBAC policy:
 

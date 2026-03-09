@@ -7,7 +7,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     authMode: resolveAuthMode(),
-    trustedTokens: getTrustedTokenHealthSummary(process.env.WEBAPP_TRUSTED_TOKENS_JSON),
+    trustedTokens: getTrustedTokenHealthSummary(process.env.WEBAPP_TRUSTED_TOKENS_JSON, { env: process.env }),
     devRoleSwitchEnabled: process.env.NEXT_PUBLIC_ENABLE_DEV_ROLE_SWITCH === 'true'
   });
 }
