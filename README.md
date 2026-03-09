@@ -197,13 +197,15 @@ RBAC-Rollen:
   - `POST /api/jobs`
   - `POST /api/provision/tenant`
   - `POST /api/setup/plan`
-- `admin`: umfasst aktuell `technician` + Zugriff auf `GET /api/audit/events`, `GET /api/audit/events.csv`, `GET /api/auth/health`, `GET /api/auth/alerts`, `POST /api/auth/rotation/plan`, `POST /api/auth/rotation/simulate`
+- `admin`: umfasst aktuell `technician` + Zugriff auf `GET /api/audit/events`, `GET /api/audit/events.csv`, `GET /api/auth/health`, `GET /api/auth/alerts`, `POST /api/auth/rotation/plan`, `POST /api/auth/rotation/simulate`, `GET /api/alerts/config`, `POST /api/alerts/config`, `POST /api/alerts/test`, `POST /api/auth/alerts/dispatch`
   - `/api/audit/events` unterstützt serverseitige Filter: `limit`, `outcome`, `actionContains`, `operationContains`, `since`
   - `/api/audit/events.csv` exportiert dieselben gefilterten Events als CSV (nur admin)
   - `/api/auth/health` liefert nur sichere Aggregationen (keine Tokenwerte): `total`, `active`, `expired`, `expiringSoon`, `warningDays`
   - `/api/auth/alerts` liefert handlungsorientierte Token-Risiko-Hinweise (`critical|warning|info`) mit Empfehlungen, ohne Secrets
   - `/api/auth/rotation/plan` liefert eine sichere Rotation-Checkliste inkl. Overlap-/Cutover-Hinweisen und aktueller Auth-Health-Zusammenfassung
   - `/api/auth/rotation/simulate` akzeptiert nur Metadaten (`tokenId`, `userId`, `role`, `expiresAt`) und liefert Impact-Counts + Prioritätsaktionen; Payloads mit `token`/`password`/`secret` werden mit `400` abgewiesen
+  - Alert-Channel-Konfiguration erfolgt in `/admin/security` über Teams-Webhook und SMTP-Felder; Secrets werden serverseitig persistent gespeichert, in API/UI-Reads aber maskiert.
+  - `/api/alerts/test` sendet einen Test, `/api/auth/alerts/dispatch` sendet aktuelle Auth-Alerts an aktivierte, routing-freigegebene Kanäle und gibt pro Kanal Status zurück.
 
 Bei fehlender Rolle liefern Endpoints `403` mit Rolle + benötigter Rolle im Response-Body.
 Auth-Guards schreiben bei `401`/`403` zusätzlich ein `auth.guard.denied`-Audit-Event (inkl. Operation, required/effective role, auth mode).

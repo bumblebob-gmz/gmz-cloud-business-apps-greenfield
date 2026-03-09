@@ -31,6 +31,10 @@ test('policy requirements for protected GET and POST endpoints', () => {
   assert.equal(getRequiredRoleForOperation('GET /api/auth/alerts'), 'admin');
   assert.equal(getRequiredRoleForOperation('POST /api/auth/rotation/plan'), 'admin');
   assert.equal(getRequiredRoleForOperation('POST /api/auth/rotation/simulate'), 'admin');
+  assert.equal(getRequiredRoleForOperation('GET /api/alerts/config'), 'admin');
+  assert.equal(getRequiredRoleForOperation('POST /api/alerts/config'), 'admin');
+  assert.equal(getRequiredRoleForOperation('POST /api/alerts/test'), 'admin');
+  assert.equal(getRequiredRoleForOperation('POST /api/auth/alerts/dispatch'), 'admin');
 });
 
 test('denial helper contract returns consistent payload shape', () => {

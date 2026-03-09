@@ -24,7 +24,11 @@ export const RBAC_POLICY = {
   'GET /api/auth/health': 'admin',
   'GET /api/auth/alerts': 'admin',
   'POST /api/auth/rotation/plan': 'admin',
-  'POST /api/auth/rotation/simulate': 'admin'
+  'POST /api/auth/rotation/simulate': 'admin',
+  'GET /api/alerts/config': 'admin',
+  'POST /api/alerts/config': 'admin',
+  'POST /api/alerts/test': 'admin',
+  'POST /api/auth/alerts/dispatch': 'admin'
 };
 
 /** @param {UserRole} role @param {UserRole} minimumRole */

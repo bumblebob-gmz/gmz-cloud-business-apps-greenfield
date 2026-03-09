@@ -63,8 +63,43 @@ type AuditFilters = {
   since: string;
 };
 
+type AlertConfig = {
+  channels: {
+    teams: { enabled: boolean; webhookUrl: string; routes: { authAlerts: boolean; testAlerts: boolean } };
+    email: {
+      enabled: boolean;
+      smtpHost: string;
+      smtpPort: number;
+      smtpSecure: boolean;
+      smtpUser: string;
+      smtpPass: string;
+      from: string;
+      to: string;
+      routes: { authAlerts: boolean; testAlerts: boolean };
+    };
+  };
+};
+
+type AlertStatus = { channel: 'teams' | 'email'; attempted: boolean; ok: boolean; message: string };
+
 const EMPTY_SIM_INPUT: SimInput = { tokenId: '', userId: '', role: 'readonly', expiresAt: '' };
 const DEFAULT_FILTERS: AuditFilters = { limit: 50, outcome: '', actionContains: '', operationContains: '', since: '' };
+const DEFAULT_ALERT_CONFIG: AlertConfig = {
+  channels: {
+    teams: { enabled: false, webhookUrl: '', routes: { authAlerts: true, testAlerts: true } },
+    email: {
+      enabled: false,
+      smtpHost: '',
+      smtpPort: 587,
+      smtpSecure: false,
+      smtpUser: '',
+      smtpPass: '',
+      from: '',
+      to: '',
+      routes: { authAlerts: true, testAlerts: true }
+    }
+  }
+};
 
 export default function AdminSecurityPage() {
   const [health, setHealth] = useState<AuthHealthResponse | null>(null);
@@ -85,25 +120,34 @@ export default function AdminSecurityPage() {
   const [simulateError, setSimulateError] = useState<string | null>(null);
   const [simulateResult, setSimulateResult] = useState<SimResponse['impact'] | null>(null);
 
+  const [alertConfig, setAlertConfig] = useState<AlertConfig>(DEFAULT_ALERT_CONFIG);
+  const [alertSaving, setAlertSaving] = useState(false);
+  const [alertActionLoading, setAlertActionLoading] = useState(false);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+
   useEffect(() => {
     async function load() {
       try {
         setLoading(true);
         setError(null);
 
-        const [healthRes, alertsRes] = await Promise.all([
+        const [healthRes, alertsRes, alertConfigRes] = await Promise.all([
           fetch('/api/auth/health', { cache: 'no-store' }),
-          fetch('/api/auth/alerts', { cache: 'no-store' })
+          fetch('/api/auth/alerts', { cache: 'no-store' }),
+          fetch('/api/alerts/config', { cache: 'no-store' })
         ]);
 
         if (!healthRes.ok) throw new Error(formatAuthError(healthRes.status, 'auth health'));
         if (!alertsRes.ok) throw new Error(formatAuthError(alertsRes.status, 'auth alerts'));
+        if (!alertConfigRes.ok) throw new Error(formatAuthError(alertConfigRes.status, 'alert config'));
 
         const healthData = (await healthRes.json()) as AuthHealthResponse;
         const alertsData = (await alertsRes.json()) as { alerts?: AuthAlert[] };
+        const configData = (await alertConfigRes.json()) as { config?: AlertConfig };
 
         setHealth(healthData);
         setAlerts(alertsData.alerts ?? []);
+        setAlertConfig(configData.config ?? DEFAULT_ALERT_CONFIG);
         await loadAuditEvents(DEFAULT_FILTERS);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load admin security data.');
@@ -195,6 +239,41 @@ export default function AdminSecurityPage() {
       setSimulateResult(null);
     } finally {
       setSimulateLoading(false);
+    }
+  }
+
+  async function saveAlertConfig() {
+    try {
+      setAlertSaving(true);
+      setAlertMessage(null);
+      const response = await fetch('/api/alerts/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(alertConfig)
+      });
+      if (!response.ok) throw new Error(formatAuthError(response.status, 'alert config save'));
+      const data = (await response.json()) as { config?: AlertConfig };
+      setAlertConfig(data.config ?? DEFAULT_ALERT_CONFIG);
+      setAlertMessage('Alert channel configuration saved.');
+    } catch (err) {
+      setAlertMessage(err instanceof Error ? err.message : 'Failed to save alert config.');
+    } finally {
+      setAlertSaving(false);
+    }
+  }
+
+  async function runAlertAction(url: string, okLabel: string) {
+    try {
+      setAlertActionLoading(true);
+      setAlertMessage(null);
+      const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channels: ['teams', 'email'] }) });
+      const data = (await response.json()) as { status?: AlertStatus[]; error?: string };
+      if (!response.ok) throw new Error(data.error ?? formatAuthError(response.status, 'alert dispatch'));
+      setAlertMessage(`${okLabel}: ${(data.status ?? []).map((item) => `${item.channel}=${item.ok ? 'ok' : item.message}`).join(', ') || 'done'}`);
+    } catch (err) {
+      setAlertMessage(err instanceof Error ? err.message : 'Alert action failed.');
+    } finally {
+      setAlertActionLoading(false);
     }
   }
 
@@ -292,6 +371,32 @@ export default function AdminSecurityPage() {
             <Metric label="Warning days" value={simulateResult.warningDays} />
           </div>
         ) : null}
+      </section>
+
+      <section className="panel p-5 space-y-3">
+        <h2 className="text-base font-semibold text-ink">Alert Channels</h2>
+        <div className="grid gap-2 md:grid-cols-2">
+          <label className="text-sm"><input type="checkbox" className="mr-2" checked={alertConfig.channels.teams.enabled} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, teams: { ...v.channels.teams, enabled: e.target.checked } } }))} />Enable Teams</label>
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Teams webhook URL" value={alertConfig.channels.teams.webhookUrl} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, teams: { ...v.channels.teams, webhookUrl: e.target.value } } }))} />
+          <label className="text-sm"><input type="checkbox" className="mr-2" checked={alertConfig.channels.email.enabled} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, email: { ...v.channels.email, enabled: e.target.checked } } }))} />Enable Email</label>
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="SMTP host" value={alertConfig.channels.email.smtpHost} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, email: { ...v.channels.email, smtpHost: e.target.value } } }))} />
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="SMTP port" type="number" value={alertConfig.channels.email.smtpPort} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, email: { ...v.channels.email, smtpPort: Number(e.target.value) || 587 } } }))} />
+          <label className="text-sm"><input type="checkbox" className="mr-2" checked={alertConfig.channels.email.smtpSecure} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, email: { ...v.channels.email, smtpSecure: e.target.checked } } }))} />SMTP secure (TLS)</label>
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="SMTP user" value={alertConfig.channels.email.smtpUser} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, email: { ...v.channels.email, smtpUser: e.target.value } } }))} />
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" type="password" placeholder="SMTP password" value={alertConfig.channels.email.smtpPass} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, email: { ...v.channels.email, smtpPass: e.target.value } } }))} />
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="From" value={alertConfig.channels.email.from} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, email: { ...v.channels.email, from: e.target.value } } }))} />
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Recipients (comma separated)" value={alertConfig.channels.email.to} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, email: { ...v.channels.email, to: e.target.value } } }))} />
+          <label className="text-sm"><input type="checkbox" className="mr-2" checked={alertConfig.channels.teams.routes.authAlerts} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, teams: { ...v.channels.teams, routes: { ...v.channels.teams.routes, authAlerts: e.target.checked } } } }))} />Teams auth alerts</label>
+          <label className="text-sm"><input type="checkbox" className="mr-2" checked={alertConfig.channels.email.routes.authAlerts} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, email: { ...v.channels.email, routes: { ...v.channels.email.routes, authAlerts: e.target.checked } } } }))} />Email auth alerts</label>
+          <label className="text-sm"><input type="checkbox" className="mr-2" checked={alertConfig.channels.teams.routes.testAlerts} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, teams: { ...v.channels.teams, routes: { ...v.channels.teams.routes, testAlerts: e.target.checked } } } }))} />Teams test alerts</label>
+          <label className="text-sm"><input type="checkbox" className="mr-2" checked={alertConfig.channels.email.routes.testAlerts} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, email: { ...v.channels.email, routes: { ...v.channels.email.routes, testAlerts: e.target.checked } } } }))} />Email test alerts</label>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button className="rounded-xl bg-brand px-4 py-2 text-sm font-medium text-white" onClick={saveAlertConfig} disabled={alertSaving}>{alertSaving ? 'Saving…' : 'Save config'}</button>
+          <button className="rounded-xl border border-slate-300 px-4 py-2 text-sm" onClick={() => runAlertAction('/api/alerts/test', 'Test sent')} disabled={alertActionLoading}>Send test</button>
+          <button className="rounded-xl border border-slate-300 px-4 py-2 text-sm" onClick={() => runAlertAction('/api/auth/alerts/dispatch', 'Auth alerts dispatched')} disabled={alertActionLoading}>Dispatch current auth alerts</button>
+        </div>
+        {alertMessage ? <p className="text-sm text-slate-700">{alertMessage}</p> : null}
       </section>
 
       <section className="panel p-5 space-y-4">

@@ -17,6 +17,10 @@ export const RBAC_POLICY: {
   readonly 'GET /api/auth/alerts': 'admin';
   readonly 'POST /api/auth/rotation/plan': 'admin';
   readonly 'POST /api/auth/rotation/simulate': 'admin';
+  readonly 'GET /api/alerts/config': 'admin';
+  readonly 'POST /api/alerts/config': 'admin';
+  readonly 'POST /api/alerts/test': 'admin';
+  readonly 'POST /api/auth/alerts/dispatch': 'admin';
 };
 
 export function hasMinimumRole(role: UserRole, minimumRole: UserRole): boolean;
