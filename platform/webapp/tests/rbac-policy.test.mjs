@@ -38,6 +38,7 @@ test('policy requirements for protected GET and POST endpoints', () => {
   assert.equal(getRequiredRoleForOperation('POST /api/auth/alerts/dispatch'), 'admin');
   assert.equal(getRequiredRoleForOperation('GET /api/tenants/:id/traefik-config'), 'admin');
   assert.equal(getRequiredRoleForOperation('GET /api/tenants/:id/ansible-inventory'), 'admin');
+  assert.equal(getRequiredRoleForOperation('GET /api/monitoring/status'), 'admin');
 });
 
 test('ansible-inventory endpoint requires admin role', () => {

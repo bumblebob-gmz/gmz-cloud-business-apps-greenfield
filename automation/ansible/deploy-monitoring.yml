@@ -1,0 +1,6 @@
+---
+- name: Deploy Monitoring Stack
+  hosts: management
+  become: yes
+  roles:
+    - monitoring

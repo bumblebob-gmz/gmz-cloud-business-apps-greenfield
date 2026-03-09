@@ -1,0 +1,28 @@
+---
+- name: Create monitoring directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /opt/monitoring
+    - /opt/monitoring/prometheus
+    - /opt/monitoring/grafana/provisioning/datasources
+    - /opt/monitoring/grafana/provisioning/dashboards
+    - /opt/monitoring/promtail
+
+- name: Template monitoring files
+  copy:
+    src: "{{ playbook_dir }}/../../infra/monitoring/{{ item }}"
+    dest: "/opt/monitoring/{{ item }}"
+  loop:
+    - docker-compose.yml
+    - prometheus/prometheus.yml
+    - grafana/provisioning/datasources/datasources.yaml
+    - grafana/provisioning/dashboards/dashboards.yaml
+    - promtail/config.yml
+
+- name: Start monitoring stack
+  docker_compose:
+    project_src: /opt/monitoring
+    state: present

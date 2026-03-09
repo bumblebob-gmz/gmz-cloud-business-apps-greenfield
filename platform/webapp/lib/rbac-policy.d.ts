@@ -24,6 +24,7 @@ export const RBAC_POLICY: {
   readonly 'POST /api/alerts/test': 'admin';
   readonly 'POST /api/alerts/preview-routing': 'admin';
   readonly 'POST /api/auth/alerts/dispatch': 'admin';
+  readonly 'GET /api/monitoring/status': 'admin';
 };
 
 export function hasMinimumRole(role: UserRole, minimumRole: UserRole): boolean;

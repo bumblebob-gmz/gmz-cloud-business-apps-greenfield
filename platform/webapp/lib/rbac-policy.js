@@ -31,7 +31,8 @@ export const RBAC_POLICY = {
   'POST /api/alerts/config': 'admin',
   'POST /api/alerts/test': 'admin',
   'POST /api/alerts/preview-routing': 'admin',
-  'POST /api/auth/alerts/dispatch': 'admin'
+  'POST /api/auth/alerts/dispatch': 'admin',
+  'GET /api/monitoring/status': 'admin'
 };
 
 /** @param {UserRole} role @param {UserRole} minimumRole */
