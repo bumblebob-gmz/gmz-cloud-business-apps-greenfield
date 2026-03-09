@@ -5,7 +5,7 @@ import {
   getRequiredRoleForOperation,
   authorizeOperation,
   buildDeniedPayload
-} from '../lib/rbac-policy.js';
+} from '../lib/rbac-policy.ts';
 
 test('role ranking works for readonly/technician/admin', () => {
   assert.equal(hasMinimumRole('readonly', 'readonly'), true);

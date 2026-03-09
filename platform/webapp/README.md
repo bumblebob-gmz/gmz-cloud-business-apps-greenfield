@@ -214,3 +214,117 @@ Errors:
 - Initial seed records are written once if the data file does not exist
 - No external database required
 - New tenant creations immediately show up on Dashboard and Customers pages
+
+## Storage backends
+
+The webapp supports two storage backends selected at runtime via `DATABASE_URL`:
+
+| Backend | Trigger | Notes |
+|---|---|---|
+| File (default) | `DATABASE_URL` not set | JSON stored in `.data/store.json` + `.data/audit-events.jsonl` |
+| PostgreSQL | `DATABASE_URL=postgresql://…` | Full Prisma ORM; requires applied migrations |
+
+A startup health check (`instrumentation.ts`) verifies whichever backend is active at boot time, failing fast before serving any traffic if the backend is unreachable or the schema is out of date.
+
+### Validating the database schema
+
+```bash
+# Check schema is valid + report pending migrations
+npm run db:validate
+
+# Generate Prisma client after schema changes
+npm run db:generate
+
+# Apply all pending migrations
+npm run db:migrate
+```
+
+## Migrating from file storage to PostgreSQL
+
+Follow these steps to move from `.data/` file storage to a PostgreSQL database.
+
+### 1. Provision a PostgreSQL instance
+
+Use any PostgreSQL 14+ provider (self-hosted, RDS, Supabase, Neon, etc.).
+
+```bash
+# Example — local Docker for testing
+docker run -d \
+  --name gmz-pg \
+  -e POSTGRES_USER=gmz \
+  -e POSTGRES_PASSWORD=secret \
+  -e POSTGRES_DB=gmz_cloud \
+  -p 5432:5432 \
+  postgres:16-alpine
+```
+
+### 2. Set environment variables
+
+```bash
+export DATABASE_URL="postgresql://gmz:secret@localhost:5432/gmz_cloud"
+```
+
+Add this to your `.env.local` (never commit to version control).
+
+### 3. Apply migrations
+
+```bash
+cd platform/webapp
+npm run db:migrate
+```
+
+This runs `prisma migrate deploy` (or the custom `scripts/db-migrate.ts` wrapper) which creates all tables in the target database.
+
+Verify everything looks correct:
+
+```bash
+npm run db:validate
+```
+
+### 4. Seed initial data (optional)
+
+To pre-populate the database with the same seed records used by the file backend:
+
+```bash
+npm run db:migrate:seed
+```
+
+### 5. Migrate existing file data (manual)
+
+If you have production data in `.data/store.json` and `.data/audit-events.jsonl` that you want to preserve:
+
+1. Export file data as JSON:
+   ```bash
+   cat .data/store.json | jq .
+   cat .data/audit-events.jsonl
+   ```
+
+2. Transform and insert each entity via the Prisma Studio UI or a custom migration script:
+   ```bash
+   npm run db:studio
+   ```
+   Open `http://localhost:5555` and insert records into `tenants`, `jobs`, `deployments`, `reports`, and `audit_events`.
+
+3. Verify row counts match your file data before switching traffic.
+
+### 6. Switch traffic to PostgreSQL
+
+Restart the application with `DATABASE_URL` set. The startup health check will:
+- Connect to PostgreSQL
+- Confirm all schema tables exist
+- Log `[startup:health-check] backend=postgresql ok`
+
+If any table is missing the app will refuse to start and print a clear error message.
+
+### 7. Back up the old files
+
+```bash
+tar -czf .data-backup-$(date +%Y%m%d).tar.gz .data/
+```
+
+Keep the backup until you've confirmed the PostgreSQL deployment is stable.
+
+### Rollback
+
+To revert to file storage: unset `DATABASE_URL` and restart.  
+The `.data/` files are untouched by the PostgreSQL migration.

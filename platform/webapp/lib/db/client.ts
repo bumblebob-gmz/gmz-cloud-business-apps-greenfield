@@ -1,5 +1,11 @@
 /**
- * Prisma client singleton.
+ * Prisma client singleton — canonical source of truth for backend selection.
+ *
+ * `isDatabaseEnabled()` is the single, centralised check for whether PostgreSQL
+ * is the active backend.  All data-access layers (data-store.ts, audit.ts,
+ * notification-config.ts) import it from here.  Route handlers must NOT call
+ * this function directly — they interact exclusively through the data-access
+ * layer public API.
  *
  * Only instantiated when DATABASE_URL is configured.
  * Falls back to file-based storage otherwise.

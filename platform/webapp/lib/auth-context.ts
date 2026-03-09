@@ -4,8 +4,9 @@ import {
   authorizeOperation as authorizeOperationWithPolicy,
   buildDeniedPayload,
   getRequiredRoleForOperation,
-  hasMinimumRole
-} from './rbac-policy.js';
+  hasMinimumRole,
+  type RbacOperation
+} from './rbac-policy.ts';
 import {
   assertAuthModeSafe,
   getAuthContextFromRequest,
@@ -24,7 +25,7 @@ import { appendAuditEvent, buildAuditEvent, getCorrelationIdFromRequest } from '
 
 export type { UserRole, AuthMode, AuthContext, TrustedTokenEntry, TrustedTokenHealthSummary };
 
-export type RbacOperation = keyof typeof RBAC_POLICY;
+export type { RbacOperation };
 
 const UNAUTHORIZED_MESSAGE = 'Unauthorized: valid bearer token required for trusted-bearer mode.';
 
