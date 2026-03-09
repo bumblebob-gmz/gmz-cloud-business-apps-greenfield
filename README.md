@@ -1,269 +1,223 @@
 # GMZ Cloud Business Apps
 
-Interne Control-Plane für ein Multi-Tenant Hosting auf Proxmox 9 (LVM-Thin/Ceph),
-mit Provisioning via OpenTofu, Konfiguration via Ansible und App-Deployment via Docker Compose.
+> Interne Control-Plane für Multi-Tenant Hosting auf Proxmox — provisioniert, deployt und verwaltet Kunden-VMs vollautomatisch.
 
-## Ziele
-- Pro Tenant genau **1 Debian 13 VM**
-- VLAN-separiert (UniFi-gesteuert), statische IP: `10.<VLAN-ID>.10.100`
-- Zentrales Traefik mit Domain-Schema: `service.kunde.irongeeks.eu`
-- Pro Tenant immer Authentik + SSO für nachgelagerte Services
-- Interne moderne WebApp (Desktop/Tablet/Mobile)
-- Reporting (PDF/CSV): Kunde, User, Storage, Services, Health
-- Nightly Updates je Tenant mit Wartungsfenster, Healthchecks, Auto-Rollback
+[![CI](https://github.com/bumblebob-gmz/gmz-cloud-business-apps-greenfield/actions/workflows/ci.yml/badge.svg)](https://github.com/bumblebob-gmz/gmz-cloud-business-apps-greenfield/actions)
+[![Security](https://github.com/bumblebob-gmz/gmz-cloud-business-apps-greenfield/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/bumblebob-gmz/gmz-cloud-business-apps-greenfield/actions)
+
+---
+
+## Überblick
+
+GMZ Cloud Business Apps ist eine vollständige **Self-Hosted Cloud-Management-Plattform** für Managed-Service-Provider. Sie automatisiert den gesamten Lifecycle von Kunden-Umgebungen — von der VM-Provisionierung über App-Deployment bis hin zu automatischen Nightly-Updates mit gesundheitsgeprüftem Rollback.
+
+**Stack:** Next.js · OpenTofu · Ansible · Docker Compose · Traefik · PostgreSQL · Prometheus · Grafana · Loki
+
+---
+
+## Architektur
+
+```
+Internet
+    │
+    ▼
+┌───────────────────────────────────────────────────────────────┐
+│  Traefik (Management-VM)                                      │
+│  *.kunde.irongeeks.eu  →  IONOS DNS ACME  →  Let's Encrypt   │
+└────────────────┬──────────────────────────────────────────────┘
+                 │
+     ┌───────────┴───────────┐
+     ▼                       ▼
+┌──────────────┐    ┌──────────────────────────────────────────┐
+│ Control-Plane│    │  Tenant-VMs (Debian 13, VLAN-isoliert)   │
+│ WebApp       │    │                                          │
+│ :3000        │    │  VLAN 120 → 10.120.10.100 (Kunde A)      │
+│              │    │  VLAN 130 → 10.130.10.100 (Kunde B)      │
+│ PostgreSQL   │    │  VLAN 140 → 10.140.10.100 (Kunde C)      │
+│ Monitoring   │    │                                          │
+└──────────────┘    │  Je VM: Authentik + Apps via Compose     │
+                    └──────────────────────────────────────────┘
+```
+
+---
+
+## Features
+
+### Control-Plane WebApp
+- 🏢 **Tenant-Management** — Anlegen, Verwalten, Status-Übersicht aller Kunden-VMs
+- 🚀 **Provisionierung** — Vollautomatisch Wizard → OpenTofu → Ansible → `active`
+- 📦 **App-Katalog** — 14 vorkonfigurierte Apps (Authentik, Nextcloud, Documenso, u.v.m.)
+- 🔐 **RBAC** — Rollenmodell `admin` / `technician` / `readonly` auf allen API-Routen
+- 📋 **Audit-Log** — Vollständiges Ereignisprotokoll aller Aktionen
+- 🔔 **Alerts** — Teams + E-Mail Benachrichtigungen mit Severity-Routing
+- 📊 **Reporting** — PDF/CSV-Export (Tenants, Audit-Events, Provisioning)
+- 🔑 **Auth-Modi** — `trusted-bearer`, `jwt` (OIDC/Vault), `dev-header` (nur Dev)
+
+### Infrastruktur
+- 🌐 **Traefik** — Automatisches TLS via IONOS DNS ACME Challenge
+- 📡 **Monitoring** — Prometheus + Grafana + Loki + Promtail + Alertmanager
+- 🔄 **Nightly Updates** — Snapshot → Update → Healthcheck → Auto-Rollback
+- 🛡️ **Security CI** — gitleaks (Secret-Scan) + checkov (IaC-Lint) auf jedem PR
+- 🗄️ **State Backend** — OpenTofu Remote State via S3/MinIO (per-Tenant isoliert)
 
 ---
 
 ## Projektstatus
 
-- [x] Requirements konsolidiert
-- [x] Architekturentwurf v1
-- [x] BMAD-Roadmap v1
-- [x] Repo-Skeleton
-- [x] Traefik IONOS DNS ACME config + Ansible role
-- [x] Ansible provision-tenant.yml playbook
-- [x] Webapp: `/api/tenants/:id/ansible-inventory` (admin-only)
-- [ ] Produktive Umsetzung der Provisioning-/Deploy-Pipeline
+| Bereich | Status |
+|---|---|
+| Control-Plane WebApp (Next.js) | ✅ Produktionsbereit |
+| RBAC + Auth (trusted-bearer, JWT/OIDC) | ✅ Vollständig |
+| Audit-Logging | ✅ Vollständig |
+| Tenant-Provisionierung (OpenTofu + Ansible) | ✅ Vollständig |
+| App-Katalog (14 Apps) | ✅ Vollständig |
+| Traefik + IONOS DNS ACME | ✅ Vollständig |
+| Monitoring Stack | ✅ Vollständig |
+| Nightly Updates + Rollback | ✅ Vollständig |
+| PostgreSQL Integration | ✅ Vollständig |
+| PDF/CSV Reporting | ✅ Vollständig |
+| Security CI Pack | ✅ Vollständig |
+| Documenso Integration | ✅ Vollständig |
+| Security Hardening (Code Review) | ✅ Abgeschlossen |
 
 ---
 
-## Struktur
+## Schnellstart
 
-```text
-infra/
-  opentofu/              # Proxmox VM-Provisioning
-  traefik/               # Traefik static + dynamic config (IONOS DNS ACME)
-automation/
-  ansible/               # Hardening, Docker, App-Deploy, Updates
-    roles/traefik/       # Ansible role: deploy Traefik on management VM
-    deploy-traefik.yml   # Playbook: deploy Traefik
-    provision-tenant.yml # Playbook: full tenant provisioning (bootstrap + apps + Traefik)
-catalog/
-  apps/                  # Git-basierter App-Katalog
-platform/
-  webapp/                # Interne Control-Plane UI
-ops/
-  scripts/               # Hilfsskripte (z. B. Proxmox API Bootstrap)
-docs/                    # Architektur, Roadmap, Spezifikationen
+→ **[Vollständige Setup-Anleitung lesen](docs/SETUP-GUIDE.md)**
+
+### Kurzübersicht
+
+```bash
+# 1. Repository klonen
+git clone https://github.com/bumblebob-gmz/gmz-cloud-business-apps-greenfield.git
+cd gmz-cloud-business-apps-greenfield
+
+# 2. Umgebungsvariablen konfigurieren
+cp platform/webapp/.env.example platform/webapp/.env
+# → .env mit eigenen Werten befüllen
+
+# 3. WebApp starten (Development)
+cd platform/webapp
+npm install
+npm run dev
+
+# 4. Traefik deployen (Production)
+cd automation/ansible
+ansible-playbook deploy-traefik.yml -i inventory/production.yml
+
+# 5. Ersten Tenant provisionieren
+# → WebApp öffnen → Tenants → New Tenant
 ```
 
 ---
 
-## Anleitung (Setup / Quickstart)
+## Repo-Struktur
 
-## 1) Voraussetzungen
-
-Benötigt auf der Management-VM (Debian):
-- `git`
-- `opentofu` (>= 1.6)
-- `ansible` (inkl. benötigter Collections)
-- `docker` + `docker compose`
-- Zugriff auf:
-  - Proxmox API
-  - IONOS DNS API
-  - GitHub Repo
-
-Optional lokal für Entwicklung:
-- Node.js 20+
-- pnpm oder npm
-
-## 2) Repository klonen
-
-```bash
-git clone <REPO_URL>
-cd gmz-cloud-business-apps
 ```
-
-## 3) Proxmox API User/Token anlegen
-
-Auf einem Proxmox Node (root) das Helper-Script ausführen:
-
-```bash
-bash ops/scripts/proxmox-api-bootstrap.sh
+gmz-cloud-business-apps/
+├── platform/
+│   └── webapp/              # Next.js Control-Plane (API + UI)
+│       ├── app/api/         # REST API Routes
+│       ├── lib/             # Auth, RBAC, Audit, Provisioning Engine
+│       ├── tests/           # Test Suite (Node.js built-in test runner)
+│       └── prisma/          # Datenbankschema + Migrationen
+├── infra/
+│   ├── opentofu/            # Proxmox VM-Provisioning (IaC)
+│   ├── traefik/             # Traefik Static + Dynamic Config
+│   └── monitoring/          # Prometheus + Grafana + Loki + Alertmanager
+├── automation/
+│   └── ansible/             # Ansible Roles + Playbooks
+│       ├── roles/           # Hardening, Docker, Traefik, Apps, ...
+│       ├── deploy-traefik.yml
+│       └── provision-tenant.yml
+├── catalog/
+│   └── apps/                # App-Katalog (14 Apps)
+│       ├── authentik/
+│       ├── nextcloud/
+│       ├── documenso/
+│       └── ...
+├── ops/
+│   └── scripts/             # Hilfsskripte (Catalog Validator, Gate Bundle, ...)
+├── docs/
+│   ├── SETUP-GUIDE.md       # Vollständige Installations-Anleitung
+│   ├── DOCUMENSO-GUIDE.md   # Documenso-Anleitung
+│   ├── ARCHITECTURE-V2.md   # Architektur-Dokumentation
+│   ├── PRD.md               # Product Requirements
+│   └── bmad/                # BMAD Review Artefakte (REVIEW-001 bis REVIEW-025+)
+└── .github/
+    └── workflows/           # CI/CD Pipelines
+        ├── ci.yml
+        ├── secret-scan.yml  # gitleaks
+        ├── iac-security-lint.yml  # checkov
+        ├── gate-evidence.yml
+        └── nightly-updates.yml
 ```
-
-Danach Token sicher speichern (für Setup-Wizard / OpenTofu Secrets).
-
-## 4) OpenTofu vorbereiten (Tenant-VM Provisioning)
-
-```bash
-cd infra/opentofu/environments/prod
-cp terraform.tfvars.example terraform.tfvars
-# terraform.tfvars mit realen Werten befüllen
-# empfohlen: proxmox_api_token via ENV (TF_VAR_proxmox_api_token) statt Klartext
-```
-
-Security-Default:
-- `proxmox_api_token` statt Username/Passwort
-- `proxmox_insecure = false` (TLS-Verifikation aktiv)
-- Lab-only Override (`true`) nur bewusst und dokumentiert nutzen
-
-Dann:
-
-```bash
-tofu init
-tofu plan
-tofu apply
-```
-
-Damit wird eine Debian-13 Tenant-VM mit VLAN + statischer IP (`10.<VLAN>.10.100`) erstellt.
-
-## 5) Tenant per Ansible bootstrappen
-
-Inventory anlegen/ergänzen:
-
-```bash
-cp automation/ansible/inventory/tenant.ini.example automation/ansible/inventory/tenant.ini
-```
-
-Bootstrap ausführen:
-
-```bash
-ansible-playbook -i automation/ansible/inventory/tenant.ini automation/ansible/playbooks/bootstrap-tenant.yml
-```
-
-App-Deployment:
-
-```bash
-ansible-playbook -i automation/ansible/inventory/tenant.ini automation/ansible/playbooks/deploy-apps.yml
-```
-
-Nightly Updates (manuell testweise):
-
-```bash
-ansible-playbook -i automation/ansible/inventory/tenant.ini automation/ansible/playbooks/nightly-updates.yml
-```
-
-## 6) App-Katalog erweitern
-
-Neue App unter `catalog/apps/<app-id>/` anlegen mit:
-- `app.yaml`
-- `compose.template.yml`
-- `vars.schema.json`
-
-Danach in CI/Review freigeben, dann deploybar machen.
-
-## 7) Platform WebApp Provisioning API (Dry-Run + Execution)
-
-Die Control-Plane (`platform/webapp`) bietet:
-
-- `POST /api/provision/tenant` mit `{ tenantId, dryRun }`
-  - `dryRun: true` (Default): erzeugt Job-Arbeitsverzeichnis + Artefakte, führt nichts aus
-  - `dryRun: false`: führt OpenTofu + Ansible aus (nur wenn Execution-Preflight grün)
-- `GET /api/provision/preflight`
-  - liefert nur sichere Readiness-Flags (present/missing), keine Secrets
-
-Execution-Mode benötigt folgende ENV-Variablen:
-
-- `PROVISION_EXECUTION_ENABLED=true`
-- `PROVISION_PROXMOX_ENDPOINT`
-- `PROVISION_PROXMOX_API_TOKEN`
-- `PROVISION_DEFAULT_SSH_PUBLIC_KEY`
-
-Optionale Defaults (empfohlen):
-
-- `PROVISION_DEFAULT_TENANT_PROFILE`
-- `PROVISION_DEFAULT_NODE`
-- `PROVISION_DEFAULT_STORAGE`
-- `PROVISION_DEBIAN_TEMPLATE_ID`
-
-Pro Job werden Artefakte unter `platform/webapp/.data/provisioning/<jobId>/` erzeugt:
-
-- `tenant.auto.tfvars`
-- `tenant.ini`
-
-## 8) Auth + RBAC (WebApp API)
-
-Die WebApp unterstützt drei Auth-Modi:
-
-- `WEBAPP_AUTH_MODE=trusted-bearer` (**Standard / empfohlen für alle Deployments**)
-  - Fail-safe-Default: aktiv wenn kein gültiger anderer Modus gesetzt ist.
-  - Erwartet `Authorization: Bearer <token>`
-  - Prüft gegen statische Token-Mapping-Env:
-    - `WEBAPP_TRUSTED_TOKENS_JSON=[{"token":"...","userId":"...","role":"admin","tokenId":"ops-admin-2026","expiresAt":"2026-12-31T23:59:59.000Z"}]`
-  - Unterstützte Felder je Token: `token`, `userId`, `role` (required), `tokenId`, `expiresAt` (optional, ISO-Zeitstempel)
-  - Abgelaufene Tokens (`expiresAt` in der Vergangenheit) werden abgewiesen.
-  - Rückwärtskompatibel: Einträge ohne `expiresAt` bleiben gültig.
-  - Ignoriert `x-user-id` / `x-user-role` in diesem Modus.
-  - Fehlender/ungültiger/abgelaufener Token auf geschützten Endpoints => `401 Unauthorized`.
-  - Optionale Warning-Window-Konfiguration für Token-Rotation in `GET /api/auth/health`:
-    - `WEBAPP_TRUSTED_TOKEN_EXPIRY_WARNING_DAYS` (Default: `14`)
-
-- `WEBAPP_AUTH_MODE=dev-header` (⚠️ **NUR LOKAL – NIEMALS IN PRODUKTION** ⚠️)
-  - Vertraut client-seitigen `x-user-id` / `x-user-role`-Headern ohne Authentifizierung.
-  - **Nur aktiv wenn beide Bedingungen erfüllt sind:** `NODE_ENV=development` UND `WEBAPP_ENABLE_DEV_AUTH=true`.
-  - Fällt automatisch auf `trusted-bearer` zurück wenn eine Bedingung fehlt.
-  - Der Startup-Guard `assertAuthModeSafe()` wirft einen Fehler bei Production-Betrieb.
-
-RBAC-Rollen:
-
-- `readonly`: Lesezugriffe auf geschützte GET-Endpunkte:
-  - `GET /api/tenants`
-  - `GET /api/jobs`
-  - `GET /api/deployments`
-  - `GET /api/reports`
-  - `GET /api/reports.csv`
-  - `GET /api/provision/preflight`
-- `technician`: umfasst `readonly` + Mutationen auf:
-  - `POST /api/tenants`
-  - `POST /api/jobs`
-  - `POST /api/provision/tenant`
-  - `POST /api/setup/plan`
-- `admin`: umfasst aktuell `technician` + Zugriff auf `GET /api/audit/events`, `GET /api/audit/events.csv`, `GET /api/auth/health`, `GET /api/auth/alerts`, `POST /api/auth/rotation/plan`, `POST /api/auth/rotation/simulate`, `GET /api/alerts/config`, `POST /api/alerts/config`, `POST /api/alerts/test`, `POST /api/alerts/preview-routing`, `POST /api/auth/alerts/dispatch`, `GET /api/tenants/:id/traefik-config`
-  - `/api/audit/events` unterstützt serverseitige Filter: `limit`, `outcome`, `actionContains`, `operationContains`, `since`
-  - `/api/audit/events.csv` exportiert dieselben gefilterten Events als CSV (nur admin)
-  - `/api/auth/health` liefert nur sichere Aggregationen (keine Tokenwerte): `total`, `active`, `expired`, `expiringSoon`, `warningDays`
-  - `/api/auth/alerts` liefert handlungsorientierte Token-Risiko-Hinweise (`critical|warning|info`) mit Empfehlungen, ohne Secrets
-  - `/api/auth/rotation/plan` liefert eine sichere Rotation-Checkliste inkl. Overlap-/Cutover-Hinweisen und aktueller Auth-Health-Zusammenfassung
-  - `/api/auth/rotation/simulate` akzeptiert nur Metadaten (`tokenId`, `userId`, `role`, `expiresAt`) und liefert Impact-Counts + Prioritätsaktionen; Payloads mit `token`/`password`/`secret` werden mit `400` abgewiesen
-  - Alert-Channel-Konfiguration erfolgt in `/admin/security` über Teams-Webhook und SMTP-Felder; Secrets werden serverseitig persistent gespeichert, in API/UI-Reads aber maskiert.
-  - Routing-Regeln unterstützen Severity-Matrix (`info|warning|critical`) pro Kanal sowie optionale E-Mail-Empfängergruppen (z. B. `ops`, `management`) inkl. Severity→Group-Mapping.
-  - `/api/alerts/test` sendet einen Test, `/api/auth/alerts/dispatch` sendet aktuelle Auth-Alerts an aktivierte, routing-freigegebene Kanäle und gibt pro Kanal + pro Alert Routing-Status zurück.
-  - `/api/alerts/preview-routing` berechnet dieselbe Routing-Matrix als Dry-Run (ohne Versand) für aktuelle oder mitgelieferte Beispiel-Alerts.
-  - `GET /api/tenants/:id/traefik-config` liefert Traefik Dynamic Config YAML für einen Tenant (Backend-IP aus VLAN, Host-Regeln `<app>.<slug>.irongeeks.eu`, TLS certResolver `letsencrypt`).
-
-Bei fehlender Rolle liefern Endpoints `403` mit Rolle + benötigter Rolle im Response-Body.
-Auth-Guards schreiben bei `401`/`403` zusätzlich ein `auth.guard.denied`-Audit-Event (inkl. Operation, required/effective role, auth mode).
-
-Developer UX (absichtlich env-gated):
-
-- **Dev role**-Switcher + clientseitige Header-Injektion sind nur aktiv bei
-  - `NEXT_PUBLIC_ENABLE_DEV_ROLE_SWITCH=true`
-- Default ist `false` (production-safe).
-
-## 9) Setup-Wizard / Architektur lesen
-
-- PRD: `docs/PRD.md`
-- Architektur (v1): `docs/ARCHITECTURE.md`
-- Architektur (implementierungsnah): `docs/ARCHITECTURE-V2.md`
-- BMAD Roadmap: `docs/BMAD-ROADMAP.md`
-- Management-VM Wizard: `docs/MANAGEMENT-VM-SETUP-WIZARD.md`
-- App-Katalog-Spec: `docs/APP-CATALOG-SPEC.md`
-- Branding-Seed: `docs/BRANDING-SEED.md`
-- BMAD-Artefakte (Brainstorming → Plan → Review): `docs/bmad/`
 
 ---
 
-## Enthaltene Initial-Apps
+## App-Katalog
 
-- authentik
-- nextcloud (+talk, collabora CODE)
-- IT Tools
-- paperless-ngx
-- vaultwarden
-- bookstack
-- joplin
-- libretranslate
-- ollama
-- openwebui
-- searxng
-- snipe-it
-- wiki.js
+| App | Kategorie | Status |
+|---|---|---|
+| Authentik | Identity & Access | ✅ Certified Reference |
+| Nextcloud | Collaboration | ✅ Certified Reference |
+| Paperless-NGX | Dokumentenmanagement | ✅ Certified Reference |
+| Bookstack | Wiki / Dokumentation | ✅ Certified Reference |
+| Vaultwarden | Passwort-Manager | ✅ Certified Reference |
+| Documenso | Dokumentensignatur | 📋 Draft |
+| Joplin | Notizen | 📋 Draft |
+| IT-Tools | Dev-Toolbox | 📋 Draft |
+| Wiki.js | Wiki | 📋 Draft |
+| Snipe-IT | Asset-Management | 📋 Draft |
+| Searxng | Metasuchmaschine | 📋 Draft |
+| LibreTranslate | Übersetzung | 📋 Draft |
+| OpenWebUI | KI-Frontend | 📋 Draft |
+| Ollama | LLM-Runtime | 📋 Draft |
 
 ---
 
-## Wichtige Hinweise
+## Dokumentation
 
-- Backups sind aktuell **out of scope**.
-- Dieses Repo ist für **interne Nutzung** im IT-Systemhaus.
-- Secrets niemals im Klartext committen.
+| Dokument | Beschreibung |
+|---|---|
+| [Setup-Anleitung](docs/SETUP-GUIDE.md) | Vollständige Installations- und Deployment-Anleitung |
+| [Documenso Guide](docs/DOCUMENSO-GUIDE.md) | Documenso Setup, API, Webhooks |
+| [Architektur](docs/ARCHITECTURE-V2.md) | Technische Architektur-Dokumentation |
+| [PRD](docs/PRD.md) | Product Requirements Document |
+| [BMAD Reviews](docs/bmad/) | Code Review Artefakte |
+
+---
+
+## Tests ausführen
+
+```bash
+cd platform/webapp
+
+# Alle Tests
+npm test
+
+# RBAC-Tests
+npm run test:rbac
+
+# Datenbank-Schema validieren
+npm run db:validate
+
+# App-Katalog validieren
+python3 ops/scripts/validate_catalog.py
+```
+
+---
+
+## Sicherheitshinweise
+
+- **Auth-Mode in Production:** `WEBAPP_AUTH_MODE=trusted-bearer` (niemals `dev-header` in Prod)
+- **Secrets:** Alle Secrets über Ansible Vault oder Umgebungsvariablen — nie im Repository
+- **TLS:** `proxmox_insecure=false` ist erzwungen — CI-Guard verhindert Regression
+- **Bekannte Schwachstellen:** Vollständiger Code-Review unter [docs/bmad/REVIEW-025-FULL-CODE-REVIEW.md](docs/bmad/REVIEW-025-FULL-CODE-REVIEW.md)
+
+---
+
+## Lizenz
+
+Intern — GMZ Platform Team
