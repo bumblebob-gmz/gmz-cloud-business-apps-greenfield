@@ -1,0 +1,14 @@
+checks:
+  - id: vaultwarden-alive
+    type: http
+    target: https://vaultwarden.{tenant}.irongeeks.eu/alive
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 5
+
+  - id: vaultwarden-web
+    type: http
+    target: https://vaultwarden.{tenant}.irongeeks.eu/
+    expectedStatus: 200
+    intervalSeconds: 60
+    timeoutSeconds: 5
