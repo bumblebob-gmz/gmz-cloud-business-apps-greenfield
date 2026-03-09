@@ -10,6 +10,7 @@ import { runProvisioningEngine } from '@/lib/provisioning-engine';
 import { appendAuditEvent, buildAuditEvent, getCorrelationIdFromRequest } from '@/lib/audit';
 import { findForbiddenSecretKeys, getExecutionSecretPresence } from '@/lib/secrets-policy';
 import { requireProtectedOperation } from '@/lib/auth-context';
+import { applyRateLimit } from '@/lib/rate-limit-middleware';
 
 type ProvisionRequest = {
   tenantId?: string;
@@ -17,6 +18,10 @@ type ProvisionRequest = {
 };
 
 export async function POST(request: Request) {
+  // Rate-limit: 5 requests per minute per token (SEC-004)
+  const rateLimited = await applyRateLimit(request, 'POST /api/provision/tenant', { limit: 5 });
+  if (rateLimited) return rateLimited;
+
   const authz = await requireProtectedOperation(request, 'POST /api/provision/tenant');
   if (!authz.ok) return authz.response;
 

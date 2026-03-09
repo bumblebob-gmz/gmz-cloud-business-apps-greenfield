@@ -2,8 +2,13 @@ import { NextResponse } from 'next/server';
 import { appendAuditEvent, buildAuditEvent, getCorrelationIdFromRequest } from '@/lib/audit';
 import { getTrustedTokenHealthSummary, requireProtectedOperation } from '@/lib/auth-context';
 import { buildRotationChecklist } from '@/lib/token-rotation';
+import { applyRateLimit } from '@/lib/rate-limit-middleware';
 
 export async function POST(request: Request) {
+  // Rate-limit: 10 requests per minute per token (SEC-004)
+  const rateLimited = await applyRateLimit(request, 'POST /api/auth/rotation/plan', { limit: 10 });
+  if (rateLimited) return rateLimited;
+
   const correlationId = getCorrelationIdFromRequest(request);
   const authz = await requireProtectedOperation(request, 'POST /api/auth/rotation/plan');
 

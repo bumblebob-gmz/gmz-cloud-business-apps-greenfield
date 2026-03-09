@@ -14,14 +14,49 @@
  * On full success: tenant status is promoted to 'Active'.
  */
 
-import { exec as execCb } from 'node:child_process';
+import { execFile as execFileCb } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { AuditEvent } from './audit.ts';
 import { appendAuditEvent, buildAuditEvent } from './audit.ts';
 import { updateJob, updateTenant } from './data-store.ts';
 import type { Job, JobLogEntry, JobPhase, JobPhaseStatus, JobPhaseTrace, ProvisionPlan, Tenant } from './types.ts';
 
-const exec = promisify(execCb);
+const execFile = promisify(execFileCb);
+
+/**
+ * Parse a command string into [binary, ...args] without invoking a shell.
+ * Handles single-quoted tokens. Does NOT support shell builtins, pipes,
+ * redirections, or environment variable expansion – use structured args
+ * for those cases.
+ */
+function parseCommand(command: string): { file: string; args: string[] } {
+  const tokens: string[] = [];
+  let current = '';
+  let inSingle = false;
+
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i];
+    if (inSingle) {
+      if (ch === "'") {
+        inSingle = false;
+      } else {
+        current += ch;
+      }
+    } else if (ch === "'") {
+      inSingle = true;
+    } else if (ch === ' ' || ch === '\t') {
+      if (current.length > 0) {
+        tokens.push(current);
+        current = '';
+      }
+    } else {
+      current += ch;
+    }
+  }
+  if (current.length > 0) tokens.push(current);
+  if (tokens.length === 0) throw new Error('Cannot parse empty command');
+  return { file: tokens[0], args: tokens.slice(1) };
+}
 
 // ---------------------------------------------------------------------------
 // Phase definition
@@ -112,9 +147,18 @@ function summarizeText(text: string, max = 240): string {
   return normalized.length > max ? `${normalized.slice(0, max)}…` : normalized;
 }
 
-async function runCommand(command: string): Promise<{ exitCode: number; snippet: string }> {
+async function runCommand(
+  command: string,
+  extraEnv?: Record<string, string>
+): Promise<{ exitCode: number; snippet: string }> {
   try {
-    const { stdout, stderr } = await exec(command, { cwd: process.cwd(), maxBuffer: 1024 * 1024 });
+    const { file, args } = parseCommand(command);
+    const env = extraEnv ? { ...process.env, ...extraEnv } : process.env;
+    const { stdout, stderr } = await execFile(file, args, {
+      cwd: process.cwd(),
+      maxBuffer: 1024 * 1024,
+      env
+    });
     const out = [stdout, stderr].filter(Boolean).join('\n').trim();
     return { exitCode: 0, snippet: out ? summarizeText(out) : 'Command completed with no output.' };
   } catch (error) {

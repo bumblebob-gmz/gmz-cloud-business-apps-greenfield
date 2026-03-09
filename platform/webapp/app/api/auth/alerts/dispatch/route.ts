@@ -4,8 +4,13 @@ import { buildAuthAlerts } from '@/lib/auth-alerts';
 import { getTrustedTokenHealthSummary, requireProtectedOperation } from '@/lib/auth-context';
 import { dispatchAlertsToConfiguredChannels } from '@/lib/alert-dispatch';
 import { readNotificationConfig } from '@/lib/notification-config';
+import { applyRateLimit } from '@/lib/rate-limit-middleware';
 
 export async function POST(request: Request) {
+  // Rate-limit: 20 requests per minute per token (SEC-004)
+  const rateLimited = await applyRateLimit(request, 'POST /api/alerts/dispatch', { limit: 20 });
+  if (rateLimited) return rateLimited;
+
   const correlationId = getCorrelationIdFromRequest(request);
   const authz = await requireProtectedOperation(request, 'POST /api/auth/alerts/dispatch');
 
