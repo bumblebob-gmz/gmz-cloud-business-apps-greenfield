@@ -8,10 +8,10 @@ import type { JobLogEntry, ProvisionPlan, ProvisionPreflight, Tenant, TenantSize
 const exec = promisify(execCb);
 
 const SIZE_MAP: Record<TenantSize, { cpu: number; ramGb: number; diskGb: number }> = {
-  S: { cpu: 2, ramGb: 4, diskGb: 60 },
-  M: { cpu: 4, ramGb: 8, diskGb: 120 },
-  L: { cpu: 8, ramGb: 16, diskGb: 240 },
-  XL: { cpu: 12, ramGb: 32, diskGb: 480 }
+  S:  { cpu: 2, ramGb: 4,  diskGb: 120 },
+  M:  { cpu: 4, ramGb: 6,  diskGb: 200 },
+  L:  { cpu: 6, ramGb: 12, diskGb: 400 },
+  XL: { cpu: 8, ramGb: 16, diskGb: 800 }
 };
 
 function slugify(input: string) {

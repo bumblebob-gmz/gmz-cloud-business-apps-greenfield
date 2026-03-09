@@ -31,6 +31,7 @@ Open: `http://localhost:3000`
 
 - `GET /api/tenants`
 - `POST /api/tenants` → creates tenant and automatically queues provisioning job
+- `GET /api/tenants/:id/traefik-config` → admin-only; returns Traefik dynamic config YAML for a tenant (Content-Type: text/yaml)
 - `GET /api/jobs`
 - `POST /api/jobs` → creates a job in local JSON store
 - `GET /api/deployments`
@@ -92,6 +93,7 @@ RBAC policy:
 - `POST /api/alerts/test` requires `admin`.
 - `POST /api/alerts/preview-routing` requires `admin`.
 - `POST /api/auth/alerts/dispatch` requires `admin`.
+- `GET /api/tenants/:id/traefik-config` requires `admin`.
 - Auth denials (`401`/`403`) emit an audit event (`auth.guard.denied`) with operation, required/effective role, and auth mode.
 - RBAC denials return `403` with role + requiredRole in JSON body.
 
@@ -166,6 +168,40 @@ Job details at `/jobs/[id]` include per-attempt timeline, retry metadata, and ro
 - Audit events are appended to `.data/audit-events.jsonl` as JSONL.
 - Envelope shape is validated at runtime against the documented contract fields in `docs/audit/audit-event.schema.json` (best-effort, no external validator dependency).
 - Provisioning and tenant-create APIs emit request/success/failure lifecycle events with `correlationId` propagation.
+
+## Traefik config renderer
+
+`GET /api/tenants/:id/traefik-config` (admin-only)
+
+Returns a Traefik dynamic configuration YAML for the given tenant.
+
+- Derives the backend IP from `10.<vlanId>.10.100`
+- Generates one HTTP router + service per app in the tenant's `apps[]`
+- Default subdomain: `<app>.<tenantSlug>.irongeeks.eu`
+- TLS: `certResolver: letsencrypt`, entrypoint: `websecure`
+- Response: `Content-Type: text/yaml`
+
+Default port mapping (`lib/traefik-config.ts → APP_PORT_MAP`):
+
+| App | Port |
+|---|---|
+| authentik | 9000 |
+| nextcloud | 80 |
+| it-tools | 80 |
+| paperless-ngx | 80 |
+| vaultwarden | 80 |
+| bookstack | 80 |
+| joplin | 22300 |
+| libretranslate | 5000 |
+| ollama | 11434 |
+| openwebui | 8080 |
+| searxng | 8080 |
+| snipe-it | 80 |
+| wiki-js | 3000 |
+
+Errors:
+- `404` if tenant not found
+- `400` if tenant has no `vlan` set
 
 ## Data persistence behavior
 

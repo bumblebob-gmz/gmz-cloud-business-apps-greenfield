@@ -11,6 +11,7 @@ const ROLE_RANK = {
 export const RBAC_POLICY = {
   'GET /api/tenants': 'readonly',
   'POST /api/tenants': 'technician',
+  'GET /api/tenants/:id/traefik-config': 'admin',
   'GET /api/jobs': 'readonly',
   'POST /api/jobs': 'technician',
   'GET /api/deployments': 'readonly',

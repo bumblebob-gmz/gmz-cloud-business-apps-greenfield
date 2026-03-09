@@ -197,7 +197,7 @@ RBAC-Rollen:
   - `POST /api/jobs`
   - `POST /api/provision/tenant`
   - `POST /api/setup/plan`
-- `admin`: umfasst aktuell `technician` + Zugriff auf `GET /api/audit/events`, `GET /api/audit/events.csv`, `GET /api/auth/health`, `GET /api/auth/alerts`, `POST /api/auth/rotation/plan`, `POST /api/auth/rotation/simulate`, `GET /api/alerts/config`, `POST /api/alerts/config`, `POST /api/alerts/test`, `POST /api/alerts/preview-routing`, `POST /api/auth/alerts/dispatch`
+- `admin`: umfasst aktuell `technician` + Zugriff auf `GET /api/audit/events`, `GET /api/audit/events.csv`, `GET /api/auth/health`, `GET /api/auth/alerts`, `POST /api/auth/rotation/plan`, `POST /api/auth/rotation/simulate`, `GET /api/alerts/config`, `POST /api/alerts/config`, `POST /api/alerts/test`, `POST /api/alerts/preview-routing`, `POST /api/auth/alerts/dispatch`, `GET /api/tenants/:id/traefik-config`
   - `/api/audit/events` unterstützt serverseitige Filter: `limit`, `outcome`, `actionContains`, `operationContains`, `since`
   - `/api/audit/events.csv` exportiert dieselben gefilterten Events als CSV (nur admin)
   - `/api/auth/health` liefert nur sichere Aggregationen (keine Tokenwerte): `total`, `active`, `expired`, `expiringSoon`, `warningDays`
@@ -208,6 +208,7 @@ RBAC-Rollen:
   - Routing-Regeln unterstützen Severity-Matrix (`info|warning|critical`) pro Kanal sowie optionale E-Mail-Empfängergruppen (z. B. `ops`, `management`) inkl. Severity→Group-Mapping.
   - `/api/alerts/test` sendet einen Test, `/api/auth/alerts/dispatch` sendet aktuelle Auth-Alerts an aktivierte, routing-freigegebene Kanäle und gibt pro Kanal + pro Alert Routing-Status zurück.
   - `/api/alerts/preview-routing` berechnet dieselbe Routing-Matrix als Dry-Run (ohne Versand) für aktuelle oder mitgelieferte Beispiel-Alerts.
+  - `GET /api/tenants/:id/traefik-config` liefert Traefik Dynamic Config YAML für einen Tenant (Backend-IP aus VLAN, Host-Regeln `<app>.<slug>.irongeeks.eu`, TLS certResolver `letsencrypt`).
 
 Bei fehlender Rolle liefern Endpoints `403` mit Rolle + benötigter Rolle im Response-Body.
 Auth-Guards schreiben bei `401`/`403` zusätzlich ein `auth.guard.denied`-Audit-Event (inkl. Operation, required/effective role, auth mode).
