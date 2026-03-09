@@ -1,7 +1,21 @@
+/**
+ * Data store adapter.
+ *
+ * Routes to PostgreSQL (via Prisma) when DATABASE_URL is configured,
+ * otherwise falls back to .data/ file-based JSON storage.
+ *
+ * No callers need to change – the public API is identical.
+ */
+
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { CreateJobInput, CreateTenantInput, DataShape, Job, JobStatus, Report, Tenant } from '@/lib/types';
+import { isDatabaseEnabled } from './db/client.ts';
+import type { CreateJobInput, CreateTenantInput, DataShape, Deployment, Job, JobStatus, Report, Tenant } from '@/lib/types';
+
+// ---------------------------------------------------------------------------
+// File-based fallback (original implementation)
+// ---------------------------------------------------------------------------
 
 const DATA_DIR = path.join(process.cwd(), '.data');
 const DATA_FILE = path.join(DATA_DIR, 'store.json');
@@ -77,10 +91,10 @@ const seedData: DataShape = {
   ]
 };
 
-let initialized = false;
+let fileStoreInitialized = false;
 
 async function ensureStore() {
-  if (initialized) return;
+  if (fileStoreInitialized) return;
 
   await mkdir(DATA_DIR, { recursive: true });
 
@@ -90,7 +104,7 @@ async function ensureStore() {
     await writeFile(DATA_FILE, JSON.stringify(seedData, null, 2), 'utf8');
   }
 
-  initialized = true;
+  fileStoreInitialized = true;
 }
 
 async function readStore(): Promise<DataShape> {
@@ -107,42 +121,46 @@ function nowClock() {
   return new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 }
 
-export async function listTenants(): Promise<Tenant[]> {
+// ---------------------------------------------------------------------------
+// File-based implementations
+// ---------------------------------------------------------------------------
+
+async function fileListTenants(): Promise<Tenant[]> {
   const data = await readStore();
   return data.tenants;
 }
 
-export async function getTenantById(id: string): Promise<Tenant | null> {
+async function fileGetTenantById(id: string): Promise<Tenant | null> {
   const data = await readStore();
-  return data.tenants.find((tenant) => tenant.id === id) ?? null;
+  return data.tenants.find((t) => t.id === id) ?? null;
 }
 
-export async function listJobs(): Promise<Job[]> {
+async function fileGetTenantByName(name: string): Promise<Tenant | null> {
+  const data = await readStore();
+  return data.tenants.find((t) => t.name === name) ?? null;
+}
+
+async function fileListJobs(): Promise<Job[]> {
   const data = await readStore();
   return data.jobs;
 }
 
-export async function getJobById(id: string): Promise<Job | null> {
+async function fileGetJobById(id: string): Promise<Job | null> {
   const data = await readStore();
-  return data.jobs.find((job) => job.id === id) ?? null;
+  return data.jobs.find((j) => j.id === id) ?? null;
 }
 
-export async function getTenantByName(name: string): Promise<Tenant | null> {
-  const data = await readStore();
-  return data.tenants.find((tenant) => tenant.name === name) ?? null;
-}
-
-export async function listDeployments() {
+async function fileListDeployments(): Promise<Deployment[]> {
   const data = await readStore();
   return data.deployments;
 }
 
-export async function listReports(): Promise<Report[]> {
+async function fileListReports(): Promise<Report[]> {
   const data = await readStore();
   return data.reports;
 }
 
-export async function createJob(input: CreateJobInput): Promise<Job> {
+async function fileCreateJob(input: CreateJobInput): Promise<Job> {
   const data = await readStore();
   const job: Job = {
     id: `job-${randomUUID().slice(0, 8)}`,
@@ -160,12 +178,12 @@ export async function createJob(input: CreateJobInput): Promise<Job> {
   return job;
 }
 
-export async function updateJob(
+async function fileUpdateJob(
   id: string,
   patch: Partial<Pick<Job, 'status' | 'details' | 'updatedAt'>>
 ): Promise<Job | null> {
   const data = await readStore();
-  const index = data.jobs.findIndex((job) => job.id === id);
+  const index = data.jobs.findIndex((j) => j.id === id);
   if (index < 0) return null;
 
   const current = data.jobs[index];
@@ -181,7 +199,7 @@ export async function updateJob(
   return next;
 }
 
-export async function createTenant(input: CreateTenantInput): Promise<{ tenant: Tenant; job: Job }> {
+async function fileCreateTenant(input: CreateTenantInput): Promise<{ tenant: Tenant; job: Job }> {
   const data = await readStore();
 
   const tenant: Tenant = {
@@ -213,6 +231,92 @@ export async function createTenant(input: CreateTenantInput): Promise<{ tenant: 
   data.jobs.unshift(job);
 
   await writeStore(data);
-
   return { tenant, job };
+}
+
+// ---------------------------------------------------------------------------
+// Public API - routes based on DATABASE_URL
+// ---------------------------------------------------------------------------
+
+export async function listTenants(): Promise<Tenant[]> {
+  if (isDatabaseEnabled()) {
+    const { dbListTenants } = await import('./db/data-store-db.ts');
+    return dbListTenants();
+  }
+  return fileListTenants();
+}
+
+export async function getTenantById(id: string): Promise<Tenant | null> {
+  if (isDatabaseEnabled()) {
+    const { dbGetTenantById } = await import('./db/data-store-db.ts');
+    return dbGetTenantById(id);
+  }
+  return fileGetTenantById(id);
+}
+
+export async function getTenantByName(name: string): Promise<Tenant | null> {
+  if (isDatabaseEnabled()) {
+    const { dbGetTenantByName } = await import('./db/data-store-db.ts');
+    return dbGetTenantByName(name);
+  }
+  return fileGetTenantByName(name);
+}
+
+export async function listJobs(): Promise<Job[]> {
+  if (isDatabaseEnabled()) {
+    const { dbListJobs } = await import('./db/data-store-db.ts');
+    return dbListJobs();
+  }
+  return fileListJobs();
+}
+
+export async function getJobById(id: string): Promise<Job | null> {
+  if (isDatabaseEnabled()) {
+    const { dbGetJobById } = await import('./db/data-store-db.ts');
+    return dbGetJobById(id);
+  }
+  return fileGetJobById(id);
+}
+
+export async function listDeployments(): Promise<Deployment[]> {
+  if (isDatabaseEnabled()) {
+    const { dbListDeployments } = await import('./db/data-store-db.ts');
+    return dbListDeployments();
+  }
+  return fileListDeployments();
+}
+
+export async function listReports(): Promise<Report[]> {
+  if (isDatabaseEnabled()) {
+    const { dbListReports } = await import('./db/data-store-db.ts');
+    return dbListReports();
+  }
+  return fileListReports();
+}
+
+export async function createJob(input: CreateJobInput): Promise<Job> {
+  if (isDatabaseEnabled()) {
+    const { dbCreateJob } = await import('./db/data-store-db.ts');
+    return dbCreateJob(input);
+  }
+  return fileCreateJob(input);
+}
+
+export async function updateJob(
+  id: string,
+  patch: Partial<Pick<Job, 'status' | 'details' | 'updatedAt'>>
+): Promise<Job | null> {
+  if (isDatabaseEnabled()) {
+    const { dbUpdateJob } = await import('./db/data-store-db.ts');
+    return dbUpdateJob(id, patch);
+  }
+  return fileUpdateJob(id, patch);
+}
+
+export async function createTenant(input: CreateTenantInput): Promise<{ tenant: Tenant; job: Job }> {
+  if (isDatabaseEnabled()) {
+    const { dbCreateTenant } = await import('./db/data-store-db.ts');
+    return dbCreateTenant(input);
+  }
+  return fileCreateTenant(input);
 }

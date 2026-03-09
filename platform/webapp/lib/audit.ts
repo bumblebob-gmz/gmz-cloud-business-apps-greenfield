@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { mkdir, readFile, appendFile } from 'node:fs/promises';
+import { isDatabaseEnabled } from './db/client.ts';
 
 const DATA_DIR = path.join(process.cwd(), '.data');
 const AUDIT_FILE = path.join(DATA_DIR, 'audit-events.jsonl');
@@ -138,12 +139,17 @@ function redactValue(input: unknown): unknown {
 }
 
 export async function appendAuditEvent(event: AuditEvent): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const validation = validateAuditEnvelope(event);
-    if (!validation.ok) {
-      return { ok: false, error: safeError(validation.error ?? 'invalid envelope') };
-    }
+  const validation = validateAuditEnvelope(event);
+  if (!validation.ok) {
+    return { ok: false, error: safeError(validation.error ?? 'invalid envelope') };
+  }
 
+  if (isDatabaseEnabled()) {
+    const { dbAppendAuditEvent } = await import('./db/audit-db.ts');
+    return dbAppendAuditEvent(event);
+  }
+
+  try {
     await mkdir(DATA_DIR, { recursive: true });
     await appendFile(AUDIT_FILE, `${JSON.stringify(event)}\n`, 'utf8');
     return { ok: true };
@@ -183,6 +189,11 @@ export async function listAuditEvents(filtersOrLimit: number | Partial<AuditEven
         operationContains: sanitizeContains(filtersOrLimit.operationContains),
         since: sanitizeSince(filtersOrLimit.since)
       };
+
+  if (isDatabaseEnabled()) {
+    const { dbListAuditEvents } = await import('./db/audit-db.ts');
+    return dbListAuditEvents(filters);
+  }
 
   try {
     const raw = await readFile(AUDIT_FILE, 'utf8');

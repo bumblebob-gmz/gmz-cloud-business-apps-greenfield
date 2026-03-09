@@ -1,0 +1,198 @@
+// GMZ Cloud Business Apps - Prisma Schema
+// See: docs/bmad/REVIEW-013-POSTGRESQL-INTEGRATION.md
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Tenants
+// ---------------------------------------------------------------------------
+
+enum TenantStatus {
+  Active
+  Provisioning
+  Paused
+}
+
+enum TenantSize {
+  S
+  M
+  L
+  XL
+}
+
+enum AuthMode {
+  EntraID
+  LDAP
+  LocalUser
+}
+
+model Tenant {
+  id                String       @id @default(uuid())
+  name              String       @unique
+  customer          String
+  region            String
+  status            TenantStatus @default(Provisioning)
+  size              TenantSize
+  vlan              Int
+  ipAddress         String
+
+  // Auth config
+  authMode          AuthMode?
+  entraTenantId     String?
+  ldapUrl           String?
+  localAdminEmail   String?
+
+  // Provisioning config
+  apps              String[]
+  maintenanceWindow String?
+  contactEmail      String?
+
+  // Relations
+  jobs              Job[]
+
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@map("tenants")
+}
+
+// ---------------------------------------------------------------------------
+// Jobs (Provisioning + operational tasks)
+// ---------------------------------------------------------------------------
+
+enum JobStatus {
+  Queued
+  Running
+  Success
+  Failed
+  DryRun
+}
+
+model Job {
+  id            String    @id @default(uuid())
+  tenantName    String?
+  task          String
+  status        JobStatus @default(Queued)
+  startedAt     String    // kept as clock string for UI compatibility
+  updatedAt     String?
+  correlationId String?
+
+  // Complex nested details stored as JSON
+  details       Json?
+
+  tenant        Tenant?   @relation(fields: [tenantName], references: [name], onDelete: SetNull)
+
+  createdAt     DateTime  @default(now())
+
+  @@map("jobs")
+}
+
+// ---------------------------------------------------------------------------
+// Deployments
+// ---------------------------------------------------------------------------
+
+enum DeploymentEnv {
+  Staging
+  Production
+}
+
+enum DeploymentStatus {
+  Healthy
+  Warning
+  Failed
+}
+
+model Deployment {
+  id         String           @id @default(uuid())
+  tenant     String
+  version    String
+  env        DeploymentEnv
+  status     DeploymentStatus @default(Healthy)
+  updatedAt  String
+
+  createdAt  DateTime         @default(now())
+
+  @@map("deployments")
+}
+
+// ---------------------------------------------------------------------------
+// Reports
+// ---------------------------------------------------------------------------
+
+model Report {
+  id          String   @id @default(uuid())
+  title       String
+  owner       String
+  period      String
+  generatedAt String
+
+  createdAt   DateTime @default(now())
+
+  @@map("reports")
+}
+
+// ---------------------------------------------------------------------------
+// Audit Events
+// ---------------------------------------------------------------------------
+
+enum AuditOutcome {
+  success
+  failure
+  denied
+}
+
+enum ActorType {
+  user
+  service
+}
+
+model AuditEvent {
+  id            String       @id @default(uuid())
+  eventId       String       @unique
+  timestamp     DateTime
+  correlationId String
+  tenantId      String
+  action        String
+  resource      String
+  outcome       AuditOutcome
+
+  // Actor
+  actorType     ActorType
+  actorId       String
+  actorRole     String?
+
+  // Source
+  sourceService   String
+  sourceOperation String
+  sourceIp        String?
+
+  // Flexible extra data
+  details       Json?
+
+  createdAt     DateTime     @default(now())
+
+  @@index([tenantId])
+  @@index([timestamp])
+  @@index([outcome])
+  @@index([action])
+  @@map("audit_events")
+}
+
+// ---------------------------------------------------------------------------
+// Notification Config (singleton row per config key)
+// ---------------------------------------------------------------------------
+
+model NotificationConfig {
+  id        String   @id @default("default")
+  config    Json     @default("{}")
+  updatedAt DateTime @updatedAt
+
+  @@map("notification_config")
+}

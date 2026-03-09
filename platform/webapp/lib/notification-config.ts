@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { isDatabaseEnabled } from './db/client.ts';
 
 const DATA_DIR = path.join(process.cwd(), '.data');
 const CONFIG_FILE = path.join(DATA_DIR, 'notification-config.json');
@@ -160,6 +161,11 @@ function sanitizeConfig(input: unknown): NotificationConfig {
 }
 
 export async function readNotificationConfig(): Promise<NotificationConfig> {
+  if (isDatabaseEnabled()) {
+    const { dbReadNotificationConfig } = await import('./db/notification-config-db.ts');
+    return dbReadNotificationConfig(sanitizeConfig, structuredClone(DEFAULT_NOTIFICATION_CONFIG));
+  }
+
   try {
     const raw = await readFile(CONFIG_FILE, 'utf8');
     return sanitizeConfig(JSON.parse(raw));
@@ -169,8 +175,15 @@ export async function readNotificationConfig(): Promise<NotificationConfig> {
 }
 
 export async function writeNotificationConfig(config: NotificationConfig): Promise<void> {
+  const sanitized = sanitizeConfig(config);
+
+  if (isDatabaseEnabled()) {
+    const { dbWriteNotificationConfig } = await import('./db/notification-config-db.ts');
+    return dbWriteNotificationConfig(sanitized);
+  }
+
   await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(CONFIG_FILE, `${JSON.stringify(sanitizeConfig(config), null, 2)}\n`, 'utf8');
+  await writeFile(CONFIG_FILE, `${JSON.stringify(sanitized, null, 2)}\n`, 'utf8');
 }
 
 export async function updateNotificationConfig(patch: Partial<NotificationConfig>): Promise<NotificationConfig> {
