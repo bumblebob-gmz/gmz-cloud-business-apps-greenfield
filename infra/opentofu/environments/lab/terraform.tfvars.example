@@ -1,0 +1,30 @@
+# ── LAB ENVIRONMENT — NOT FOR PRODUCTION ───────────────────────────────────
+# This file is a template for local/lab deployments where the Proxmox API
+# uses a self-signed or internal-CA certificate.
+#
+# proxmox_tls_insecure=true is intentional here.  The prod environment
+# must NEVER set this flag; the CI guard will reject it.
+# ────────────────────────────────────────────────────────────────────────────
+proxmox_endpoint     = "https://lab-proxmox.local:8006/api2/json"
+proxmox_api_token    = "gmz-automation@pve!tofu=CHANGE_ME"
+proxmox_tls_insecure = true  # LAB ONLY – self-signed cert bypass
+
+tenant_name        = "lab-tenant"
+vm_id              = 11001
+vlan_id            = 110
+cores              = 2
+memory_mb          = 2048
+disk_gb            = 50
+debian_template_id = 9000
+bridge             = "vmbr0"
+ci_user            = "debian"
+ssh_public_key     = "ssh-ed25519 AAAA..."
+
+node_storage_profiles = {
+  lab-lvm = {
+    node_name       = "lab-pve"
+    storage         = "local-lvm"
+    storage_backend = "lvm-thin"
+  }
+}
+tenant_profile = "lab-lvm"

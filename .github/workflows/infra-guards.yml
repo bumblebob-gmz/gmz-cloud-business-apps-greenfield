@@ -14,10 +14,33 @@ on:
 
 jobs:
   prod-tfvars-security-guard:
+    name: "TLS default regression guard (prod)"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate prod tfvars templates stay secure
+      - name: Validate prod TLS default stays secure
         run: bash ops/scripts/check_prod_tfvars_secure.sh
+
+  lab-tls-override-audit:
+    name: "Lab TLS override audit"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure lab tfvars.example uses proxmox_tls_insecure (not proxmox_insecure)
+        shell: bash
+        run: |
+          LAB_EXAMPLE="infra/opentofu/environments/lab/terraform.tfvars.example"
+          if [[ ! -f "$LAB_EXAMPLE" ]]; then
+            echo "No lab tfvars example found – skipping (OK)."
+            exit 0
+          fi
+          # Lab must use proxmox_tls_insecure, not the prod proxmox_insecure variable.
+          if grep -Eq '^[[:space:]]*proxmox_insecure[[:space:]]*=' "$LAB_EXAMPLE"; then
+            echo "❌ Lab tfvars example uses proxmox_insecure (prod variable). Use proxmox_tls_insecure instead."
+            exit 1
+          fi
+          echo "✅ Lab tfvars example uses correct lab-only variable (proxmox_tls_insecure)."

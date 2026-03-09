@@ -25,6 +25,28 @@ export type Tenant = {
 
 export type JobStatus = 'Queued' | 'Running' | 'Success' | 'Failed' | 'DryRun';
 
+// ---------------------------------------------------------------------------
+// Provisioning job phases
+// ---------------------------------------------------------------------------
+
+/** The five ordered phases of a tenant provisioning job. */
+export type JobPhase = 'vm_create' | 'network_config' | 'os_bootstrap' | 'app_deploy' | 'health_verify';
+
+/** Lifecycle status of a single provisioning phase. */
+export type JobPhaseStatus = 'pending' | 'running' | 'success' | 'failed' | 'skipped' | 'planned';
+
+/** Full trace record for one phase within a provisioning job. */
+export type JobPhaseTrace = {
+  phase: JobPhase;
+  status: JobPhaseStatus;
+  startedAt?: string;
+  completedAt?: string;
+  durationMs?: number;
+  auditEventId?: string;
+  logs: JobLogEntry[];
+  error?: string;
+};
+
 export type JobLogEntry = {
   at: string;
   level: 'info' | 'warn' | 'error';
@@ -105,6 +127,8 @@ export type Job = {
     logs?: JobLogEntry[];
     outputSummary?: string;
     error?: string;
+    /** Phase-level trace for E2E provisioning jobs. */
+    phases?: JobPhaseTrace[];
   };
 };
 
@@ -150,6 +174,18 @@ export type CreateTenantInput = {
   apps: string[];
   maintenanceWindow: string;
   contactEmail: string;
+  /**
+   * Admin-only: when true, policy constraint violations (e.g. non-standard VLAN/IP)
+   * are permitted but MUST be audit-logged explicitly by the route handler.
+   * Ignored for non-Admin roles.
+   */
+  policyOverride?: boolean;
+  /**
+   * Optional explicit IP address (for Admin override scenarios).
+   * When provided and policyOverride is true, the value is stored as-is
+   * and logged. Otherwise it must satisfy 10.<VLAN>.10.100.
+   */
+  ipAddress?: string;
 };
 
 export type CreateJobInput = {

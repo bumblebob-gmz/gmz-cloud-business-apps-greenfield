@@ -5,7 +5,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { getDbClient } from './client.ts';
-import type { CreateDeploymentInput, CreateJobInput, CreateTenantInput, Deployment, Job, Report, Tenant, UpdateDeploymentPatch } from '../types.ts';
+import type { CreateDeploymentInput, CreateJobInput, CreateTenantInput, Deployment, Job, Report, Tenant, TenantStatus, UpdateDeploymentPatch } from '../types.ts';
 
 // Prisma enum values map to TypeScript string literals
 function nowClock() {
@@ -255,4 +255,30 @@ export async function dbListReports(): Promise<Report[]> {
   const db = getDbClient();
   const rows = await db.report.findMany({ orderBy: { createdAt: 'desc' } });
   return rows.map((r) => dbReportToReport(r as unknown as Record<string, unknown>));
+}
+
+// ---------------------------------------------------------------------------
+// Tenant update (status)
+// ---------------------------------------------------------------------------
+
+export async function dbUpdateTenant(id: string, patch: { status?: TenantStatus }): Promise<Tenant | null> {
+  const db = getDbClient();
+  try {
+    const row = await db.tenant.update({
+      where: { id },
+      data: { status: patch.status }
+    });
+    return {
+      id: row.id,
+      name: row.name,
+      customer: row.customer,
+      region: row.region,
+      status: row.status as TenantStatus,
+      size: row.size as import('../types.ts').TenantSize,
+      vlan: row.vlan,
+      ipAddress: row.ipAddress
+    };
+  } catch {
+    return null;
+  }
 }

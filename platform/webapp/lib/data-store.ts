@@ -11,7 +11,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { isDatabaseEnabled } from './db/client.ts';
-import type { CreateDeploymentInput, CreateJobInput, CreateTenantInput, DataShape, Deployment, Job, JobStatus, Report, Tenant, UpdateDeploymentPatch } from '@/lib/types';
+import type { CreateDeploymentInput, CreateJobInput, CreateTenantInput, DataShape, Deployment, Job, JobStatus, Report, Tenant, TenantStatus, UpdateDeploymentPatch } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
 // File-based fallback (original implementation)
@@ -229,6 +229,18 @@ async function fileUpdateJob(
   return next;
 }
 
+async function fileUpdateTenant(id: string, patch: { status?: TenantStatus }): Promise<Tenant | null> {
+  const data = await readStore();
+  const index = data.tenants.findIndex((t) => t.id === id);
+  if (index < 0) return null;
+
+  const current = data.tenants[index];
+  const next: Tenant = { ...current, ...patch };
+  data.tenants[index] = next;
+  await writeStore(data);
+  return next;
+}
+
 async function fileCreateTenant(input: CreateTenantInput): Promise<{ tenant: Tenant; job: Job }> {
   const data = await readStore();
 
@@ -240,7 +252,9 @@ async function fileCreateTenant(input: CreateTenantInput): Promise<{ tenant: Ten
     status: 'Provisioning',
     size: input.size,
     vlan: input.vlan,
-    ipAddress: `10.${input.vlan}.10.100`,
+    // Use caller-supplied ipAddress (already policy-validated or admin-overridden upstream)
+    // Fall back to the computed policy address when not provided.
+    ipAddress: input.ipAddress ?? `10.${input.vlan}.10.100`,
     authMode: input.authMode,
     authConfig: input.authConfig,
     apps: input.apps,
@@ -357,6 +371,14 @@ export async function createDeployment(input: CreateDeploymentInput): Promise<De
     return dbCreateDeployment(input);
   }
   return fileCreateDeployment(input);
+}
+
+export async function updateTenant(id: string, patch: { status?: TenantStatus }): Promise<Tenant | null> {
+  if (isDatabaseEnabled()) {
+    const { dbUpdateTenant } = await import('./db/data-store-db.ts');
+    return dbUpdateTenant(id, patch);
+  }
+  return fileUpdateTenant(id, patch);
 }
 
 export async function updateDeployment(id: string, patch: UpdateDeploymentPatch): Promise<Deployment | null> {

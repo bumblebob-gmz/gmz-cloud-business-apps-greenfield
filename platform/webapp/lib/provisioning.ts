@@ -3,16 +3,10 @@ import path from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { exec as execCb } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { JobLogEntry, ProvisionPlan, ProvisionPreflight, Tenant, TenantSize } from '@/lib/types';
+import type { JobLogEntry, ProvisionPlan, ProvisionPreflight, Tenant } from './types.ts';
+import { SIZE_MAP } from './tenant-policy.ts';
 
 const exec = promisify(execCb);
-
-const SIZE_MAP: Record<TenantSize, { cpu: number; ramGb: number; diskGb: number }> = {
-  S:  { cpu: 2, ramGb: 4,  diskGb: 120 },
-  M:  { cpu: 4, ramGb: 6,  diskGb: 200 },
-  L:  { cpu: 6, ramGb: 12, diskGb: 400 },
-  XL: { cpu: 8, ramGb: 16, diskGb: 800 }
-};
 
 function slugify(input: string) {
   return input

@@ -9,25 +9,22 @@ terraform {
   }
 }
 
-# ---------------------------------------------------------------------------
-# Provider: Proxmox VE
-# Auth: API token ONLY (username/password auth is explicitly NOT supported).
-# Required Proxmox ACL rights for the token (rights matrix):
-#   /                        -> Sys.Audit
-#   /nodes/<node>            -> Sys.Audit
-#   /vms/<vmid>              -> VM.Allocate, VM.Config.CDROM, VM.Config.CPU,
-#                               VM.Config.Disk, VM.Config.Memory,
-#                               VM.Config.Network, VM.Config.Options,
-#                               VM.Monitor, VM.PowerMgmt
-#   /storage/<storage>       -> Datastore.AllocateSpace, Datastore.Audit
-# ---------------------------------------------------------------------------
+# ── LAB ONLY ────────────────────────────────────────────────────────────────
+# This environment is exclusively for local/lab Proxmox nodes that use
+# self-signed certificates.  proxmox_tls_insecure=true is the explicit
+# opt-in flag for this use-case.
+#
+# DO NOT copy this pattern to the prod environment.
+# The prod environment enforces proxmox_insecure=false by default and the
+# CI guard (infra-guards.yml / check_prod_tfvars_secure.sh) will fail if
+# a prod tfvars template ever sets it to true.
+# ────────────────────────────────────────────────────────────────────────────
 provider "proxmox" {
   endpoint  = var.proxmox_endpoint
   api_token = var.proxmox_api_token
-  insecure  = var.proxmox_insecure
-
-  # username and password are intentionally NOT configured.
-  # API token is the only supported authentication method.
+  # Lab-only TLS bypass: only honoured when proxmox_tls_insecure=true is
+  # explicitly set.  Never set this in production.
+  insecure  = var.proxmox_tls_insecure
 }
 
 locals {

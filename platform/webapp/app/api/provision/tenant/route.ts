@@ -4,9 +4,9 @@ import {
   buildProvisionPlan,
   getProvisionPreflight,
   materializeProvisionFiles,
-  runProvisionCommands,
   runRollbackHook
 } from '@/lib/provisioning';
+import { runProvisioningEngine } from '@/lib/provisioning-engine';
 import { appendAuditEvent, buildAuditEvent, getCorrelationIdFromRequest } from '@/lib/audit';
 import { findForbiddenSecretKeys, getExecutionSecretPresence } from '@/lib/secrets-policy';
 import { requireProtectedOperation } from '@/lib/auth-context';
@@ -23,6 +23,7 @@ export async function POST(request: Request) {
   const correlationId = getCorrelationIdFromRequest(request);
   const body = (await request.json().catch(() => ({}))) as ProvisionRequest;
 
+  // ── Secret guard ────────────────────────────────────────────────────────────
   const forbiddenKeys = findForbiddenSecretKeys(body);
   if (forbiddenKeys.length > 0) {
     await appendAuditEvent(
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
     );
   }
 
+  // ── Audit: request received ──────────────────────────────────────────────────
   await appendAuditEvent(
     buildAuditEvent({
       correlationId,
@@ -87,6 +89,7 @@ export async function POST(request: Request) {
   const preflight = getProvisionPreflight();
   const plan = buildProvisionPlan(tenant);
 
+  // ── Create job ───────────────────────────────────────────────────────────────
   const job = await createJob({
     tenant: tenant.name,
     task: 'Provision Tenant Infrastructure',
@@ -96,20 +99,18 @@ export async function POST(request: Request) {
       dryRun,
       preflight,
       plan,
+      phases: [],
       logs: [{ at: new Date().toISOString(), level: 'info', message: 'Provisioning request accepted.' }]
     }
   });
 
+  // ── Materialise files (tfvars + inventory) ──────────────────────────────────
   const files = await materializeProvisionFiles(job.id, plan);
   const commands = plan.commands.map((command) =>
     command.replaceAll('<TFVARS_PATH>', files.tfvarsPath).replaceAll('<INVENTORY_PATH>', files.inventoryPath)
   );
 
-  const enrichedPlan = {
-    ...plan,
-    commands,
-    generatedFiles: files
-  };
+  const enrichedPlan = { ...plan, commands, generatedFiles: files };
 
   await updateJob(job.id, {
     details: {
@@ -123,32 +124,12 @@ export async function POST(request: Request) {
     }
   });
 
-  if (dryRun) {
-    await appendAuditEvent(
-      buildAuditEvent({
-        correlationId,
-        actor: { type: 'user', id: authz.auth.userId, role: authz.auth.role },
-        tenantId: tenant.id,
-        action: 'tenant.provision.dryrun_planned',
-        resource: 'provisioning',
-        outcome: 'success',
-        source: { service: 'webapp', operation: 'POST /api/provision/tenant' },
-        details: { jobId: job.id }
-      })
-    );
+  // ── Dry-run short-circuit ────────────────────────────────────────────────────
+  // For dry-run we still run the engine (it simulates all phases and emits audit events),
+  // but no shell commands are executed.
 
-    return NextResponse.json({
-      mode: 'dry-run',
-      message: 'Dry-run only. No commands executed.',
-      correlationId,
-      preflight,
-      executionSecrets: getExecutionSecretPresence(),
-      job: { ...job, details: { ...job.details, plan: enrichedPlan, generatedFiles: files } },
-      plan: enrichedPlan
-    });
-  }
-
-  if (!preflight.executionEnabled) {
+  // ── Execution guard ──────────────────────────────────────────────────────────
+  if (!dryRun && !preflight.executionEnabled) {
     const reason = 'Execution disabled. Set PROVISION_EXECUTION_ENABLED=true to allow non-dry-run provisioning.';
     await updateJob(job.id, {
       status: 'Failed',
@@ -180,7 +161,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (preflight.missingForExecution.length > 0) {
+  if (!dryRun && preflight.missingForExecution.length > 0) {
     const reason = `Missing required execution environment variables: ${preflight.missingForExecution.join(', ')}.`;
     await updateJob(job.id, {
       status: 'Failed',
@@ -219,107 +200,131 @@ export async function POST(request: Request) {
     );
   }
 
-  await updateJob(job.id, { status: 'Running' });
+  // ── Run the E2E phase engine ─────────────────────────────────────────────────
+  const actor = { type: 'user' as const, id: authz.auth.userId, role: authz.auth.role };
+
   await appendAuditEvent(
     buildAuditEvent({
       correlationId,
-      actor: { type: 'user', id: authz.auth.userId, role: authz.auth.role },
+      actor,
       tenantId: tenant.id,
       action: 'tenant.provision.execution_started',
       resource: 'provisioning',
       outcome: 'success',
       source: { service: 'webapp', operation: 'POST /api/provision/tenant' },
-      details: { jobId: job.id }
+      details: { jobId: job.id, dryRun }
     })
   );
 
-  const result = await runProvisionCommands(commands);
+  const engineResult = await runProvisioningEngine(
+    {
+      jobId: job.id,
+      tenantId: tenant.id,
+      correlationId,
+      actor,
+      dryRun,
+      plan: enrichedPlan,
+      commands
+    },
+    tenant,
+    job
+  );
 
-  const rollbackHook = process.env.PROVISION_ROLLBACK_HOOK_CMD?.trim();
-  const rollbackNeeded = Boolean(result.failedCommand && result.applySucceeded);
+  // ── Rollback (execution mode only, if apply succeeded before failure) ────────
+  let rollback: Record<string, unknown> = { attempted: false, reason: 'Not needed.' };
 
-  const rollback = rollbackNeeded
-    ? rollbackHook
-      ? { attempted: true, ...(await runRollbackHook(rollbackHook)) }
-      : {
-          attempted: false,
-          reason: 'No rollback hook configured (PROVISION_ROLLBACK_HOOK_CMD not set).'
-        }
-    : {
-        attempted: false,
-        reason: result.failedCommand ? 'Failure happened before apply completed; rollback skipped.' : 'Not needed.'
-      };
-
-  if (rollbackNeeded) {
-    await appendAuditEvent(
-      buildAuditEvent({
-        correlationId,
-        actor: { type: 'user', id: authz.auth.userId, role: authz.auth.role },
-        tenantId: tenant.id,
-        action: rollback.attempted ? 'tenant.provision.rollback.result' : 'tenant.provision.rollback.attempted',
-        resource: 'provisioning',
-        outcome: rollback.attempted && 'ok' in rollback && rollback.ok === false ? 'failure' : 'success',
-        source: { service: 'webapp', operation: 'POST /api/provision/tenant' },
-        details: rollback
-      })
+  if (!dryRun && engineResult.failedPhase) {
+    const applySucceeded = engineResult.phases.find(
+      (p) => p.phase === 'vm_create' && p.status === 'success'
     );
-  }
 
-  const mergedLogs = [...result.logs];
-  if (rollbackNeeded) {
-    if (rollback.attempted && 'at' in rollback) {
-      mergedLogs.push({
-        at: rollback.at,
-        level: rollback.ok ? 'warn' : 'error',
-        message: `Rollback hook ${rollback.ok ? 'completed' : 'failed'}: ${rollback.snippet}`
-      });
-    } else {
-      mergedLogs.push({
-        at: new Date().toISOString(),
-        level: 'warn',
-        message: 'Rollback skipped: PROVISION_ROLLBACK_HOOK_CMD is not set.'
-      });
+    if (applySucceeded) {
+      const rollbackHook = process.env.PROVISION_ROLLBACK_HOOK_CMD?.trim();
+      if (rollbackHook) {
+        const rb = await runRollbackHook(rollbackHook);
+        rollback = { attempted: true, ...rb };
+      } else {
+        rollback = { attempted: false, reason: 'No rollback hook configured (PROVISION_ROLLBACK_HOOK_CMD not set).' };
+      }
+
+      await appendAuditEvent(
+        buildAuditEvent({
+          correlationId,
+          actor,
+          tenantId: tenant.id,
+          action: rollback.attempted ? 'tenant.provision.rollback.result' : 'tenant.provision.rollback.attempted',
+          resource: 'provisioning',
+          outcome: rollback.attempted && 'ok' in rollback && rollback.ok === false ? 'failure' : 'success',
+          source: { service: 'webapp', operation: 'POST /api/provision/tenant' },
+          details: rollback
+        })
+      );
     }
   }
 
-  const success = !result.failedCommand;
+  // ── Final job update ─────────────────────────────────────────────────────────
+  const allPhaseLogs = engineResult.phases.flatMap((p) => p.logs);
+
   const updatedJob = await updateJob(job.id, {
-    status: success ? 'Success' : 'Failed',
+    status: engineResult.finalJobStatus,
     details: {
       ...job.details,
       preflight,
       plan: enrichedPlan,
       generatedFiles: files,
-      commandResults: result.commandResults,
-      commandAttempts: result.commandAttempts,
-      retriesConfigured: result.retriesConfigured,
+      phases: engineResult.phases.map((r) => ({
+        phase: r.phase,
+        status: r.status,
+        startedAt: r.startedAt,
+        completedAt: r.completedAt,
+        durationMs: r.durationMs,
+        auditEventId: r.auditEventId,
+        logs: r.logs,
+        error: r.error
+      })),
       rollback,
-      logs: mergedLogs,
-      outputSummary: result.outputSummary,
-      error: result.failedCommand ? `Failed command: ${result.failedCommand}` : undefined
+      logs: allPhaseLogs,
+      outputSummary: engineResult.outputSummary,
+      error: engineResult.failedPhase ? `Provisioning failed at phase: ${engineResult.failedPhase}` : undefined
     }
   });
 
+  // ── Final audit event ────────────────────────────────────────────────────────
   await appendAuditEvent(
     buildAuditEvent({
       correlationId,
-      actor: { type: 'user', id: authz.auth.userId, role: authz.auth.role },
+      actor,
       tenantId: tenant.id,
-      action: success ? 'tenant.provision.success' : 'tenant.provision.failure',
+      action: dryRun
+        ? 'tenant.provision.dryrun_planned'
+        : engineResult.success
+          ? 'tenant.provision.success'
+          : 'tenant.provision.failure',
       resource: 'provisioning',
-      outcome: success ? 'success' : 'failure',
+      outcome: engineResult.success || dryRun ? 'success' : 'failure',
       source: { service: 'webapp', operation: 'POST /api/provision/tenant' },
-      details: { jobId: job.id, failedStep: result.failedStep }
+      details: {
+        jobId: job.id,
+        failedPhase: engineResult.failedPhase,
+        phases: engineResult.phases.map((p) => ({ phase: p.phase, status: p.status }))
+      }
     })
   );
 
   return NextResponse.json({
-    mode: 'execute',
+    mode: dryRun ? 'dry-run' : 'execute',
     correlationId,
     preflight,
     executionSecrets: getExecutionSecretPresence(),
     plan: enrichedPlan,
     job: updatedJob ?? job,
-    success
+    phases: engineResult.phases.map((r) => ({
+      phase: r.phase,
+      status: r.status,
+      durationMs: r.durationMs,
+      error: r.error
+    })),
+    success: engineResult.success,
+    failedPhase: engineResult.failedPhase
   });
 }
