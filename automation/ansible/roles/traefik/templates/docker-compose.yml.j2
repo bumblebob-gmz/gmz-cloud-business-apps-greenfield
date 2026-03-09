@@ -1,0 +1,21 @@
+# Managed by: automation/ansible/roles/traefik
+services:
+  traefik:
+    image: {{ traefik_image }}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - IONOS_API_KEY=${IONOS_API_KEY}
+      - ACME_EMAIL=${ACME_EMAIL}
+    volumes:
+      - {{ traefik_config_dir }}/traefik.yml:/etc/traefik/traefik.yml:ro
+      - {{ traefik_dynamic_dir }}:/etc/traefik/dynamic:ro
+      - {{ traefik_acme_dir }}:/etc/traefik/acme
+    networks:
+      - traefik
+
+networks:
+  traefik:
+    external: false

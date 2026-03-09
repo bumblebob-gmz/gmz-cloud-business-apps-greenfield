@@ -1,0 +1,38 @@
+# Traefik dynamic config — default (always loaded)
+# Drop additional per-tenant YAML files into /etc/traefik/dynamic/
+
+http:
+  middlewares:
+    redirect-to-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+    # Strip /traefik prefix for dashboard sub-path routing
+    strip-traefik-prefix:
+      stripPrefix:
+        prefixes:
+          - "/traefik"
+
+    # IP allowlist — restrict dashboard to internal management networks
+    mgmt-ipallowlist:
+      ipAllowList:
+        # Adjust to your actual management network ranges
+        sourceRange:
+          - "10.0.0.0/8"
+          - "172.16.0.0/12"
+          - "192.168.0.0/16"
+
+  routers:
+    # Traefik dashboard — internal management access only
+    # Protected by IP allowlist; do NOT expose to the internet
+    traefik-dashboard:
+      rule: "Host(`mgmt.irongeeks.eu`) && (PathPrefix(`/traefik/api`) || PathPrefix(`/traefik/dashboard`))"
+      entryPoints:
+        - websecure
+      service: api@internal
+      middlewares:
+        - mgmt-ipallowlist
+        - strip-traefik-prefix
+      tls:
+        certResolver: letsencrypt

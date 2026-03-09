@@ -37,6 +37,18 @@ test('policy requirements for protected GET and POST endpoints', () => {
   assert.equal(getRequiredRoleForOperation('POST /api/alerts/preview-routing'), 'admin');
   assert.equal(getRequiredRoleForOperation('POST /api/auth/alerts/dispatch'), 'admin');
   assert.equal(getRequiredRoleForOperation('GET /api/tenants/:id/traefik-config'), 'admin');
+  assert.equal(getRequiredRoleForOperation('GET /api/tenants/:id/ansible-inventory'), 'admin');
+});
+
+test('ansible-inventory endpoint requires admin role', () => {
+  const readonlyAuth = { userId: 'u-ro', role: 'readonly' };
+  const techAuth = { userId: 'u-tech', role: 'technician' };
+  const adminAuth = { userId: 'u-admin', role: 'admin' };
+
+  const op = 'GET /api/tenants/:id/ansible-inventory';
+  assert.equal(authorizeOperation(readonlyAuth, op).ok, false);
+  assert.equal(authorizeOperation(techAuth, op).ok, false);
+  assert.equal(authorizeOperation(adminAuth, op).ok, true);
 });
 
 test('traefik-config endpoint requires admin role', () => {

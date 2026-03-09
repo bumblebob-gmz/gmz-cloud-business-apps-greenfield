@@ -1,0 +1,28 @@
+# Traefik dynamic config — tenant: {{ tenant_slug }}
+# Managed by: automation/ansible/provision-tenant.yml
+# VLAN: {{ vlan_id }} | VM IP: {{ vm_ip }}
+
+http:
+  routers:
+{% for app in apps %}
+    {{ tenant_slug }}-{{ app }}:
+      rule: "Host(`{{ app }}.{{ tenant_slug }}.irongeeks.eu`)"
+      entryPoints:
+        - websecure
+      service: {{ tenant_slug }}-{{ app }}-svc
+      middlewares:
+        - redirect-to-https@file
+      tls:
+        certResolver: letsencrypt
+
+{% endfor %}
+
+  services:
+{% for app in apps %}
+    {{ tenant_slug }}-{{ app }}-svc:
+      loadBalancer:
+        servers:
+          - url: "http://{{ vm_ip }}:{{ app_ports[app] | default(8080) }}"
+        passHostHeader: true
+
+{% endfor %}

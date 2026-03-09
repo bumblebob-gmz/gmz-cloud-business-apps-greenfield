@@ -1,0 +1,66 @@
+---
+# Full tenant provisioning playbook
+# Called by platform/webapp via: ansible-playbook provision-tenant.yml -i <inventory>
+#
+# Required variables (pass via -e or extra-vars file):
+#   tenant_slug    — URL-safe tenant identifier (e.g. "kunde-a")
+#   vlan_id        — VLAN number (e.g. 120)
+#   vm_ip          — tenant VM static IP (e.g. "10.120.10.100")
+#   ssh_public_key — SSH public key for debian user
+#   apps           — list of app names from catalog (e.g. ["authentik", "nextcloud"])
+#
+# Inventory must have a [tenant] group pointing to vm_ip.
+
+- name: Validate required provision variables
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Assert required vars are present
+      ansible.builtin.assert:
+        that:
+          - tenant_slug is defined and tenant_slug | length > 0
+          - vlan_id is defined
+          - vm_ip is defined and vm_ip | length > 0
+          - ssh_public_key is defined and ssh_public_key | length > 0
+        fail_msg: "Missing required variable(s): tenant_slug, vlan_id, vm_ip, ssh_public_key"
+
+- name: Bootstrap tenant VM
+  hosts: tenant
+  become: true
+  vars:
+    tenant_slug: "{{ tenant_slug }}"
+    vlan_id: "{{ vlan_id }}"
+    vm_ip: "{{ vm_ip }}"
+    ssh_public_key: "{{ ssh_public_key }}"
+  roles:
+    - role: common-hardening
+    - role: docker-runtime
+    - role: authentik-bootstrap
+
+- name: Deploy tenant application stack
+  hosts: tenant
+  become: true
+  vars:
+    tenant_slug: "{{ tenant_slug }}"
+    apps: "{{ apps | default(['authentik']) }}"
+  roles:
+    - role: catalog-deployer
+
+- name: Register tenant in Traefik dynamic config
+  hosts: management
+  become: true
+  vars:
+    tenant_slug: "{{ tenant_slug }}"
+    vlan_id: "{{ vlan_id }}"
+    vm_ip: "{{ vm_ip }}"
+    apps: "{{ apps | default(['authentik']) }}"
+    traefik_dynamic_dir: /etc/traefik/dynamic
+  tasks:
+    - name: Render and deploy per-tenant Traefik config
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/templates/traefik-tenant.yml.j2"
+        dest: "{{ traefik_dynamic_dir }}/{{ tenant_slug }}.yml"
+        owner: root
+        group: root
+        mode: "0644"
+      # Traefik watches the directory — no restart needed

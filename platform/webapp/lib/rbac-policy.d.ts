@@ -4,6 +4,7 @@ export const RBAC_POLICY: {
   readonly 'GET /api/tenants': 'readonly';
   readonly 'POST /api/tenants': 'technician';
   readonly 'GET /api/tenants/:id/traefik-config': 'admin';
+  readonly 'GET /api/tenants/:id/ansible-inventory': 'admin';
   readonly 'GET /api/jobs': 'readonly';
   readonly 'POST /api/jobs': 'technician';
   readonly 'GET /api/deployments': 'readonly';

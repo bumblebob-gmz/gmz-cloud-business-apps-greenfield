@@ -20,6 +20,9 @@ mit Provisioning via OpenTofu, Konfiguration via Ansible und App-Deployment via 
 - [x] Architekturentwurf v1
 - [x] BMAD-Roadmap v1
 - [x] Repo-Skeleton
+- [x] Traefik IONOS DNS ACME config + Ansible role
+- [x] Ansible provision-tenant.yml playbook
+- [x] Webapp: `/api/tenants/:id/ansible-inventory` (admin-only)
 - [ ] Produktive Umsetzung der Provisioning-/Deploy-Pipeline
 
 ---
@@ -29,8 +32,12 @@ mit Provisioning via OpenTofu, Konfiguration via Ansible und App-Deployment via 
 ```text
 infra/
   opentofu/              # Proxmox VM-Provisioning
+  traefik/               # Traefik static + dynamic config (IONOS DNS ACME)
 automation/
   ansible/               # Hardening, Docker, App-Deploy, Updates
+    roles/traefik/       # Ansible role: deploy Traefik on management VM
+    deploy-traefik.yml   # Playbook: deploy Traefik
+    provision-tenant.yml # Playbook: full tenant provisioning (bootstrap + apps + Traefik)
 catalog/
   apps/                  # Git-basierter App-Katalog
 platform/

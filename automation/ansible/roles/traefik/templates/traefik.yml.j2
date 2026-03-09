@@ -1,0 +1,47 @@
+# Traefik v3 static configuration — rendered by Ansible
+# Managed by: automation/ansible/roles/traefik
+
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+log:
+  level: INFO
+
+accessLog: {}
+
+api:
+  dashboard: true
+  insecure: false
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: "${ACME_EMAIL}"
+      storage: {{ traefik_acme_dir }}/acme.json
+      dnsChallenge:
+        provider: ionos
+        resolvers:
+          - "ns1.ionos.com:53"
+          - "ns1095.ui-dns.biz:53"
+
+providers:
+  file:
+    directory: {{ traefik_dynamic_dir }}
+    watch: true

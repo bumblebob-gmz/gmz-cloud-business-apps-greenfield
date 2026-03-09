@@ -1,0 +1,19 @@
+---
+# Deploy Traefik to the management VM
+#
+# Usage:
+#   ansible-playbook deploy-traefik.yml \
+#     -e acme_email=ops@irongeeks.eu \
+#     -e ionos_api_key=<public>.<secret>
+#
+# Or use Ansible Vault for secrets:
+#   ansible-playbook deploy-traefik.yml --vault-password-file vault-pass.txt
+#
+# Inventory: ensure [management] group exists in your inventory
+# with the management VM IP and SSH access configured.
+
+- name: Deploy Traefik on management VM
+  hosts: management
+  become: true
+  roles:
+    - role: traefik

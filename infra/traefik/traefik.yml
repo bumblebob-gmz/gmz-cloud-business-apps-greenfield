@@ -1,0 +1,51 @@
+# Traefik v3 static configuration — Management VM
+# Deploy at: /etc/traefik/traefik.yml
+# Required env vars: IONOS_API_KEY, ACME_EMAIL
+
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+log:
+  level: INFO
+
+accessLog: {}
+
+api:
+  dashboard: true
+  insecure: false  # dashboard exposed via secure dynamic route only
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: "${ACME_EMAIL}"
+      storage: /etc/traefik/acme/acme.json
+      dnsChallenge:
+        provider: ionos
+        # IONOS DNS API credentials are picked up from environment:
+        #   IONOS_API_KEY=<public-prefix>.<secret>
+        # See: https://go-acme.github.io/lego/dns/ionos/
+        resolvers:
+          - "ns1.ionos.com:53"
+          - "ns1095.ui-dns.biz:53"
+
+providers:
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true

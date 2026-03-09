@@ -1,0 +1,21 @@
+---
+# Required — must be overridden at runtime (never commit real values)
+acme_email: ""
+ionos_api_key: ""
+
+# Traefik image tag
+traefik_image: "traefik:v3"
+
+# Paths on the target host
+traefik_config_dir: /etc/traefik
+traefik_dynamic_dir: /etc/traefik/dynamic
+traefik_acme_dir: /etc/traefik/acme
+
+# Management VM hostname for dashboard router rule
+traefik_mgmt_hostname: "mgmt.irongeeks.eu"
+
+# Internal IP ranges allowed to access the dashboard
+traefik_dashboard_allowed_cidrs:
+  - "10.0.0.0/8"
+  - "172.16.0.0/12"
+  - "192.168.0.0/16"

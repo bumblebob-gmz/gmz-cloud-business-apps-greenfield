@@ -32,6 +32,7 @@ Open: `http://localhost:3000`
 - `GET /api/tenants`
 - `POST /api/tenants` → creates tenant and automatically queues provisioning job
 - `GET /api/tenants/:id/traefik-config` → admin-only; returns Traefik dynamic config YAML for a tenant (Content-Type: text/yaml)
+- `GET /api/tenants/:id/ansible-inventory` → admin-only; returns Ansible INI inventory for a tenant (host, vlan_id, vm_ip, tenant_slug)
 - `GET /api/jobs`
 - `POST /api/jobs` → creates a job in local JSON store
 - `GET /api/deployments`
