@@ -28,6 +28,7 @@ export const RBAC_POLICY = {
   'GET /api/alerts/config': 'admin',
   'POST /api/alerts/config': 'admin',
   'POST /api/alerts/test': 'admin',
+  'POST /api/alerts/preview-routing': 'admin',
   'POST /api/auth/alerts/dispatch': 'admin'
 };
 

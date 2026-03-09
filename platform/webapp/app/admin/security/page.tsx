@@ -65,7 +65,12 @@ type AuditFilters = {
 
 type AlertConfig = {
   channels: {
-    teams: { enabled: boolean; webhookUrl: string; routes: { authAlerts: boolean; testAlerts: boolean } };
+    teams: {
+      enabled: boolean;
+      webhookUrl: string;
+      routes: { authAlerts: boolean; testAlerts: boolean };
+      bySeverity: { info: boolean; warning: boolean; critical: boolean };
+    };
     email: {
       enabled: boolean;
       smtpHost: string;
@@ -76,17 +81,21 @@ type AlertConfig = {
       from: string;
       to: string;
       routes: { authAlerts: boolean; testAlerts: boolean };
+      bySeverity: { info: boolean; warning: boolean; critical: boolean };
+      recipientGroups: Record<string, string>;
+      severityGroupMap: { info?: string; warning?: string; critical?: string };
     };
   };
 };
 
-type AlertStatus = { channel: 'teams' | 'email'; attempted: boolean; ok: boolean; message: string };
+type AlertDecision = { alertId: string; severity: 'info' | 'warning' | 'critical'; deliver: boolean; reason: string; recipients?: string[]; recipientGroup?: string };
+type AlertStatus = { channel: 'teams' | 'email'; attempted: boolean; ok: boolean; message: string; decisions?: AlertDecision[] };
 
 const EMPTY_SIM_INPUT: SimInput = { tokenId: '', userId: '', role: 'readonly', expiresAt: '' };
 const DEFAULT_FILTERS: AuditFilters = { limit: 50, outcome: '', actionContains: '', operationContains: '', since: '' };
 const DEFAULT_ALERT_CONFIG: AlertConfig = {
   channels: {
-    teams: { enabled: false, webhookUrl: '', routes: { authAlerts: true, testAlerts: true } },
+    teams: { enabled: false, webhookUrl: '', routes: { authAlerts: true, testAlerts: true }, bySeverity: { info: true, warning: true, critical: true } },
     email: {
       enabled: false,
       smtpHost: '',
@@ -96,7 +105,10 @@ const DEFAULT_ALERT_CONFIG: AlertConfig = {
       smtpPass: '',
       from: '',
       to: '',
-      routes: { authAlerts: true, testAlerts: true }
+      routes: { authAlerts: true, testAlerts: true },
+      bySeverity: { info: true, warning: true, critical: true },
+      recipientGroups: {},
+      severityGroupMap: {}
     }
   }
 };
@@ -124,6 +136,8 @@ export default function AdminSecurityPage() {
   const [alertSaving, setAlertSaving] = useState(false);
   const [alertActionLoading, setAlertActionLoading] = useState(false);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const [recipientGroupsText, setRecipientGroupsText] = useState('');
+  const [routingPreview, setRoutingPreview] = useState<AlertStatus[] | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -147,7 +161,9 @@ export default function AdminSecurityPage() {
 
         setHealth(healthData);
         setAlerts(alertsData.alerts ?? []);
-        setAlertConfig(configData.config ?? DEFAULT_ALERT_CONFIG);
+        const nextConfig = configData.config ?? DEFAULT_ALERT_CONFIG;
+        setAlertConfig(nextConfig);
+        setRecipientGroupsText(Object.entries(nextConfig.channels.email.recipientGroups).map(([k, v]) => `${k}=${v}`).join('\n'));
         await loadAuditEvents(DEFAULT_FILTERS);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load admin security data.');
@@ -246,19 +262,55 @@ export default function AdminSecurityPage() {
     try {
       setAlertSaving(true);
       setAlertMessage(null);
+      const recipientGroups = Object.fromEntries(
+        recipientGroupsText
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .map((line) => {
+            const [name, ...rest] = line.split('=');
+            return [name.trim(), rest.join('=').trim()];
+          })
+          .filter(([name]) => Boolean(name))
+      );
       const response = await fetch('/api/alerts/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(alertConfig)
+        body: JSON.stringify({
+          ...alertConfig,
+          channels: {
+            ...alertConfig.channels,
+            email: { ...alertConfig.channels.email, recipientGroups }
+          }
+        })
       });
       if (!response.ok) throw new Error(formatAuthError(response.status, 'alert config save'));
       const data = (await response.json()) as { config?: AlertConfig };
-      setAlertConfig(data.config ?? DEFAULT_ALERT_CONFIG);
+      const nextConfig = data.config ?? DEFAULT_ALERT_CONFIG;
+      setAlertConfig(nextConfig);
+      setRecipientGroupsText(Object.entries(nextConfig.channels.email.recipientGroups).map(([k, v]) => `${k}=${v}`).join('\n'));
       setAlertMessage('Alert channel configuration saved.');
     } catch (err) {
       setAlertMessage(err instanceof Error ? err.message : 'Failed to save alert config.');
     } finally {
       setAlertSaving(false);
+    }
+  }
+
+  async function runAlertPreview() {
+    try {
+      setAlertActionLoading(true);
+      setAlertMessage(null);
+      const response = await fetch('/api/alerts/preview-routing', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: 'authAlerts', channels: ['teams', 'email'] }) });
+      const data = (await response.json()) as { routing?: AlertStatus[]; error?: string };
+      if (!response.ok) throw new Error(data.error ?? formatAuthError(response.status, 'alert preview'));
+      setRoutingPreview(data.routing ?? []);
+      setAlertMessage('Routing preview generated.');
+    } catch (err) {
+      setAlertMessage(err instanceof Error ? err.message : 'Alert preview failed.');
+      setRoutingPreview(null);
+    } finally {
+      setAlertActionLoading(false);
     }
   }
 
@@ -390,13 +442,44 @@ export default function AdminSecurityPage() {
           <label className="text-sm"><input type="checkbox" className="mr-2" checked={alertConfig.channels.email.routes.authAlerts} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, email: { ...v.channels.email, routes: { ...v.channels.email.routes, authAlerts: e.target.checked } } } }))} />Email auth alerts</label>
           <label className="text-sm"><input type="checkbox" className="mr-2" checked={alertConfig.channels.teams.routes.testAlerts} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, teams: { ...v.channels.teams, routes: { ...v.channels.teams.routes, testAlerts: e.target.checked } } } }))} />Teams test alerts</label>
           <label className="text-sm"><input type="checkbox" className="mr-2" checked={alertConfig.channels.email.routes.testAlerts} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, email: { ...v.channels.email, routes: { ...v.channels.email.routes, testAlerts: e.target.checked } } } }))} />Email test alerts</label>
+
+          <label className="text-sm"><input type="checkbox" className="mr-2" checked={alertConfig.channels.teams.bySeverity.info} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, teams: { ...v.channels.teams, bySeverity: { ...v.channels.teams.bySeverity, info: e.target.checked } } } }))} />Teams info</label>
+          <label className="text-sm"><input type="checkbox" className="mr-2" checked={alertConfig.channels.teams.bySeverity.warning} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, teams: { ...v.channels.teams, bySeverity: { ...v.channels.teams.bySeverity, warning: e.target.checked } } } }))} />Teams warning</label>
+          <label className="text-sm"><input type="checkbox" className="mr-2" checked={alertConfig.channels.teams.bySeverity.critical} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, teams: { ...v.channels.teams, bySeverity: { ...v.channels.teams.bySeverity, critical: e.target.checked } } } }))} />Teams critical</label>
+
+          <label className="text-sm"><input type="checkbox" className="mr-2" checked={alertConfig.channels.email.bySeverity.info} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, email: { ...v.channels.email, bySeverity: { ...v.channels.email.bySeverity, info: e.target.checked } } } }))} />Email info</label>
+          <label className="text-sm"><input type="checkbox" className="mr-2" checked={alertConfig.channels.email.bySeverity.warning} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, email: { ...v.channels.email, bySeverity: { ...v.channels.email.bySeverity, warning: e.target.checked } } } }))} />Email warning</label>
+          <label className="text-sm"><input type="checkbox" className="mr-2" checked={alertConfig.channels.email.bySeverity.critical} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, email: { ...v.channels.email, bySeverity: { ...v.channels.email.bySeverity, critical: e.target.checked } } } }))} />Email critical</label>
+
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Group for info severity (optional)" value={alertConfig.channels.email.severityGroupMap.info ?? ''} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, email: { ...v.channels.email, severityGroupMap: { ...v.channels.email.severityGroupMap, info: e.target.value } } } }))} />
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Group for warning severity (optional)" value={alertConfig.channels.email.severityGroupMap.warning ?? ''} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, email: { ...v.channels.email, severityGroupMap: { ...v.channels.email.severityGroupMap, warning: e.target.value } } } }))} />
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Group for critical severity (optional)" value={alertConfig.channels.email.severityGroupMap.critical ?? ''} onChange={(e) => setAlertConfig((v) => ({ ...v, channels: { ...v.channels, email: { ...v.channels.email, severityGroupMap: { ...v.channels.email.severityGroupMap, critical: e.target.value } } } }))} />
         </div>
+        <label className="text-sm">
+          <span className="mb-1 block text-slate-600">Email recipient groups (one per line: group=mail1@example.com,mail2@example.com)</span>
+          <textarea className="min-h-28 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" value={recipientGroupsText} onChange={(e) => setRecipientGroupsText(e.target.value)} />
+        </label>
         <div className="flex flex-wrap gap-2">
           <button className="rounded-xl bg-brand px-4 py-2 text-sm font-medium text-white" onClick={saveAlertConfig} disabled={alertSaving}>{alertSaving ? 'Saving…' : 'Save config'}</button>
+          <button className="rounded-xl border border-slate-300 px-4 py-2 text-sm" onClick={runAlertPreview} disabled={alertActionLoading}>Preview routing</button>
           <button className="rounded-xl border border-slate-300 px-4 py-2 text-sm" onClick={() => runAlertAction('/api/alerts/test', 'Test sent')} disabled={alertActionLoading}>Send test</button>
           <button className="rounded-xl border border-slate-300 px-4 py-2 text-sm" onClick={() => runAlertAction('/api/auth/alerts/dispatch', 'Auth alerts dispatched')} disabled={alertActionLoading}>Dispatch current auth alerts</button>
         </div>
         {alertMessage ? <p className="text-sm text-slate-700">{alertMessage}</p> : null}
+        {routingPreview ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 space-y-2">
+            {routingPreview.map((row) => (
+              <div key={row.channel}>
+                <p className="font-semibold">{row.channel}: {row.message}</p>
+                <ul className="list-disc pl-5">
+                  {(row.decisions ?? []).map((d) => (
+                    <li key={`${row.channel}-${d.alertId}-${d.severity}`}>{d.alertId} ({d.severity}) → {d.deliver ? 'deliver' : 'skip'} [{d.reason}]</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </section>
 
       <section className="panel p-5 space-y-4">

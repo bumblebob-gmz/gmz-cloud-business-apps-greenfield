@@ -20,6 +20,7 @@ export const RBAC_POLICY: {
   readonly 'GET /api/alerts/config': 'admin';
   readonly 'POST /api/alerts/config': 'admin';
   readonly 'POST /api/alerts/test': 'admin';
+  readonly 'POST /api/alerts/preview-routing': 'admin';
   readonly 'POST /api/auth/alerts/dispatch': 'admin';
 };
 

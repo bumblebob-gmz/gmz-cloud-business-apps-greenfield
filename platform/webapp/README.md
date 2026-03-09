@@ -13,7 +13,7 @@ Next.js + TypeScript + Tailwind MVP scaffold for tenant operations.
 - Reports page (API-driven + CSV export)
 - Jobs page (API-driven + quick create form)
 - Job detail page at `/jobs/[id]` with related tenant context
-- Admin Security page at `/admin/security` (auth health + token-risk alerts + configurable Teams/Email alert channels + server-side audit filters + CSV export)
+- Admin Security page at `/admin/security` (auth health + token-risk alerts + configurable Teams/Email alert channels + severity-based routing + recipient groups + routing preview + server-side audit filters + CSV export)
 - Lightweight local JSON persistence (`.data/store.json`)
 - API routes under `app/api/*` with local data-flow behavior
 
@@ -47,7 +47,8 @@ Open: `http://localhost:3000`
 - `GET /api/alerts/config` → admin-only read current alert channel config with secrets masked
 - `POST /api/alerts/config` → admin-only update persistent alert channel config (Teams + Email SMTP)
 - `POST /api/alerts/test` → admin-only send test alert to selected configured channels
-- `POST /api/auth/alerts/dispatch` → admin-only dispatch current auth alerts to configured channels, returning per-channel status
+- `POST /api/auth/alerts/dispatch` → admin-only dispatch current auth alerts to configured channels, returning per-channel status + per-alert routing decisions
+- `POST /api/alerts/preview-routing` → admin-only dry-run preview of computed routing matrix (no sends); uses provided alerts payload or current auth alerts when omitted
 
 ## Auth modes + RBAC (current MVP)
 
@@ -89,6 +90,7 @@ RBAC policy:
 - `GET /api/alerts/config` requires `admin`.
 - `POST /api/alerts/config` requires `admin`.
 - `POST /api/alerts/test` requires `admin`.
+- `POST /api/alerts/preview-routing` requires `admin`.
 - `POST /api/auth/alerts/dispatch` requires `admin`.
 - Auth denials (`401`/`403`) emit an audit event (`auth.guard.denied`) with operation, required/effective role, and auth mode.
 - RBAC denials return `403` with role + requiredRole in JSON body.

@@ -5,8 +5,13 @@ import { maskNotificationConfig, DEFAULT_NOTIFICATION_CONFIG } from '../lib/noti
 test('maskNotificationConfig hides webhook and smtp password', () => {
   const masked = maskNotificationConfig({
     channels: {
-      teams: { ...DEFAULT_NOTIFICATION_CONFIG.channels.teams, webhookUrl: 'https://example.webhook' },
-      email: { ...DEFAULT_NOTIFICATION_CONFIG.channels.email, smtpPass: 'secret' }
+      teams: { ...DEFAULT_NOTIFICATION_CONFIG.channels.teams, webhookUrl: 'https://example.webhook', bySeverity: { info: true, warning: false, critical: true } },
+      email: {
+        ...DEFAULT_NOTIFICATION_CONFIG.channels.email,
+        smtpPass: 'secret',
+        recipientGroups: { ops: 'ops@example.com' },
+        severityGroupMap: { warning: 'ops' }
+      }
     }
   });
 

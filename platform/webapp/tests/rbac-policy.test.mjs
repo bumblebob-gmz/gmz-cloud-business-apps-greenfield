@@ -34,6 +34,7 @@ test('policy requirements for protected GET and POST endpoints', () => {
   assert.equal(getRequiredRoleForOperation('GET /api/alerts/config'), 'admin');
   assert.equal(getRequiredRoleForOperation('POST /api/alerts/config'), 'admin');
   assert.equal(getRequiredRoleForOperation('POST /api/alerts/test'), 'admin');
+  assert.equal(getRequiredRoleForOperation('POST /api/alerts/preview-routing'), 'admin');
   assert.equal(getRequiredRoleForOperation('POST /api/auth/alerts/dispatch'), 'admin');
 });
 

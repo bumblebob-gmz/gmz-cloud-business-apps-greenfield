@@ -11,10 +11,19 @@ type RouteToggles = {
   testAlerts: boolean;
 };
 
+export type AlertSeverity = 'info' | 'warning' | 'critical';
+
+export type SeverityRouting = {
+  info: boolean;
+  warning: boolean;
+  critical: boolean;
+};
+
 export type TeamsConfig = {
   enabled: boolean;
   webhookUrl: string;
   routes: RouteToggles;
+  bySeverity: SeverityRouting;
 };
 
 export type EmailConfig = {
@@ -27,6 +36,9 @@ export type EmailConfig = {
   from: string;
   to: string;
   routes: RouteToggles;
+  bySeverity: SeverityRouting;
+  recipientGroups: Record<string, string>;
+  severityGroupMap: Partial<Record<AlertSeverity, string>>;
 };
 
 export type NotificationConfig = {
@@ -36,12 +48,15 @@ export type NotificationConfig = {
   };
 };
 
+const DEFAULT_SEVERITY_ROUTING: SeverityRouting = { info: true, warning: true, critical: true };
+
 export const DEFAULT_NOTIFICATION_CONFIG: NotificationConfig = {
   channels: {
     teams: {
       enabled: false,
       webhookUrl: '',
-      routes: { authAlerts: true, testAlerts: true }
+      routes: { authAlerts: true, testAlerts: true },
+      bySeverity: { ...DEFAULT_SEVERITY_ROUTING }
     },
     email: {
       enabled: false,
@@ -52,7 +67,10 @@ export const DEFAULT_NOTIFICATION_CONFIG: NotificationConfig = {
       smtpPass: '',
       from: '',
       to: '',
-      routes: { authAlerts: true, testAlerts: true }
+      routes: { authAlerts: true, testAlerts: true },
+      bySeverity: { ...DEFAULT_SEVERITY_ROUTING },
+      recipientGroups: {},
+      severityGroupMap: {}
     }
   }
 };
@@ -79,6 +97,35 @@ function sanitizeRoutes(input: unknown, fallback: RouteToggles): RouteToggles {
   };
 }
 
+function sanitizeSeverityRouting(input: unknown, fallback: SeverityRouting): SeverityRouting {
+  const candidate = input && typeof input === 'object' ? input as Record<string, unknown> : {};
+  return {
+    info: toBool(candidate.info, fallback.info),
+    warning: toBool(candidate.warning, fallback.warning),
+    critical: toBool(candidate.critical, fallback.critical)
+  };
+}
+
+function sanitizeRecipientGroups(input: unknown): Record<string, string> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+  const next: Record<string, string> = {};
+  for (const [group, recipients] of Object.entries(input as Record<string, unknown>)) {
+    const normalizedGroup = group.trim();
+    if (!normalizedGroup) continue;
+    next[normalizedGroup] = toStringSafe(recipients);
+  }
+  return next;
+}
+
+function sanitizeSeverityGroupMap(input: unknown): Partial<Record<AlertSeverity, string>> {
+  const candidate = input && typeof input === 'object' ? input as Record<string, unknown> : {};
+  return {
+    info: toStringSafe(candidate.info),
+    warning: toStringSafe(candidate.warning),
+    critical: toStringSafe(candidate.critical)
+  };
+}
+
 function sanitizeConfig(input: unknown): NotificationConfig {
   const root = input && typeof input === 'object' ? input as Record<string, unknown> : {};
   const channels = root.channels && typeof root.channels === 'object' ? root.channels as Record<string, unknown> : {};
@@ -91,7 +138,8 @@ function sanitizeConfig(input: unknown): NotificationConfig {
       teams: {
         enabled: toBool(teamsIn.enabled, DEFAULT_NOTIFICATION_CONFIG.channels.teams.enabled),
         webhookUrl: toStringSafe(teamsIn.webhookUrl),
-        routes: sanitizeRoutes(teamsIn.routes, DEFAULT_NOTIFICATION_CONFIG.channels.teams.routes)
+        routes: sanitizeRoutes(teamsIn.routes, DEFAULT_NOTIFICATION_CONFIG.channels.teams.routes),
+        bySeverity: sanitizeSeverityRouting(teamsIn.bySeverity, DEFAULT_NOTIFICATION_CONFIG.channels.teams.bySeverity)
       },
       email: {
         enabled: toBool(emailIn.enabled, DEFAULT_NOTIFICATION_CONFIG.channels.email.enabled),
@@ -102,7 +150,10 @@ function sanitizeConfig(input: unknown): NotificationConfig {
         smtpPass: toStringSafe(emailIn.smtpPass),
         from: toStringSafe(emailIn.from),
         to: toStringSafe(emailIn.to),
-        routes: sanitizeRoutes(emailIn.routes, DEFAULT_NOTIFICATION_CONFIG.channels.email.routes)
+        routes: sanitizeRoutes(emailIn.routes, DEFAULT_NOTIFICATION_CONFIG.channels.email.routes),
+        bySeverity: sanitizeSeverityRouting(emailIn.bySeverity, DEFAULT_NOTIFICATION_CONFIG.channels.email.bySeverity),
+        recipientGroups: sanitizeRecipientGroups(emailIn.recipientGroups),
+        severityGroupMap: sanitizeSeverityGroupMap(emailIn.severityGroupMap)
       }
     }
   };
@@ -142,12 +193,28 @@ export async function updateNotificationConfig(patch: Partial<NotificationConfig
       ...current.channels.teams.routes,
       ...(patch.channels.teams.routes ?? {})
     };
+    next.channels.teams.bySeverity = {
+      ...current.channels.teams.bySeverity,
+      ...(patch.channels.teams.bySeverity ?? {})
+    };
   }
 
   if (patch.channels?.email && typeof patch.channels.email === 'object') {
     next.channels.email.routes = {
       ...current.channels.email.routes,
       ...(patch.channels.email.routes ?? {})
+    };
+    next.channels.email.bySeverity = {
+      ...current.channels.email.bySeverity,
+      ...(patch.channels.email.bySeverity ?? {})
+    };
+    next.channels.email.recipientGroups = {
+      ...current.channels.email.recipientGroups,
+      ...(patch.channels.email.recipientGroups ?? {})
+    };
+    next.channels.email.severityGroupMap = {
+      ...current.channels.email.severityGroupMap,
+      ...(patch.channels.email.severityGroupMap ?? {})
     };
 
     if (typeof patch.channels.email.smtpPass === 'string' && patch.channels.email.smtpPass === MASK) {
