@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:rbac": "node --test tests/rbac-policy.test.mjs"
+    "test:rbac": "node --experimental-strip-types --test tests/rbac-policy.test.mjs tests/auth-context.test.ts"
   },
   "dependencies": {
     "next": "14.2.5",

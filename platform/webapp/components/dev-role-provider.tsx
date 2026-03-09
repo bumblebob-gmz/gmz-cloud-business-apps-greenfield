@@ -3,8 +3,11 @@
 import { useEffect } from 'react';
 import { getDevRole, getDevUserId } from '@/lib/dev-auth-client';
 
+const ENABLE_DEV_ROLE_SWITCH = process.env.NEXT_PUBLIC_ENABLE_DEV_ROLE_SWITCH === 'true';
+
 export function DevRoleProvider() {
   useEffect(() => {
+    if (!ENABLE_DEV_ROLE_SWITCH) return;
     const originalFetch = window.fetch.bind(window);
 
     window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -29,5 +32,6 @@ export function DevRoleProvider() {
     };
   }, []);
 
+  if (!ENABLE_DEV_ROLE_SWITCH) return null;
   return null;
 }

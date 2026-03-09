@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import { type DevRole, getDevRole, setDevRole } from '@/lib/dev-auth-client';
 
 const roles: DevRole[] = ['admin', 'technician', 'readonly'];
+const ENABLE_DEV_ROLE_SWITCH = process.env.NEXT_PUBLIC_ENABLE_DEV_ROLE_SWITCH === 'true';
 
 export function DevRoleSwitch() {
+  if (!ENABLE_DEV_ROLE_SWITCH) return null;
   const [role, setRole] = useState<DevRole>('technician');
 
   useEffect(() => {

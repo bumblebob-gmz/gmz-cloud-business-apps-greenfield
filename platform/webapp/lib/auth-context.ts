@@ -1,43 +1,35 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server.js';
 import {
   RBAC_POLICY,
   authorizeOperation as authorizeOperationWithPolicy,
   buildDeniedPayload,
   getRequiredRoleForOperation,
   hasMinimumRole
-} from '@/lib/rbac-policy';
+} from './rbac-policy';
+import {
+  getAuthContextFromRequest,
+  parseTrustedTokensJson,
+  resolveAuthMode,
+  type AuthContext,
+  type AuthMode,
+  type TrustedTokenEntry,
+  type UserRole
+} from './auth-core';
 
-export type UserRole = 'readonly' | 'technician' | 'admin';
-
-export type AuthContext = {
-  userId: string;
-  role: UserRole;
-};
+export type { UserRole, AuthMode, AuthContext, TrustedTokenEntry };
 
 export type RbacOperation = keyof typeof RBAC_POLICY;
 
-const DEFAULT_USER_ID = 'dev-user';
-const DEFAULT_ROLE: UserRole = 'technician';
+const UNAUTHORIZED_MESSAGE = 'Unauthorized: valid bearer token required for trusted-bearer mode.';
 
-function normalizeRole(input: string | null): UserRole {
-  const role = input?.trim().toLowerCase();
-  if (role === 'admin' || role === 'technician' || role === 'readonly') {
-    return role;
-  }
-  return DEFAULT_ROLE;
-}
-
-export function getAuthContextFromRequest(request: Request): AuthContext {
-  const userId = request.headers.get('x-user-id')?.trim() || DEFAULT_USER_ID;
-  const role = normalizeRole(request.headers.get('x-user-role'));
-
-  return { userId, role };
-}
-
-export { hasMinimumRole, getRequiredRoleForOperation };
+export { getAuthContextFromRequest, parseTrustedTokensJson, resolveAuthMode, hasMinimumRole, getRequiredRoleForOperation };
 
 export function authorizeOperation(auth: AuthContext, operation: RbacOperation) {
   return authorizeOperationWithPolicy(auth, operation);
+}
+
+function buildUnauthorizedResponse() {
+  return NextResponse.json({ error: UNAUTHORIZED_MESSAGE }, { status: 401 });
 }
 
 export function buildForbiddenResponse(auth: AuthContext, operation: string, requiredRole: UserRole) {
@@ -46,6 +38,10 @@ export function buildForbiddenResponse(auth: AuthContext, operation: string, req
 
 export function requireOperationRole(request: Request, operation: RbacOperation) {
   const auth = getAuthContextFromRequest(request);
+  if (!auth) {
+    return { ok: false as const, response: buildUnauthorizedResponse() };
+  }
+
   const authorization = authorizeOperation(auth, operation);
 
   if (!authorization.ok) {
@@ -62,6 +58,9 @@ export function requireOperationRole(request: Request, operation: RbacOperation)
 
 export function requireMinimumRole(request: Request, minimumRole: UserRole, operation: string) {
   const auth = getAuthContextFromRequest(request);
+  if (!auth) {
+    return { ok: false as const, response: buildUnauthorizedResponse() };
+  }
 
   if (!hasMinimumRole(auth.role, minimumRole)) {
     return {

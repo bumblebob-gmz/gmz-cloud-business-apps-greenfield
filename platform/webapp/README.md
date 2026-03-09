@@ -39,19 +39,39 @@ Open: `http://localhost:3000`
 - `POST /api/provision/tenant` → creates a provisioning job, returns OpenTofu + Ansible command plan, and supports guarded execution
 - `GET /api/audit/events?limit=50` → returns latest internal audit events from local JSONL store (sanitized)
 
-## Mock auth + RBAC (current MVP)
+## Auth modes + RBAC (current MVP)
 
-- Request headers (optional):
-  - `x-user-id` (default: `dev-user`)
-  - `x-user-role` (`admin` | `technician` | `readonly`, default: `technician`)
+`lib/auth-context.ts` supports two modes:
+
+- `WEBAPP_AUTH_MODE=dev-header` (default, development-friendly)
+  - Request headers (optional):
+    - `x-user-id` (default: `dev-user`)
+    - `x-user-role` (`admin` | `technician` | `readonly`, default: `technician`)
+- `WEBAPP_AUTH_MODE=trusted-bearer` (safer for deployed environments)
+  - Requires `Authorization: Bearer <token>`
+  - Token is validated against `WEBAPP_TRUSTED_TOKENS_JSON`
+  - Example:
+    - `WEBAPP_TRUSTED_TOKENS_JSON=[{"token":"ops-admin-token","userId":"ops-admin","role":"admin"}]`
+  - In this mode, `x-user-id` / `x-user-role` are ignored.
+  - Missing/invalid bearer token on protected endpoints returns `401`.
+
+RBAC policy:
+
 - Protected read endpoints require at least `readonly`:
   - `GET /api/tenants`, `GET /api/jobs`, `GET /api/deployments`
   - `GET /api/reports`, `GET /api/reports.csv`, `GET /api/provision/preflight`
 - Protected write endpoints require at least `technician`.
 - `GET /api/audit/events` requires `admin`.
-- All denials return `403` with role + requiredRole in the JSON body.
-- Policy enforcement is centralized in `lib/rbac-policy.js` + `lib/auth-context.ts`.
-- In UI, a **Dev role** switch in the sidebar controls outgoing API role headers for local testing.
+- RBAC denials return `403` with role + requiredRole in JSON body.
+
+Developer-only role tooling:
+
+- Sidebar **Dev role** switch and client-side header injection are only active if:
+  - `NEXT_PUBLIC_ENABLE_DEV_ROLE_SWITCH=true`
+- Default is disabled (`false`) for production safety.
+- Local development flow:
+  1. Set `NEXT_PUBLIC_ENABLE_DEV_ROLE_SWITCH=true`
+  2. Keep `WEBAPP_AUTH_MODE=dev-header` (or unset)
 
 ## Operator flow notes
 

@@ -165,40 +165,42 @@ Pro Job werden Artefakte unter `platform/webapp/.data/provisioning/<jobId>/` erz
 - `tenant.auto.tfvars`
 - `tenant.ini`
 
-## 8) Mock Auth + RBAC (WebApp API)
+## 8) Auth + RBAC (WebApp API)
 
-Für die internen Mutations-Endpoints gilt ein leichtgewichtiges Header-basiertes RBAC (ohne externen IdP):
+Die WebApp unterstützt zwei Auth-Modi:
 
-- Header:
-  - `x-user-id` (optional, serverseitiger Default: `dev-user`)
-  - `x-user-role` (optional, serverseitiger Default: `technician`)
-- Rollen:
-  - `readonly`: Lesezugriffe auf geschützte GET-Endpunkte:
-    - `GET /api/tenants`
-    - `GET /api/jobs`
-    - `GET /api/deployments`
-    - `GET /api/reports`
-    - `GET /api/reports.csv`
-    - `GET /api/provision/preflight`
-  - `technician`: umfasst `readonly` + Mutationen auf:
-    - `POST /api/tenants`
-    - `POST /api/jobs`
-    - `POST /api/provision/tenant`
-    - `POST /api/setup/plan`
-  - `admin`: umfasst aktuell `technician` + Zugriff auf `GET /api/audit/events`
+- `WEBAPP_AUTH_MODE=dev-header` (Default, lokal bequem)
+  - Nutzt optionale Header `x-user-id` (Default `dev-user`) und `x-user-role` (Default `technician`).
+- `WEBAPP_AUTH_MODE=trusted-bearer` (für sicherere Deployments)
+  - Erwartet `Authorization: Bearer <token>`
+  - Prüft gegen statische Token-Mapping-Env:
+    - `WEBAPP_TRUSTED_TOKENS_JSON=[{"token":"...","userId":"...","role":"admin"}]`
+  - Ignoriert `x-user-id` / `x-user-role` in diesem Modus.
+  - Fehlender/ungültiger Token auf geschützten Endpoints => `401 Unauthorized`.
 
-Bei fehlender Berechtigung liefern die Endpoints `403` mit Rolle und benötigter Rolle im Response-Body.
+RBAC-Rollen:
 
-Audit-Events verwenden für diese Flows den Actor aus dem Auth-Kontext:
+- `readonly`: Lesezugriffe auf geschützte GET-Endpunkte:
+  - `GET /api/tenants`
+  - `GET /api/jobs`
+  - `GET /api/deployments`
+  - `GET /api/reports`
+  - `GET /api/reports.csv`
+  - `GET /api/provision/preflight`
+- `technician`: umfasst `readonly` + Mutationen auf:
+  - `POST /api/tenants`
+  - `POST /api/jobs`
+  - `POST /api/provision/tenant`
+  - `POST /api/setup/plan`
+- `admin`: umfasst aktuell `technician` + Zugriff auf `GET /api/audit/events`
 
-- `actor.type = "user"`
-- `actor.id = x-user-id` (oder Default)
-- `actor.role = x-user-role` (oder Default)
+Bei fehlender Rolle liefern Endpoints `403` mit Rolle + benötigter Rolle im Response-Body.
 
-Developer UX:
+Developer UX (absichtlich env-gated):
 
-- In der linken Navigation gibt es einen **Dev role**-Switcher (`admin` / `technician` / `readonly`).
-- Die WebApp setzt die Header für API-Calls clientseitig automatisch.
+- **Dev role**-Switcher + clientseitige Header-Injektion sind nur aktiv bei
+  - `NEXT_PUBLIC_ENABLE_DEV_ROLE_SWITCH=true`
+- Default ist `false` (production-safe).
 
 ## 9) Setup-Wizard / Architektur lesen
 
