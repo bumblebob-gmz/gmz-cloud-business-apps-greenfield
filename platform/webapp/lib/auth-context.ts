@@ -8,6 +8,7 @@ import {
 } from './rbac-policy.js';
 import {
   getAuthContextFromRequest,
+  getAuthContextFromRequestAsync,
   getTrustedTokenExpiryWarningDays,
   getTrustedTokenHealthSummary,
   parseTrustedTokensJson,
@@ -28,6 +29,7 @@ const UNAUTHORIZED_MESSAGE = 'Unauthorized: valid bearer token required for trus
 
 export {
   getAuthContextFromRequest,
+  getAuthContextFromRequestAsync,
   parseTrustedTokensJson,
   resolveAuthMode,
   hasMinimumRole,
@@ -73,7 +75,7 @@ async function appendDeniedAuditEvent(request: Request, params: {
 }
 
 export async function requireProtectedOperation(request: Request, operation: RbacOperation) {
-  const auth = getAuthContextFromRequest(request);
+  const auth = await getAuthContextFromRequestAsync(request);
 
   if (!auth) {
     const requiredRole = getRequiredRoleForOperation(operation);

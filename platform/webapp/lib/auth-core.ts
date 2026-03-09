@@ -1,5 +1,5 @@
 export type UserRole = 'readonly' | 'technician' | 'admin';
-export type AuthMode = 'dev-header' | 'trusted-bearer';
+export type AuthMode = 'dev-header' | 'trusted-bearer' | 'jwt';
 
 export type AuthContext = {
   userId: string;
@@ -66,7 +66,9 @@ function isTrustedTokenExpiringSoon(entry: TrustedTokenEntry, warningDays: numbe
 }
 
 export function resolveAuthMode(env: NodeJS.ProcessEnv = process.env): AuthMode {
-  return env.WEBAPP_AUTH_MODE === 'trusted-bearer' ? 'trusted-bearer' : DEFAULT_AUTH_MODE;
+  if (env.WEBAPP_AUTH_MODE === 'trusted-bearer') return 'trusted-bearer';
+  if (env.WEBAPP_AUTH_MODE === 'jwt') return 'jwt';
+  return DEFAULT_AUTH_MODE;
 }
 
 export function parseTrustedTokensJson(raw: string | undefined): TrustedTokenEntry[] {
@@ -153,9 +155,37 @@ function getAuthContextFromDevHeader(request: Request): AuthContext {
 }
 
 export function getAuthContextFromRequest(request: Request, env: NodeJS.ProcessEnv = process.env): AuthContext | null {
-  if (resolveAuthMode(env) === 'trusted-bearer') {
+  const mode = resolveAuthMode(env);
+  if (mode === 'trusted-bearer') {
     return getAuthContextFromTrustedBearer(request, env);
   }
+  // JWT mode is async – callers that need JWT support should use
+  // getAuthContextFromRequestAsync() or auth-context.ts guard helpers.
+  if (mode === 'jwt') {
+    // Synchronous path cannot await; return null so callers fall through.
+    // Async callers use getAuthContextFromRequestAsync.
+    return null;
+  }
 
+  return getAuthContextFromDevHeader(request);
+}
+
+/**
+ * Async variant of getAuthContextFromRequest that supports all auth modes,
+ * including jwt (which requires an async JWKS fetch/cache lookup).
+ */
+export async function getAuthContextFromRequestAsync(
+  request: Request,
+  env: NodeJS.ProcessEnv = process.env
+): Promise<AuthContext | null> {
+  const mode = resolveAuthMode(env);
+  if (mode === 'trusted-bearer') {
+    return getAuthContextFromTrustedBearer(request, env);
+  }
+  if (mode === 'jwt') {
+    // Lazy import to avoid loading jose in non-JWT deployments.
+    const { getAuthContextFromJwt } = await import('./jwt-oidc.ts');
+    return getAuthContextFromJwt(request, env);
+  }
   return getAuthContextFromDevHeader(request);
 }
