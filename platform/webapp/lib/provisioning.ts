@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { exec as execCb } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { JobLogEntry, ProvisionPlan, Tenant, TenantSize } from '@/lib/types';
+import type { JobLogEntry, ProvisionPlan, ProvisionPreflight, Tenant, TenantSize } from '@/lib/types';
 
 const exec = promisify(execCb);
 
@@ -27,13 +28,47 @@ function resolveRepoRoot() {
   const directRoot = path.resolve(cwd);
   const parentRoot = path.resolve(cwd, '../..');
 
-  // When running inside platform/webapp, repo root is ../..
   if (cwd.endsWith(path.join('platform', 'webapp'))) {
     return parentRoot;
   }
 
-  // Fallback for running from repo root in development tools.
   return directRoot;
+}
+
+function asBool(value: string | undefined) {
+  return value === 'true';
+}
+
+function hasValue(value: string | undefined) {
+  return Boolean(value && value.trim().length > 0);
+}
+
+export function getProvisionPreflight(): ProvisionPreflight {
+  const required = {
+    PROVISION_PROXMOX_ENDPOINT: hasValue(process.env.PROVISION_PROXMOX_ENDPOINT),
+    PROVISION_PROXMOX_API_TOKEN: hasValue(process.env.PROVISION_PROXMOX_API_TOKEN),
+    PROVISION_DEFAULT_SSH_PUBLIC_KEY: hasValue(process.env.PROVISION_DEFAULT_SSH_PUBLIC_KEY)
+  };
+
+  const optionalDefaults = {
+    PROVISION_DEFAULT_NODE: hasValue(process.env.PROVISION_DEFAULT_NODE),
+    PROVISION_DEFAULT_STORAGE: hasValue(process.env.PROVISION_DEFAULT_STORAGE),
+    PROVISION_DEFAULT_TENANT_PROFILE: hasValue(process.env.PROVISION_DEFAULT_TENANT_PROFILE),
+    PROVISION_DEBIAN_TEMPLATE_ID: hasValue(process.env.PROVISION_DEBIAN_TEMPLATE_ID)
+  };
+
+  const executionEnabled = asBool(process.env.PROVISION_EXECUTION_ENABLED);
+  const missingForExecution = Object.entries(required)
+    .filter(([, present]) => !present)
+    .map(([name]) => name);
+
+  return {
+    ready: executionEnabled && missingForExecution.length === 0,
+    executionEnabled,
+    required,
+    optionalDefaults,
+    missingForExecution
+  };
 }
 
 export function createCorrelationId() {
@@ -46,9 +81,14 @@ export function buildProvisionPlan(tenant: Tenant): ProvisionPlan {
   const ipAddress = `10.${tenant.vlan}.10.100`;
   const memoryMb = shape.ramGb * 1024;
   const vmId = 20000 + tenant.vlan;
+
   const debianTemplateId = Number(process.env.PROVISION_DEBIAN_TEMPLATE_ID ?? 9000);
-  const tenantProfile = process.env.PROVISION_DEFAULT_TENANT_PROFILE ?? 'pve01-lvmthin';
+  const tenantProfile = process.env.PROVISION_DEFAULT_TENANT_PROFILE?.trim();
+  const nodeName = process.env.PROVISION_DEFAULT_NODE?.trim();
+  const storage = process.env.PROVISION_DEFAULT_STORAGE?.trim();
   const sshPublicKey = process.env.PROVISION_DEFAULT_SSH_PUBLIC_KEY ?? '<SET_SSH_PUBLIC_KEY>';
+  const proxmoxEndpoint = process.env.PROVISION_PROXMOX_ENDPOINT ?? 'https://proxmox.local:8006/api2/json';
+  const proxmoxApiToken = process.env.PROVISION_PROXMOX_API_TOKEN ?? 'CHANGE_ME';
 
   const vars = {
     tenantId: tenant.id,
@@ -66,60 +106,114 @@ export function buildProvisionPlan(tenant: Tenant): ProvisionPlan {
     ipAddress,
     debianTemplateId,
     tenantProfile,
+    nodeName,
+    storage,
     sshPublicKeyConfigured: sshPublicKey !== '<SET_SSH_PUBLIC_KEY>'
   };
 
   const repoRoot = resolveRepoRoot();
   const tofuDir = path.join(repoRoot, 'infra/opentofu/environments/prod');
-  const ansibleInventory = path.join(repoRoot, 'automation/ansible/inventory/tenant.ini');
   const ansibleBootstrap = path.join(repoRoot, 'automation/ansible/playbooks/bootstrap-tenant.yml');
   const ansibleDeploy = path.join(repoRoot, 'automation/ansible/playbooks/deploy-apps.yml');
 
   const tfVars = [
-    `tenant_name=${vars.tenantSlug}`,
-    `vm_id=${vars.vmId}`,
-    `vlan_id=${vars.vlan}`,
-    `cores=${vars.cpu}`,
-    `memory_mb=${vars.memoryMb}`,
-    `disk_gb=${vars.diskGb}`,
-    `debian_template_id=${vars.debianTemplateId}`,
-    `tenant_profile=${vars.tenantProfile}`,
-    `ssh_public_key=${sshPublicKey}`
+    `proxmox_endpoint = ${toHclString(proxmoxEndpoint)}`,
+    `proxmox_api_token = ${toHclString(proxmoxApiToken)}`,
+    `tenant_name = ${toHclString(vars.tenantSlug)}`,
+    `vm_id = ${vars.vmId}`,
+    `vlan_id = ${vars.vlan}`,
+    `cores = ${vars.cpu}`,
+    `memory_mb = ${vars.memoryMb}`,
+    `disk_gb = ${vars.diskGb}`,
+    `debian_template_id = ${vars.debianTemplateId}`,
+    `ssh_public_key = ${toHclString(sshPublicKey)}`
   ];
+
+  if (tenantProfile) {
+    tfVars.push(`tenant_profile = ${toHclString(tenantProfile)}`);
+  } else if (nodeName && storage) {
+    tfVars.push(`node_name = ${toHclString(nodeName)}`);
+    tfVars.push(`storage = ${toHclString(storage)}`);
+  }
 
   const commands = [
     `tofu -chdir='${tofuDir}' init -input=false`,
-    `tofu -chdir='${tofuDir}' plan -input=false ${tfVars.map((value) => `-var '${value}'`).join(' ')}`,
-    `ansible-playbook -i '${ansibleInventory}' '${ansibleBootstrap}'`,
-    `ansible-playbook -i '${ansibleInventory}' '${ansibleDeploy}'`
+    `tofu -chdir='${tofuDir}' plan -input=false -var-file='<TFVARS_PATH>'`,
+    `tofu -chdir='${tofuDir}' apply -input=false -auto-approve -var-file='<TFVARS_PATH>'`,
+    `ansible-playbook -i '<INVENTORY_PATH>' '${ansibleBootstrap}'`,
+    `ansible-playbook -i '<INVENTORY_PATH>' '${ansibleDeploy}'`
   ];
 
-  return { vars, commands };
+  return { vars, commands, generatedFiles: { tfvarsPath: '', inventoryPath: '', workDir: '' } };
+}
+
+export async function materializeProvisionFiles(jobId: string, plan: ProvisionPlan) {
+  const webappRoot = process.cwd();
+  const workDir = path.join(webappRoot, '.data/provisioning', jobId);
+  await mkdir(workDir, { recursive: true });
+
+  const tfvarsPath = path.join(workDir, 'tenant.auto.tfvars');
+  const inventoryPath = path.join(workDir, 'tenant.ini');
+
+  const tfvarsLines = [
+    `tenant_name = ${toHclString(plan.vars.tenantSlug)}`,
+    `vm_id = ${plan.vars.vmId}`,
+    `vlan_id = ${plan.vars.vlan}`,
+    `cores = ${plan.vars.cpu}`,
+    `memory_mb = ${plan.vars.memoryMb}`,
+    `disk_gb = ${plan.vars.diskGb}`,
+    `debian_template_id = ${plan.vars.debianTemplateId}`,
+    `ssh_public_key = ${toHclString(process.env.PROVISION_DEFAULT_SSH_PUBLIC_KEY ?? '<SET_SSH_PUBLIC_KEY>')}`,
+    `proxmox_endpoint = ${toHclString(process.env.PROVISION_PROXMOX_ENDPOINT ?? 'https://proxmox.local:8006/api2/json')}`,
+    `proxmox_api_token = ${toHclString(process.env.PROVISION_PROXMOX_API_TOKEN ?? 'CHANGE_ME')}`
+  ];
+
+  if (plan.vars.tenantProfile) {
+    tfvarsLines.push(`tenant_profile = ${toHclString(plan.vars.tenantProfile)}`);
+  } else if (plan.vars.nodeName && plan.vars.storage) {
+    tfvarsLines.push(`node_name = ${toHclString(plan.vars.nodeName)}`);
+    tfvarsLines.push(`storage = ${toHclString(plan.vars.storage)}`);
+  }
+
+  const inventory = [
+    '[tenant]',
+    `${plan.vars.tenantSlug} ansible_host=${plan.vars.ipAddress} ansible_user=debian`,
+    '',
+    '[tenant:vars]',
+    'ansible_python_interpreter=/usr/bin/python3'
+  ].join('\n');
+
+  await writeFile(tfvarsPath, `${tfvarsLines.join('\n')}\n`, 'utf8');
+  await writeFile(inventoryPath, `${inventory}\n`, 'utf8');
+
+  return { workDir, tfvarsPath, inventoryPath };
 }
 
 export async function runProvisionCommands(commands: string[]): Promise<{
   logs: JobLogEntry[];
   outputSummary: string;
+  commandResults: { command: string; exitCode: number; snippet: string }[];
   failedCommand?: string;
 }> {
   const logs: JobLogEntry[] = [];
+  const commandResults: { command: string; exitCode: number; snippet: string }[] = [];
 
   for (const command of commands) {
     try {
       logs.push({ at: new Date().toISOString(), level: 'info', message: `Running: ${command}` });
       const { stdout, stderr } = await exec(command, { cwd: process.cwd(), maxBuffer: 1024 * 1024 });
-
       const out = [stdout, stderr].filter(Boolean).join('\n').trim();
-      logs.push({
-        at: new Date().toISOString(),
-        level: 'info',
-        message: out ? summarizeText(out) : 'Command completed with no output.'
-      });
+      const snippet = out ? summarizeText(out) : 'Command completed with no output.';
+      logs.push({ at: new Date().toISOString(), level: 'info', message: snippet });
+      commandResults.push({ command, exitCode: 0, snippet });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Command failed';
-      logs.push({ at: new Date().toISOString(), level: 'error', message: summarizeText(message) });
+      const snippet = summarizeText(message);
+      logs.push({ at: new Date().toISOString(), level: 'error', message: snippet });
+      commandResults.push({ command, exitCode: 1, snippet });
       return {
         logs,
+        commandResults,
         failedCommand: command,
         outputSummary: summarizeLogs(logs)
       };
@@ -128,8 +222,13 @@ export async function runProvisionCommands(commands: string[]): Promise<{
 
   return {
     logs,
+    commandResults,
     outputSummary: summarizeLogs(logs)
   };
+}
+
+function toHclString(value: string) {
+  return JSON.stringify(value);
 }
 
 function summarizeText(text: string, max = 240) {

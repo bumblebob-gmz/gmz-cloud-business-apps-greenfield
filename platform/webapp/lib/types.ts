@@ -31,6 +31,14 @@ export type JobLogEntry = {
   message: string;
 };
 
+export type ProvisionPreflight = {
+  ready: boolean;
+  executionEnabled: boolean;
+  required: Record<string, boolean>;
+  optionalDefaults: Record<string, boolean>;
+  missingForExecution: string[];
+};
+
 export type ProvisionPlan = {
   vars: {
     tenantId: string;
@@ -47,10 +55,17 @@ export type ProvisionPlan = {
     vmId: number;
     ipAddress: string;
     debianTemplateId: number;
-    tenantProfile: string;
+    tenantProfile?: string;
+    nodeName?: string;
+    storage?: string;
     sshPublicKeyConfigured: boolean;
   };
   commands: string[];
+  generatedFiles?: {
+    tfvarsPath: string;
+    inventoryPath: string;
+    workDir: string;
+  };
 };
 
 export type Job = {
@@ -63,7 +78,10 @@ export type Job = {
   correlationId?: string;
   details?: {
     dryRun?: boolean;
+    preflight?: ProvisionPreflight;
     plan?: ProvisionPlan;
+    generatedFiles?: { tfvarsPath: string; inventoryPath: string; workDir: string };
+    commandResults?: { command: string; exitCode: number; snippet: string }[];
     logs?: JobLogEntry[];
     outputSummary?: string;
     error?: string;

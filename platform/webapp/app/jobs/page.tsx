@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { PageShell } from '@/components/page-shell';
-import type { Job, JobStatus, Tenant } from '@/lib/types';
+import type { Job, JobStatus, ProvisionPreflight, Tenant } from '@/lib/types';
 
 const statuses: JobStatus[] = ['Queued', 'Running', 'Success', 'Failed', 'DryRun'];
 
@@ -38,6 +38,8 @@ export default function JobsPage() {
   const [provisioning, setProvisioning] = useState(false);
   const [provisionResult, setProvisionResult] = useState<ProvisionResult | null>(null);
   const [form, setForm] = useState<CreateJobForm>(initialForm);
+  const [preflight, setPreflight] = useState<ProvisionPreflight | null>(null);
+  const [executeMode, setExecuteMode] = useState(false);
 
   async function loadJobs() {
     const response = await fetch('/api/jobs', { cache: 'no-store' });
@@ -55,11 +57,19 @@ export default function JobsPage() {
     if (!selectedTenantId && tenantItems[0]) setSelectedTenantId(tenantItems[0].id);
   }
 
+  async function loadPreflight() {
+    const response = await fetch('/api/provision/preflight', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Failed to load execution readiness (${response.status})`);
+    const data = (await response.json()) as ProvisionPreflight;
+    setPreflight(data);
+    if (!data.ready) setExecuteMode(false);
+  }
+
   async function loadPageData() {
     try {
       setLoading(true);
       setError(null);
-      await Promise.all([loadJobs(), loadTenants()]);
+      await Promise.all([loadJobs(), loadTenants(), loadPreflight()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data.');
     } finally {
@@ -116,17 +126,18 @@ export default function JobsPage() {
       setError(null);
       setProvisionResult(null);
 
+      const dryRun = !executeMode;
       const response = await fetch('/api/provision/tenant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId: selectedTenantId, dryRun: true })
+        body: JSON.stringify({ tenantId: selectedTenantId, dryRun })
       });
 
       const data = (await response.json()) as ProvisionResult & { error?: string };
       if (!response.ok) throw new Error(data.error ?? `Failed to run provisioning (${response.status})`);
 
       setProvisionResult(data);
-      await loadJobs();
+      await Promise.all([loadJobs(), loadPreflight()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to run provisioning.');
     } finally {
@@ -134,10 +145,29 @@ export default function JobsPage() {
     }
   }
 
+  const readinessTone = preflight?.ready ? 'text-emerald-700' : 'text-amber-700';
+
   return (
     <PageShell title="Jobs" subtitle="Track and trigger operational tasks.">
       <section className="panel p-5">
-        <h2 className="text-base font-semibold text-ink">Run Provisioning (Dry-Run)</h2>
+        <h2 className="text-base font-semibold text-ink">Execution readiness</h2>
+        {preflight ? (
+          <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-700 space-y-2">
+            <p className={readinessTone}>{preflight.ready ? 'Ready for execution' : 'Execution not ready'}</p>
+            <p>Execution enabled: {preflight.executionEnabled ? 'Yes' : 'No (set PROVISION_EXECUTION_ENABLED=true)'}</p>
+            {preflight.missingForExecution.length > 0 ? (
+              <p>
+                Missing required vars: <span className="font-mono">{preflight.missingForExecution.join(', ')}</span>
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-slate-600">Loading readiness…</p>
+        )}
+      </section>
+
+      <section className="panel p-5">
+        <h2 className="text-base font-semibold text-ink">Run Provisioning</h2>
         <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={onProvisionSubmit}>
           <label className="text-sm">
             <span className="mb-1 block text-slate-600">Tenant</span>
@@ -153,12 +183,21 @@ export default function JobsPage() {
               ))}
             </select>
           </label>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={executeMode}
+              disabled={!preflight?.ready}
+              onChange={(event) => setExecuteMode(event.target.checked)}
+            />
+            Request execution (dry-run disabled)
+          </label>
           <button
             type="submit"
             disabled={provisioning || !selectedTenantId}
             className="rounded-xl bg-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-brand/90 disabled:opacity-50"
           >
-            {provisioning ? 'Planning…' : 'Run Dry-Run'}
+            {provisioning ? 'Submitting…' : executeMode ? 'Run Execution' : 'Run Dry-Run'}
           </button>
         </form>
 

@@ -136,7 +136,36 @@ Neue App unter `catalog/apps/<app-id>/` anlegen mit:
 
 Danach in CI/Review freigeben, dann deploybar machen.
 
-## 7) Setup-Wizard / Architektur lesen
+## 7) Platform WebApp Provisioning API (Dry-Run + Execution)
+
+Die Control-Plane (`platform/webapp`) bietet:
+
+- `POST /api/provision/tenant` mit `{ tenantId, dryRun }`
+  - `dryRun: true` (Default): erzeugt Job-Arbeitsverzeichnis + Artefakte, führt nichts aus
+  - `dryRun: false`: führt OpenTofu + Ansible aus (nur wenn Execution-Preflight grün)
+- `GET /api/provision/preflight`
+  - liefert nur sichere Readiness-Flags (present/missing), keine Secrets
+
+Execution-Mode benötigt folgende ENV-Variablen:
+
+- `PROVISION_EXECUTION_ENABLED=true`
+- `PROVISION_PROXMOX_ENDPOINT`
+- `PROVISION_PROXMOX_API_TOKEN`
+- `PROVISION_DEFAULT_SSH_PUBLIC_KEY`
+
+Optionale Defaults (empfohlen):
+
+- `PROVISION_DEFAULT_TENANT_PROFILE`
+- `PROVISION_DEFAULT_NODE`
+- `PROVISION_DEFAULT_STORAGE`
+- `PROVISION_DEBIAN_TEMPLATE_ID`
+
+Pro Job werden Artefakte unter `platform/webapp/.data/provisioning/<jobId>/` erzeugt:
+
+- `tenant.auto.tfvars`
+- `tenant.ini`
+
+## 8) Setup-Wizard / Architektur lesen
 
 - PRD: `docs/PRD.md`
 - Architektur (v1): `docs/ARCHITECTURE.md`
