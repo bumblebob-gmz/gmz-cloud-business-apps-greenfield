@@ -5,6 +5,7 @@ import path from 'node:path';
 import {
   parseTrustedTokensJson,
   resolveAuthMode,
+  assertAuthModeSafe,
   getAuthContextFromRequest,
   getTrustedTokenExpiryWarningDays,
   getTrustedTokenHealthSummary
@@ -45,9 +46,64 @@ test('parseTrustedTokensJson parses valid entries and ignores invalid ones', () 
   assert.deepEqual(parseTrustedTokensJson('not json'), []);
 });
 
-test('resolveAuthMode defaults to dev-header and supports trusted-bearer', () => {
-  assert.equal(resolveAuthMode({} as NodeJS.ProcessEnv), 'dev-header');
+test('resolveAuthMode defaults to trusted-bearer (fail-safe) when no valid mode is set', () => {
+  // Empty env → fail-safe default
+  assert.equal(resolveAuthMode({} as NodeJS.ProcessEnv), 'trusted-bearer');
+  // Explicit trusted-bearer
   assert.equal(resolveAuthMode({ WEBAPP_AUTH_MODE: 'trusted-bearer' } as NodeJS.ProcessEnv), 'trusted-bearer');
+  // jwt mode
+  assert.equal(resolveAuthMode({ WEBAPP_AUTH_MODE: 'jwt' } as NodeJS.ProcessEnv), 'jwt');
+});
+
+test('resolveAuthMode allows dev-header only when NODE_ENV=development AND WEBAPP_ENABLE_DEV_AUTH=true', () => {
+  // dev-header without the required flags → falls back to fail-safe
+  assert.equal(
+    resolveAuthMode({ WEBAPP_AUTH_MODE: 'dev-header' } as NodeJS.ProcessEnv),
+    'trusted-bearer'
+  );
+  assert.equal(
+    resolveAuthMode({ WEBAPP_AUTH_MODE: 'dev-header', NODE_ENV: 'production' } as NodeJS.ProcessEnv),
+    'trusted-bearer'
+  );
+  assert.equal(
+    resolveAuthMode({ WEBAPP_AUTH_MODE: 'dev-header', NODE_ENV: 'development' } as NodeJS.ProcessEnv),
+    'trusted-bearer'
+  );
+  // Both conditions met → dev-header allowed
+  assert.equal(
+    resolveAuthMode({ WEBAPP_AUTH_MODE: 'dev-header', NODE_ENV: 'development', WEBAPP_ENABLE_DEV_AUTH: 'true' } as NodeJS.ProcessEnv),
+    'dev-header'
+  );
+});
+
+test('assertAuthModeSafe throws in production when dev-header is resolved', () => {
+  // Resolves to dev-header in dev → warns but does not throw
+  const warnMessages: string[] = [];
+  const logger = { warn: (m: string) => warnMessages.push(m), error: (_m: string) => {} };
+  assertAuthModeSafe(
+    { WEBAPP_AUTH_MODE: 'dev-header', NODE_ENV: 'development', WEBAPP_ENABLE_DEV_AUTH: 'true' } as NodeJS.ProcessEnv,
+    logger
+  );
+  assert.equal(warnMessages.length, 1);
+  assert.ok(warnMessages[0]?.includes('SEC-001'));
+
+  // Resolves to trusted-bearer (production) → no throw, no warn
+  const logger2 = { warn: (_m: string) => { throw new Error('unexpected warn'); }, error: (_m: string) => { throw new Error('unexpected error'); } };
+  assertAuthModeSafe({ WEBAPP_AUTH_MODE: 'trusted-bearer', NODE_ENV: 'production' } as NodeJS.ProcessEnv, logger2);
+
+  // dev-header somehow forced in production → throws
+  const errorMessages: string[] = [];
+  const logger3 = { warn: (_m: string) => {}, error: (m: string) => errorMessages.push(m) };
+  // Note: resolveAuthMode will downgrade dev-header in production to trusted-bearer,
+  // but the explicit env var check in assertAuthModeSafe still catches the intent.
+  assert.throws(
+    () => assertAuthModeSafe(
+      { WEBAPP_AUTH_MODE: 'dev-header', NODE_ENV: 'production' } as NodeJS.ProcessEnv,
+      logger3
+    ),
+    /SEC-001/
+  );
+  assert.ok(errorMessages.length >= 1);
 });
 
 test('trusted-bearer mode rejects missing/invalid/expired bearer token auth context', async () => {

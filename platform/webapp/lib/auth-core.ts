@@ -24,7 +24,7 @@ export type TrustedTokenHealthSummary = {
 
 const DEFAULT_USER_ID = 'dev-user';
 const DEFAULT_ROLE: UserRole = 'technician';
-const DEFAULT_AUTH_MODE: AuthMode = 'dev-header';
+const DEFAULT_AUTH_MODE: AuthMode = 'trusted-bearer';
 const DEFAULT_TOKEN_EXPIRY_WARNING_DAYS = 14;
 
 function normalizeRole(input: string | null | undefined): UserRole {
@@ -65,10 +65,60 @@ function isTrustedTokenExpiringSoon(entry: TrustedTokenEntry, warningDays: numbe
   return expiresAtMs <= now + warningWindowMs;
 }
 
+/**
+ * Returns true if dev-header mode is explicitly enabled for the current environment.
+ * Requires both NODE_ENV=development AND WEBAPP_ENABLE_DEV_AUTH=true.
+ */
+function isDevHeaderAllowed(env: NodeJS.ProcessEnv): boolean {
+  return env.NODE_ENV === 'development' && env.WEBAPP_ENABLE_DEV_AUTH === 'true';
+}
+
 export function resolveAuthMode(env: NodeJS.ProcessEnv = process.env): AuthMode {
   if (env.WEBAPP_AUTH_MODE === 'trusted-bearer') return 'trusted-bearer';
   if (env.WEBAPP_AUTH_MODE === 'jwt') return 'jwt';
+  if (env.WEBAPP_AUTH_MODE === 'dev-header') {
+    if (isDevHeaderAllowed(env)) return 'dev-header';
+    // dev-header requested but not permitted — fall through to fail-safe default
+  }
   return DEFAULT_AUTH_MODE;
+}
+
+/**
+ * Startup guard: call once at application boot to detect and reject unsafe auth configuration.
+ * Throws in production if dev-header mode is active. Logs a loud warning in development.
+ *
+ * @param env - process.env (injectable for testing)
+ * @param logger - optional logger; defaults to console
+ */
+export function assertAuthModeSafe(
+  env: NodeJS.ProcessEnv = process.env,
+  logger: { warn: (msg: string) => void; error: (msg: string) => void } = console
+): void {
+  const mode = resolveAuthMode(env);
+  const isProduction = env.NODE_ENV === 'production';
+
+  if (mode === 'dev-header') {
+    const msg =
+      '[SEC-001] CRITICAL: auth mode is "dev-header" — the server trusts client-supplied ' +
+      'x-user-role headers. This MUST NOT be used in production. ' +
+      'Set WEBAPP_AUTH_MODE=trusted-bearer (or jwt) and remove WEBAPP_ENABLE_DEV_AUTH.';
+
+    if (isProduction) {
+      logger.error(msg);
+      throw new Error(msg);
+    } else {
+      logger.warn(msg);
+    }
+  }
+
+  // Extra guard: if someone somehow forces dev-header env vars in production, refuse to start
+  if (isProduction && env.WEBAPP_AUTH_MODE === 'dev-header') {
+    const msg =
+      '[SEC-001] CRITICAL: WEBAPP_AUTH_MODE=dev-header is explicitly set in NODE_ENV=production. ' +
+      'This configuration is forbidden. Aborting.';
+    logger.error(msg);
+    throw new Error(msg);
+  }
 }
 
 export function parseTrustedTokensJson(raw: string | undefined): TrustedTokenEntry[] {

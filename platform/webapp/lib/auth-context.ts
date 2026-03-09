@@ -7,6 +7,7 @@ import {
   hasMinimumRole
 } from './rbac-policy.js';
 import {
+  assertAuthModeSafe,
   getAuthContextFromRequest,
   getAuthContextFromRequestAsync,
   getTrustedTokenExpiryWarningDays,
@@ -28,6 +29,7 @@ export type RbacOperation = keyof typeof RBAC_POLICY;
 const UNAUTHORIZED_MESSAGE = 'Unauthorized: valid bearer token required for trusted-bearer mode.';
 
 export {
+  assertAuthModeSafe,
   getAuthContextFromRequest,
   getAuthContextFromRequestAsync,
   parseTrustedTokensJson,

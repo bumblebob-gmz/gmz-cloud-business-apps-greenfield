@@ -54,13 +54,10 @@ Open: `http://localhost:3000`
 
 ## Auth modes + RBAC (current MVP)
 
-`lib/auth-context.ts` supports two modes:
+`lib/auth-context.ts` supports three modes:
 
-- `WEBAPP_AUTH_MODE=dev-header` (default, development-friendly)
-  - Request headers (optional):
-    - `x-user-id` (default: `dev-user`)
-    - `x-user-role` (`admin` | `technician` | `readonly`, default: `technician`)
-- `WEBAPP_AUTH_MODE=trusted-bearer` (safer for deployed environments)
+- `WEBAPP_AUTH_MODE=trusted-bearer` (**default** — recommended for all environments)
+  - Requires `Authorization: Bearer <token>`
   - Requires `Authorization: Bearer <token>`
   - Token is validated against `WEBAPP_TRUSTED_TOKENS_JSON`
   - Example:
@@ -103,9 +100,16 @@ Developer-only role tooling:
 - Sidebar **Dev role** switch and client-side header injection are only active if:
   - `NEXT_PUBLIC_ENABLE_DEV_ROLE_SWITCH=true`
 - Default is disabled (`false`) for production safety.
-- Local development flow:
-  1. Set `NEXT_PUBLIC_ENABLE_DEV_ROLE_SWITCH=true`
-  2. Keep `WEBAPP_AUTH_MODE=dev-header` (or unset)
+- Local development flow with dev-header mode (⚠️ insecure — local only):
+  1. Set `NODE_ENV=development`
+  2. Set `WEBAPP_ENABLE_DEV_AUTH=true`
+  3. Set `WEBAPP_AUTH_MODE=dev-header`
+  4. Optionally set `NEXT_PUBLIC_ENABLE_DEV_ROLE_SWITCH=true`
+- **`WEBAPP_AUTH_MODE=dev-header`** (⚠️ DEVELOPMENT ONLY — NEVER IN PRODUCTION)
+  - Trusts client-supplied `x-user-id` / `x-user-role` headers — no real authentication.
+  - Only activated when **both** `NODE_ENV=development` **and** `WEBAPP_ENABLE_DEV_AUTH=true` are set.
+  - Falls back to `trusted-bearer` automatically in all other cases.
+  - The startup guard `assertAuthModeSafe()` throws if `dev-header` is active in production.
 
 ## Operator flow notes
 

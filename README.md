@@ -174,11 +174,10 @@ Pro Job werden Artefakte unter `platform/webapp/.data/provisioning/<jobId>/` erz
 
 ## 8) Auth + RBAC (WebApp API)
 
-Die WebApp unterstützt zwei Auth-Modi:
+Die WebApp unterstützt drei Auth-Modi:
 
-- `WEBAPP_AUTH_MODE=dev-header` (Default, lokal bequem)
-  - Nutzt optionale Header `x-user-id` (Default `dev-user`) und `x-user-role` (Default `technician`).
-- `WEBAPP_AUTH_MODE=trusted-bearer` (für sicherere Deployments)
+- `WEBAPP_AUTH_MODE=trusted-bearer` (**Standard / empfohlen für alle Deployments**)
+  - Fail-safe-Default: aktiv wenn kein gültiger anderer Modus gesetzt ist.
   - Erwartet `Authorization: Bearer <token>`
   - Prüft gegen statische Token-Mapping-Env:
     - `WEBAPP_TRUSTED_TOKENS_JSON=[{"token":"...","userId":"...","role":"admin","tokenId":"ops-admin-2026","expiresAt":"2026-12-31T23:59:59.000Z"}]`
@@ -189,6 +188,12 @@ Die WebApp unterstützt zwei Auth-Modi:
   - Fehlender/ungültiger/abgelaufener Token auf geschützten Endpoints => `401 Unauthorized`.
   - Optionale Warning-Window-Konfiguration für Token-Rotation in `GET /api/auth/health`:
     - `WEBAPP_TRUSTED_TOKEN_EXPIRY_WARNING_DAYS` (Default: `14`)
+
+- `WEBAPP_AUTH_MODE=dev-header` (⚠️ **NUR LOKAL – NIEMALS IN PRODUKTION** ⚠️)
+  - Vertraut client-seitigen `x-user-id` / `x-user-role`-Headern ohne Authentifizierung.
+  - **Nur aktiv wenn beide Bedingungen erfüllt sind:** `NODE_ENV=development` UND `WEBAPP_ENABLE_DEV_AUTH=true`.
+  - Fällt automatisch auf `trusted-bearer` zurück wenn eine Bedingung fehlt.
+  - Der Startup-Guard `assertAuthModeSafe()` wirft einen Fehler bei Production-Betrieb.
 
 RBAC-Rollen:
 
