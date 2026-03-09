@@ -36,6 +36,7 @@ Open: `http://localhost:3000`
 - `GET /api/reports`
 - `GET /api/reports.csv` → downloads reports as CSV
 - `POST /api/setup/plan` → generates a dry-run setup plan (checks, commands, masked credentials)
+- `POST /api/provision/tenant` → creates a provisioning job, returns OpenTofu + Ansible command plan, and supports guarded execution
 
 ## Operator flow notes
 
@@ -49,6 +50,33 @@ Open: `http://localhost:3000`
 - Tenant create API validates required auth fields and requires `authentik` in `apps`
 - Job IDs are clickable from dashboard and jobs table, opening `/jobs/[id]`
 - Job detail page resolves local job + tenant context from `.data/store.json`
+
+## Provision tenant endpoint
+
+`POST /api/provision/tenant`
+
+Request body:
+
+```json
+{
+  "tenantId": "tn-001",
+  "dryRun": true
+}
+```
+
+Behavior:
+
+- `dryRun` defaults to `true` (safe by default)
+- Always creates a job entry in `.data/store.json` with a `correlationId`
+- Returns concrete OpenTofu + Ansible commands and resolved vars (size → CPU/RAM/disk, VLAN/IP rule `10.<vlan>.10.100`, tenant slug)
+- If `dryRun=false` and execution is disabled, endpoint returns `403`
+- To allow real command execution, set:
+
+```bash
+PROVISION_EXECUTION_ENABLED=true
+```
+
+When execution is enabled, commands run sequentially via child process and summarized output is stored in job details.
 
 ## Data persistence behavior
 

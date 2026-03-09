@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing required job fields.' }, { status: 400 });
   }
 
-  const allowedStatuses: JobStatus[] = ['Queued', 'Running', 'Success', 'Failed'];
+  const allowedStatuses: JobStatus[] = ['Queued', 'Running', 'Success', 'Failed', 'DryRun'];
   if (body.status && !allowedStatuses.includes(body.status)) {
     return NextResponse.json({ error: 'Invalid job status.' }, { status: 400 });
   }

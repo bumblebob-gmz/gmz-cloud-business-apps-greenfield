@@ -23,7 +23,35 @@ export type Tenant = {
   contactEmail?: string;
 };
 
-export type JobStatus = 'Queued' | 'Running' | 'Success' | 'Failed';
+export type JobStatus = 'Queued' | 'Running' | 'Success' | 'Failed' | 'DryRun';
+
+export type JobLogEntry = {
+  at: string;
+  level: 'info' | 'warn' | 'error';
+  message: string;
+};
+
+export type ProvisionPlan = {
+  vars: {
+    tenantId: string;
+    tenantSlug: string;
+    tenantName: string;
+    customer: string;
+    region: string;
+    size: TenantSize;
+    cpu: number;
+    ramGb: number;
+    memoryMb: number;
+    diskGb: number;
+    vlan: number;
+    vmId: number;
+    ipAddress: string;
+    debianTemplateId: number;
+    tenantProfile: string;
+    sshPublicKeyConfigured: boolean;
+  };
+  commands: string[];
+};
 
 export type Job = {
   id: string;
@@ -31,6 +59,15 @@ export type Job = {
   task: string;
   status: JobStatus;
   startedAt: string;
+  updatedAt?: string;
+  correlationId?: string;
+  details?: {
+    dryRun?: boolean;
+    plan?: ProvisionPlan;
+    logs?: JobLogEntry[];
+    outputSummary?: string;
+    error?: string;
+  };
 };
 
 export type DeploymentEnv = 'Staging' | 'Production';
@@ -81,4 +118,6 @@ export type CreateJobInput = {
   tenant: string;
   task: string;
   status?: JobStatus;
+  correlationId?: string;
+  details?: Job['details'];
 };

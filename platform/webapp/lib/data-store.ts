@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { CreateJobInput, CreateTenantInput, DataShape, Job, Report, Tenant } from '@/lib/types';
+import type { CreateJobInput, CreateTenantInput, DataShape, Job, JobStatus, Report, Tenant } from '@/lib/types';
 
 const DATA_DIR = path.join(process.cwd(), '.data');
 const DATA_FILE = path.join(DATA_DIR, 'store.json');
@@ -103,9 +103,18 @@ async function writeStore(data: DataShape) {
   await writeFile(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
 }
 
+function nowClock() {
+  return new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
 export async function listTenants(): Promise<Tenant[]> {
   const data = await readStore();
   return data.tenants;
+}
+
+export async function getTenantById(id: string): Promise<Tenant | null> {
+  const data = await readStore();
+  return data.tenants.find((tenant) => tenant.id === id) ?? null;
 }
 
 export async function listJobs(): Promise<Job[]> {
@@ -140,12 +149,36 @@ export async function createJob(input: CreateJobInput): Promise<Job> {
     tenant: input.tenant,
     task: input.task,
     status: input.status ?? 'Queued',
-    startedAt: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+    correlationId: input.correlationId,
+    details: input.details,
+    startedAt: nowClock(),
+    updatedAt: nowClock()
   };
 
   data.jobs.unshift(job);
   await writeStore(data);
   return job;
+}
+
+export async function updateJob(
+  id: string,
+  patch: Partial<Pick<Job, 'status' | 'details' | 'updatedAt'>>
+): Promise<Job | null> {
+  const data = await readStore();
+  const index = data.jobs.findIndex((job) => job.id === id);
+  if (index < 0) return null;
+
+  const current = data.jobs[index];
+  const next: Job = {
+    ...current,
+    ...patch,
+    details: patch.details ? { ...current.details, ...patch.details } : current.details,
+    updatedAt: patch.updatedAt ?? nowClock()
+  };
+
+  data.jobs[index] = next;
+  await writeStore(data);
+  return next;
 }
 
 export async function createTenant(input: CreateTenantInput): Promise<{ tenant: Tenant; job: Job }> {
@@ -172,7 +205,8 @@ export async function createTenant(input: CreateTenantInput): Promise<{ tenant: 
     tenant: tenant.name,
     task: 'Provision Tenant Environment',
     status: 'Queued',
-    startedAt: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+    startedAt: nowClock(),
+    updatedAt: nowClock()
   };
 
   data.tenants.unshift(tenant);
