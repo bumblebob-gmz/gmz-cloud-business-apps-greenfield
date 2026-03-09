@@ -11,7 +11,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { isDatabaseEnabled } from './db/client.ts';
-import type { CreateJobInput, CreateTenantInput, DataShape, Deployment, Job, JobStatus, Report, Tenant } from '@/lib/types';
+import type { CreateDeploymentInput, CreateJobInput, CreateTenantInput, DataShape, Deployment, Job, JobStatus, Report, Tenant, UpdateDeploymentPatch } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
 // File-based fallback (original implementation)
@@ -153,6 +153,36 @@ async function fileGetJobById(id: string): Promise<Job | null> {
 async function fileListDeployments(): Promise<Deployment[]> {
   const data = await readStore();
   return data.deployments;
+}
+
+async function fileCreateDeployment(input: CreateDeploymentInput): Promise<Deployment> {
+  const data = await readStore();
+  const deployment: Deployment = {
+    id: `dep-${randomUUID().slice(0, 8)}`,
+    tenant: input.tenant,
+    version: input.version,
+    env: input.env,
+    status: input.status ?? 'Healthy',
+    updatedAt: nowClock()
+  };
+  data.deployments.unshift(deployment);
+  await writeStore(data);
+  return deployment;
+}
+
+async function fileUpdateDeployment(id: string, patch: UpdateDeploymentPatch): Promise<Deployment | null> {
+  const data = await readStore();
+  const index = data.deployments.findIndex((d) => d.id === id);
+  if (index < 0) return null;
+  const current = data.deployments[index];
+  const next: Deployment = {
+    ...current,
+    status: patch.status ?? current.status,
+    updatedAt: patch.updatedAt ?? nowClock()
+  };
+  data.deployments[index] = next;
+  await writeStore(data);
+  return next;
 }
 
 async function fileListReports(): Promise<Report[]> {
@@ -319,4 +349,20 @@ export async function createTenant(input: CreateTenantInput): Promise<{ tenant: 
     return dbCreateTenant(input);
   }
   return fileCreateTenant(input);
+}
+
+export async function createDeployment(input: CreateDeploymentInput): Promise<Deployment> {
+  if (isDatabaseEnabled()) {
+    const { dbCreateDeployment } = await import('./db/data-store-db.ts');
+    return dbCreateDeployment(input);
+  }
+  return fileCreateDeployment(input);
+}
+
+export async function updateDeployment(id: string, patch: UpdateDeploymentPatch): Promise<Deployment | null> {
+  if (isDatabaseEnabled()) {
+    const { dbUpdateDeployment } = await import('./db/data-store-db.ts');
+    return dbUpdateDeployment(id, patch);
+  }
+  return fileUpdateDeployment(id, patch);
 }

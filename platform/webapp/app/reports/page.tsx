@@ -5,6 +5,14 @@ import { PageShell } from '@/components/page-shell';
 import type { Report } from '@/lib/types';
 import type { ReportOptions, ReportFormat, ReportType } from '@/lib/reporting/report-types';
 
+const REPORT_TYPES: { value: ReportType; label: string }[] = [
+  { value: 'summary', label: 'Platform Summary' },
+  { value: 'tenant-list', label: 'Tenant List' },
+  { value: 'audit-events', label: 'Audit Events' },
+  { value: 'provisioning-history', label: 'Provisioning History' },
+  { value: 'tenant', label: 'Per-Tenant Report' }
+];
+
 export default function ReportsPage() {
   const [items, setItems] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,15 +77,16 @@ export default function ReportsPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate report');
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || `Failed to generate report (${response.status})`);
       }
 
-      // Trigger download
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || 'report.pdf';
+      const disposition = response.headers.get('Content-Disposition') ?? '';
+      a.download = disposition.match(/filename="(.+)"/)?.[1] || `report.${format}`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -90,32 +99,33 @@ export default function ReportsPage() {
   }
 
   return (
-    <PageShell title="Reports" subtitle="Generated platform and compliance reports.">
-      
+    <PageShell title="Reports" subtitle="Generate and export platform and compliance reports.">
+
       <section className="panel p-5 mb-6">
         <h2 className="text-lg font-semibold mb-4">Generate New Report</h2>
         <form onSubmit={handleGenerate} className="flex flex-wrap gap-4 items-end">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
-            <select 
-              value={reportType} 
+            <label className="block text-sm font-medium text-slate-700 mb-1">Report Type</label>
+            <select
+              value={reportType}
               onChange={(e) => setReportType(e.target.value as ReportType)}
               className="rounded-md border border-slate-300 px-3 py-2 text-sm"
             >
-              <option value="summary">Platform Summary</option>
-              <option value="tenant">Tenant Report</option>
+              {REPORT_TYPES.map((rt) => (
+                <option key={rt.value} value={rt.value}>{rt.label}</option>
+              ))}
             </select>
           </div>
 
           {reportType === 'tenant' && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Tenant ID</label>
-              <input 
-                type="text" 
-                required 
-                value={tenantId} 
+              <input
+                type="text"
+                required
+                value={tenantId}
                 onChange={(e) => setTenantId(e.target.value)}
-                placeholder="e.g. acme-corp"
+                placeholder="e.g. tn-001"
                 className="rounded-md border border-slate-300 px-3 py-2 text-sm"
               />
             </div>
@@ -123,12 +133,13 @@ export default function ReportsPage() {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Format</label>
-            <select 
-              value={format} 
+            <select
+              value={format}
               onChange={(e) => setFormat(e.target.value as ReportFormat)}
               className="rounded-md border border-slate-300 px-3 py-2 text-sm"
             >
               <option value="pdf">PDF</option>
+              <option value="csv">CSV</option>
             </select>
           </div>
 
@@ -137,17 +148,23 @@ export default function ReportsPage() {
             disabled={generating}
             className="rounded-xl bg-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-brand/90 disabled:opacity-50"
           >
-            {generating ? 'Generating...' : 'Generate & Download'}
+            {generating ? 'Generating…' : 'Generate & Download'}
           </button>
         </form>
       </section>
 
-      <section className="flex items-center justify-end mb-4">
+      <section className="flex flex-wrap items-center gap-3 mb-4">
         <a
           href="/api/reports.csv"
-          className="rounded-xl bg-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-brand/90"
+          className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
         >
-          Export CSV (Legacy)
+          Export Report List (CSV)
+        </a>
+        <a
+          href="/api/audit/events.csv"
+          className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+        >
+          Export Audit Events (CSV)
         </a>
       </section>
 

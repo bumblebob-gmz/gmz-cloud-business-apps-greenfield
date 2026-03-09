@@ -5,7 +5,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { getDbClient } from './client.ts';
-import type { CreateJobInput, CreateTenantInput, Deployment, Job, Report, Tenant } from '../types.ts';
+import type { CreateDeploymentInput, CreateJobInput, CreateTenantInput, Deployment, Job, Report, Tenant, UpdateDeploymentPatch } from '../types.ts';
 
 // Prisma enum values map to TypeScript string literals
 function nowClock() {
@@ -206,6 +206,35 @@ export async function dbListDeployments(): Promise<Deployment[]> {
   const db = getDbClient();
   const rows = await db.deployment.findMany({ orderBy: { createdAt: 'desc' } });
   return rows.map((r) => dbDeploymentToDeployment(r as unknown as Record<string, unknown>));
+}
+
+export async function dbCreateDeployment(input: CreateDeploymentInput): Promise<Deployment> {
+  const db = getDbClient();
+  const row = await db.deployment.create({
+    data: {
+      id: `dep-${randomUUID().slice(0, 8)}`,
+      tenant: input.tenant,
+      version: input.version,
+      env: input.env as string,
+      status: (input.status ?? 'Healthy') as string,
+      updatedAt: nowClock()
+    }
+  });
+  return dbDeploymentToDeployment(row as unknown as Record<string, unknown>);
+}
+
+export async function dbUpdateDeployment(id: string, patch: UpdateDeploymentPatch): Promise<Deployment | null> {
+  const db = getDbClient();
+  const exists = await db.deployment.findUnique({ where: { id } });
+  if (!exists) return null;
+  const row = await db.deployment.update({
+    where: { id },
+    data: {
+      status: patch.status as string | undefined,
+      updatedAt: patch.updatedAt ?? nowClock()
+    }
+  });
+  return dbDeploymentToDeployment(row as unknown as Record<string, unknown>);
 }
 
 // ---------------------------------------------------------------------------

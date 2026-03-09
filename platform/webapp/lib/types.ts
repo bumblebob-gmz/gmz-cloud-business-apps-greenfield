@@ -159,3 +159,15 @@ export type CreateJobInput = {
   correlationId?: string;
   details?: Job['details'];
 };
+
+export type CreateDeploymentInput = {
+  tenant: string;
+  version: string;
+  env: DeploymentEnv;
+  status?: DeploymentStatus;
+};
+
+export type UpdateDeploymentPatch = {
+  status?: DeploymentStatus;
+  updatedAt?: string;
+};
