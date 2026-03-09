@@ -5,7 +5,8 @@ import {
   createCorrelationId,
   getProvisionPreflight,
   materializeProvisionFiles,
-  runProvisionCommands
+  runProvisionCommands,
+  runRollbackHook
 } from '@/lib/provisioning';
 
 type ProvisionRequest = {
@@ -121,6 +122,38 @@ export async function POST(request: Request) {
   await updateJob(job.id, { status: 'Running' });
   const result = await runProvisionCommands(commands);
 
+  const rollbackHook = process.env.PROVISION_ROLLBACK_HOOK_CMD?.trim();
+  const rollbackNeeded = Boolean(result.failedCommand && result.applySucceeded);
+
+  const rollback = rollbackNeeded
+    ? rollbackHook
+      ? { attempted: true, ...(await runRollbackHook(rollbackHook)) }
+      : {
+          attempted: false,
+          reason: 'No rollback hook configured (PROVISION_ROLLBACK_HOOK_CMD not set).'
+        }
+    : {
+        attempted: false,
+        reason: result.failedCommand ? 'Failure happened before apply completed; rollback skipped.' : 'Not needed.'
+      };
+
+  const mergedLogs = [...result.logs];
+  if (rollbackNeeded) {
+    if (rollback.attempted && 'at' in rollback) {
+      mergedLogs.push({
+        at: rollback.at,
+        level: rollback.ok ? 'warn' : 'error',
+        message: `Rollback hook ${rollback.ok ? 'completed' : 'failed'}: ${rollback.snippet}`
+      });
+    } else {
+      mergedLogs.push({
+        at: new Date().toISOString(),
+        level: 'warn',
+        message: 'Rollback skipped: PROVISION_ROLLBACK_HOOK_CMD is not set.'
+      });
+    }
+  }
+
   const success = !result.failedCommand;
   const updatedJob = await updateJob(job.id, {
     status: success ? 'Success' : 'Failed',
@@ -130,7 +163,10 @@ export async function POST(request: Request) {
       plan: enrichedPlan,
       generatedFiles: files,
       commandResults: result.commandResults,
-      logs: result.logs,
+      commandAttempts: result.commandAttempts,
+      retriesConfigured: result.retriesConfigured,
+      rollback,
+      logs: mergedLogs,
       outputSummary: result.outputSummary,
       error: result.failedCommand ? `Failed command: ${result.failedCommand}` : undefined
     }

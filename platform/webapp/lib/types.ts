@@ -82,6 +82,26 @@ export type Job = {
     plan?: ProvisionPlan;
     generatedFiles?: { tfvarsPath: string; inventoryPath: string; workDir: string };
     commandResults?: { command: string; exitCode: number; snippet: string }[];
+    commandAttempts?: {
+      command: string;
+      step: string;
+      attempt: number;
+      maxAttempts: number;
+      exitCode: number;
+      snippet: string;
+      at: string;
+      backoffMs?: number;
+    }[];
+    retriesConfigured?: number;
+    rollback?: {
+      attempted: boolean;
+      command?: string;
+      exitCode?: number;
+      ok?: boolean;
+      snippet?: string;
+      at?: string;
+      reason?: string;
+    };
     logs?: JobLogEntry[];
     outputSummary?: string;
     error?: string;

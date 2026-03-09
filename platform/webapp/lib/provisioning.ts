@@ -43,6 +43,31 @@ function hasValue(value: string | undefined) {
   return Boolean(value && value.trim().length > 0);
 }
 
+function toRetryCount(value: string | undefined, fallback = 1) {
+  const parsed = Number.parseInt(value ?? '', 10);
+  if (Number.isNaN(parsed) || parsed < 0) return fallback;
+  return Math.min(parsed, 5);
+}
+
+function stepSupportsRetry(command: string) {
+  const normalized = command.trim();
+  return (
+    normalized.includes('tofu ') && (normalized.includes(' plan ') || normalized.includes(' apply '))
+  ) || normalized.startsWith('ansible-playbook ');
+}
+
+function getStepName(command: string) {
+  if (command.includes('tofu ') && command.includes(' init ')) return 'tofu-init';
+  if (command.includes('tofu ') && command.includes(' plan ')) return 'tofu-plan';
+  if (command.includes('tofu ') && command.includes(' apply ')) return 'tofu-apply';
+  if (command.startsWith('ansible-playbook ')) return command.includes('deploy-apps.yml') ? 'ansible-deploy' : 'ansible-bootstrap';
+  return 'command';
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export function getProvisionPreflight(): ProvisionPreflight {
   const required = {
     PROVISION_PROXMOX_ENDPOINT: hasValue(process.env.PROVISION_PROXMOX_ENDPOINT),
@@ -193,38 +218,164 @@ export async function runProvisionCommands(commands: string[]): Promise<{
   logs: JobLogEntry[];
   outputSummary: string;
   commandResults: { command: string; exitCode: number; snippet: string }[];
+  commandAttempts: {
+    command: string;
+    step: string;
+    attempt: number;
+    maxAttempts: number;
+    exitCode: number;
+    snippet: string;
+    at: string;
+    backoffMs?: number;
+  }[];
+  retriesConfigured: number;
   failedCommand?: string;
+  failedStep?: string;
+  applySucceeded: boolean;
 }> {
   const logs: JobLogEntry[] = [];
   const commandResults: { command: string; exitCode: number; snippet: string }[] = [];
+  const commandAttempts: {
+    command: string;
+    step: string;
+    attempt: number;
+    maxAttempts: number;
+    exitCode: number;
+    snippet: string;
+    at: string;
+    backoffMs?: number;
+  }[] = [];
+
+  const retriesConfigured = toRetryCount(process.env.PROVISION_COMMAND_MAX_RETRIES, 1);
+  let applySucceeded = false;
 
   for (const command of commands) {
-    try {
-      logs.push({ at: new Date().toISOString(), level: 'info', message: `Running: ${command}` });
-      const { stdout, stderr } = await exec(command, { cwd: process.cwd(), maxBuffer: 1024 * 1024 });
-      const out = [stdout, stderr].filter(Boolean).join('\n').trim();
-      const snippet = out ? summarizeText(out) : 'Command completed with no output.';
-      logs.push({ at: new Date().toISOString(), level: 'info', message: snippet });
-      commandResults.push({ command, exitCode: 0, snippet });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Command failed';
-      const snippet = summarizeText(message);
-      logs.push({ at: new Date().toISOString(), level: 'error', message: snippet });
-      commandResults.push({ command, exitCode: 1, snippet });
-      return {
-        logs,
-        commandResults,
-        failedCommand: command,
-        outputSummary: summarizeLogs(logs)
-      };
+    const step = getStepName(command);
+    const supportsRetry = stepSupportsRetry(command);
+    const maxAttempts = supportsRetry ? retriesConfigured + 1 : 1;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        logs.push({
+          at: new Date().toISOString(),
+          level: 'info',
+          message: `Running (${step}): ${command}${maxAttempts > 1 ? ` [attempt ${attempt}/${maxAttempts}]` : ''}`
+        });
+
+        const { stdout, stderr } = await exec(command, { cwd: process.cwd(), maxBuffer: 1024 * 1024 });
+        const out = [stdout, stderr].filter(Boolean).join('\n').trim();
+        const snippet = out ? summarizeText(out) : 'Command completed with no output.';
+
+        commandAttempts.push({
+          command,
+          step,
+          attempt,
+          maxAttempts,
+          exitCode: 0,
+          snippet,
+          at: new Date().toISOString()
+        });
+
+        logs.push({ at: new Date().toISOString(), level: 'info', message: snippet });
+        commandResults.push({ command, exitCode: 0, snippet });
+
+        if (step === 'tofu-apply') {
+          applySucceeded = true;
+        }
+
+        break;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Command failed';
+        const snippet = summarizeText(message);
+        const lastAttempt = attempt === maxAttempts;
+
+        const entry: {
+          command: string;
+          step: string;
+          attempt: number;
+          maxAttempts: number;
+          exitCode: number;
+          snippet: string;
+          at: string;
+          backoffMs?: number;
+        } = {
+          command,
+          step,
+          attempt,
+          maxAttempts,
+          exitCode: 1,
+          snippet,
+          at: new Date().toISOString()
+        };
+
+        if (!lastAttempt) {
+          const backoffMs = 2000 * 2 ** (attempt - 1);
+          entry.backoffMs = backoffMs;
+          logs.push({
+            at: new Date().toISOString(),
+            level: 'warn',
+            message: `${step} failed on attempt ${attempt}/${maxAttempts}; retrying in ${Math.round(backoffMs / 1000)}s. ${snippet}`
+          });
+          commandAttempts.push(entry);
+          await sleep(backoffMs);
+          continue;
+        }
+
+        logs.push({ at: new Date().toISOString(), level: 'error', message: snippet });
+        commandAttempts.push(entry);
+        commandResults.push({ command, exitCode: 1, snippet });
+        return {
+          logs,
+          commandResults,
+          commandAttempts,
+          retriesConfigured,
+          failedCommand: command,
+          failedStep: step,
+          applySucceeded,
+          outputSummary: summarizeLogs(logs)
+        };
+      }
     }
   }
 
   return {
     logs,
     commandResults,
+    commandAttempts,
+    retriesConfigured,
+    applySucceeded,
     outputSummary: summarizeLogs(logs)
   };
+}
+
+export async function runRollbackHook(command: string): Promise<{
+  ok: boolean;
+  command: string;
+  exitCode: number;
+  snippet: string;
+  at: string;
+}> {
+  const at = new Date().toISOString();
+  try {
+    const { stdout, stderr } = await exec(command, { cwd: process.cwd(), maxBuffer: 1024 * 1024 });
+    const out = [stdout, stderr].filter(Boolean).join('\n').trim();
+    return {
+      ok: true,
+      command,
+      exitCode: 0,
+      snippet: out ? summarizeText(out) : 'Rollback hook completed with no output.',
+      at
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Rollback hook failed';
+    return {
+      ok: false,
+      command,
+      exitCode: 1,
+      snippet: summarizeText(message),
+      at
+    };
+  }
 }
 
 function toHclString(value: string) {

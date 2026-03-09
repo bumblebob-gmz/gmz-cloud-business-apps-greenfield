@@ -78,6 +78,17 @@ PROVISION_EXECUTION_ENABLED=true
 
 When execution is enabled, commands run sequentially via child process and summarized output is stored in job details.
 
+### Retry + rollback controls
+
+Optional environment variables for production-hardening:
+
+- `PROVISION_COMMAND_MAX_RETRIES` (default: `1`)  
+  Number of retries for `tofu plan`, `tofu apply`, and `ansible-playbook` steps. Uses exponential backoff (`2s`, `4s`, ...).
+- `PROVISION_ROLLBACK_HOOK_CMD` (default: unset)  
+  If a failure happens after `tofu apply` succeeded, this command is executed once as rollback hook. If unset, rollback is skipped safely.
+
+Job details at `/jobs/[id]` include per-attempt timeline, retry metadata, and rollback outcome.
+
 ## Data persistence behavior
 
 - Data is stored in `.data/store.json` (auto-created on first request)
