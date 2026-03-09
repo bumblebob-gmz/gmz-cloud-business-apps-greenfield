@@ -1,0 +1,24 @@
+id: documenso
+name: Documenso
+version: "1.5.6"
+status: draft
+category: documents
+summary: "Open-source document signing platform — self-hosted DocuSign alternative with full API, webhooks, templates, and team support."
+website: https://documenso.com
+docsUrl: https://docs.documenso.com
+requires:
+  - postgresql
+  - smtp
+supportsBranding: true
+supportsSSO: true
+exposes:
+  - service: documenso
+    component: webapp
+    protocol: https
+    port: 3000
+    hostPattern: documenso.{tenant}.irongeeks.eu
+image: documenso/documenso:1.5.6
+maintainer: gmz-platform
+healthcheck: healthcheck.yaml
+compose_template: compose.template.yml
+vars_schema: vars.schema.json

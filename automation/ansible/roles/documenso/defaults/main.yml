@@ -1,0 +1,9 @@
+---
+documenso_version: "1.5.6"
+documenso_port: 3000
+documenso_compose_dir: "/opt/documenso"
+documenso_data_dir: "/opt/documenso/data"
+documenso_image: "documenso/documenso"
+documenso_db_image: "postgres:16-alpine"
+documenso_health_retries: 12
+documenso_health_delay: 10

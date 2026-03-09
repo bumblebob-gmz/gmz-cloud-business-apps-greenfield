@@ -1,0 +1,70 @@
+version: "3.9"
+
+services:
+  documenso:
+    image: documenso/documenso:{{ version | default('1.5.6') }}
+    container_name: "{{ tenant_slug }}-documenso"
+    restart: unless-stopped
+    depends_on:
+      documenso-db:
+        condition: service_healthy
+    environment:
+      NEXTAUTH_URL: "https://{{ domain }}"
+      NEXTAUTH_SECRET: "{{ secret_key }}"
+      NEXT_PUBLIC_WEBAPP_URL: "https://{{ domain }}"
+      DATABASE_URL: "postgresql://documenso:{{ db_password }}@documenso-db:5432/documenso"
+      NEXT_PRIVATE_ENCRYPTION_KEY: "{{ encryption_key }}"
+      NEXT_PRIVATE_ENCRYPTION_SECONDARY_KEY: "{{ encryption_key_secondary | default(encryption_key) }}"
+      # SMTP
+      NEXT_PRIVATE_SMTP_HOST: "{{ smtp_host }}"
+      NEXT_PRIVATE_SMTP_PORT: "{{ smtp_port | default('587') }}"
+      NEXT_PRIVATE_SMTP_USERNAME: "{{ smtp_user }}"
+      NEXT_PRIVATE_SMTP_PASSWORD: "{{ smtp_pass }}"
+      NEXT_PRIVATE_SMTP_FROM_ADDRESS: "{{ smtp_from }}"
+      NEXT_PRIVATE_SMTP_FROM_NAME: "{{ smtp_from_name | default('Documenso') }}"
+      NEXT_PRIVATE_SMTP_SECURE: "{{ smtp_secure | default('false') }}"
+      # Optional OIDC (Authentik)
+      NEXT_PRIVATE_OIDC_WELL_KNOWN: "{{ oidc_well_known | default('') }}"
+      NEXT_PRIVATE_OIDC_CLIENT_ID: "{{ oidc_client_id | default('') }}"
+      NEXT_PRIVATE_OIDC_CLIENT_SECRET: "{{ oidc_client_secret | default('') }}"
+    ports:
+      - "{{ documenso_port | default('3000') }}:3000"
+    volumes:
+      - documenso_uploads:/app/public/uploads
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.{{ tenant_slug }}-documenso.rule=Host(`{{ domain }}`)"
+      - "traefik.http.routers.{{ tenant_slug }}-documenso.entrypoints=websecure"
+      - "traefik.http.routers.{{ tenant_slug }}-documenso.tls.certresolver=ionos"
+      - "traefik.http.services.{{ tenant_slug }}-documenso.loadbalancer.server.port=3000"
+    networks:
+      - documenso_net
+      - traefik_proxy
+
+  documenso-db:
+    image: postgres:16-alpine
+    container_name: "{{ tenant_slug }}-documenso-db"
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: documenso
+      POSTGRES_USER: documenso
+      POSTGRES_PASSWORD: "{{ db_password }}"
+    volumes:
+      - documenso_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U documenso"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - documenso_net
+
+volumes:
+  documenso_uploads:
+  documenso_db:
+
+networks:
+  documenso_net:
+    driver: bridge
+  traefik_proxy:
+    external: true

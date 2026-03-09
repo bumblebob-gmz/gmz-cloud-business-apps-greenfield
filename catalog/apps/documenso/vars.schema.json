@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Documenso App Variables",
+  "type": "object",
+  "required": ["domain", "smtp_host", "smtp_port", "smtp_user", "smtp_pass", "smtp_from", "secret_key", "encryption_key", "db_password"],
+  "additionalProperties": false,
+  "properties": {
+    "domain": {
+      "type": "string",
+      "description": "Public FQDN for Documenso (e.g. sign.kunde.irongeeks.eu)",
+      "pattern": "^[a-z0-9.-]+\\.[a-z]{2,}$"
+    },
+    "db_password": {
+      "type": "string",
+      "description": "PostgreSQL password for the documenso database user",
+      "minLength": 16
+    },
+    "secret_key": {
+      "type": "string",
+      "description": "NextAuth secret — random 32+ char string (openssl rand -hex 32)",
+      "minLength": 32
+    },
+    "encryption_key": {
+      "type": "string",
+      "description": "AES encryption key for document data — must be exactly 32 chars",
+      "minLength": 32,
+      "maxLength": 32
+    },
+    "encryption_key_secondary": {
+      "type": "string",
+      "description": "Secondary encryption key for key rotation (optional, defaults to encryption_key)",
+      "minLength": 32,
+      "maxLength": 32
+    },
+    "smtp_host": {
+      "type": "string",
+      "description": "SMTP server hostname (e.g. smtp.office365.com)"
+    },
+    "smtp_port": {
+      "type": "string",
+      "description": "SMTP port (587 for STARTTLS, 465 for SSL, 25 for plain)",
+      "enum": ["25", "465", "587", "2525"],
+      "default": "587"
+    },
+    "smtp_user": {
+      "type": "string",
+      "description": "SMTP authentication username / email address"
+    },
+    "smtp_pass": {
+      "type": "string",
+      "description": "SMTP authentication password or app password"
+    },
+    "smtp_from": {
+      "type": "string",
+      "description": "From address for outgoing emails (e.g. sign@kunde.irongeeks.eu)",
+      "format": "email"
+    },
+    "smtp_from_name": {
+      "type": "string",
+      "description": "Display name for outgoing emails",
+      "default": "Documenso"
+    },
+    "smtp_secure": {
+      "type": "string",
+      "description": "Use SSL/TLS (true for port 465, false for STARTTLS on 587)",
+      "enum": ["true", "false"],
+      "default": "false"
+    },
+    "documenso_port": {
+      "type": "string",
+      "description": "Host port to bind Documenso to (only needed without Traefik)",
+      "default": "3000"
+    },
+    "oidc_well_known": {
+      "type": "string",
+      "description": "Authentik OIDC well-known URL (optional, for SSO)",
+      "format": "uri"
+    },
+    "oidc_client_id": {
+      "type": "string",
+      "description": "OIDC client ID from Authentik application"
+    },
+    "oidc_client_secret": {
+      "type": "string",
+      "description": "OIDC client secret from Authentik application"
+    },
+    "version": {
+      "type": "string",
+      "description": "Documenso image tag to deploy",
+      "default": "1.5.6"
+    }
+  }
+}

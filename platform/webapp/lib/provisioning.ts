@@ -1,12 +1,70 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { exec as execCb } from 'node:child_process';
+import { exec as execCb, execFile as execFileCb } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { JobLogEntry, ProvisionPlan, ProvisionPreflight, Tenant } from './types.ts';
 import { SIZE_MAP } from './tenant-policy.ts';
 
 const exec = promisify(execCb);
+const execFile = promisify(execFileCb);
+
+// ---------------------------------------------------------------------------
+// SEC-009: Rollback hook command validation
+// ---------------------------------------------------------------------------
+
+/**
+ * Allowlisted pattern for PROVISION_ROLLBACK_HOOK_CMD:
+ *  - Must start with an absolute path (begins with /)
+ *  - Path segments may only contain alphanumerics, hyphens, underscores, dots
+ *  - Optional whitespace-separated arguments following the same safe character set
+ *  - No shell metacharacters: | ; & ` $ > < ( ) { } ! # * ? [ ] ~ newlines
+ */
+const SAFE_ROLLBACK_CMD_PATTERN = /^\/[a-zA-Z0-9_.\-/]+(?:\s+[a-zA-Z0-9_.\-/]+)*$/;
+
+/**
+ * Validates a rollback hook command string against the allowlisted pattern.
+ * Returns { valid: true } when safe, or { valid: false, reason } otherwise.
+ */
+export function validateRollbackHookCmd(cmd: string): { valid: boolean; reason?: string } {
+  if (!cmd || cmd.trim().length === 0) {
+    return { valid: false, reason: 'Command is empty.' };
+  }
+  const trimmed = cmd.trim();
+  if (!trimmed.startsWith('/')) {
+    return { valid: false, reason: 'Command must be an absolute path (must start with /).' };
+  }
+  if (!SAFE_ROLLBACK_CMD_PATTERN.test(trimmed)) {
+    return {
+      valid: false,
+      reason:
+        'Command contains disallowed characters. Only alphanumerics, hyphens, underscores, dots, ' +
+        'and forward slashes are permitted. Pipes, semicolons, shell operators, and other ' +
+        'metacharacters are not allowed.'
+    };
+  }
+  return { valid: true };
+}
+
+/**
+ * Checks PROVISION_ROLLBACK_HOOK_CMD at startup and emits a console warning
+ * if the value is set but does not pass the allowlist validation.
+ * Call this once during application initialisation.
+ */
+export function checkRollbackHookConfig(): void {
+  const raw = process.env.PROVISION_ROLLBACK_HOOK_CMD;
+  if (!raw || raw.trim().length === 0) {
+    return; // Not configured — nothing to warn about.
+  }
+  const result = validateRollbackHookCmd(raw.trim());
+  if (!result.valid) {
+    console.warn(
+      `[SEC-009] WARNING: PROVISION_ROLLBACK_HOOK_CMD is set but looks unsafe and will be rejected at runtime. ` +
+        `Reason: ${result.reason} ` +
+        `Value (truncated): ${raw.trim().slice(0, 80)}`
+    );
+  }
+}
 
 function slugify(input: string) {
   return input
@@ -63,6 +121,8 @@ function sleep(ms: number) {
 }
 
 export function getProvisionPreflight(): ProvisionPreflight {
+  // SEC-009: Emit startup warning if rollback hook config looks unsafe.
+  checkRollbackHookConfig();
   const required = {
     PROVISION_PROXMOX_ENDPOINT: hasValue(process.env.PROVISION_PROXMOX_ENDPOINT),
     PROVISION_PROXMOX_API_TOKEN: hasValue(process.env.PROVISION_PROXMOX_API_TOKEN),
@@ -350,8 +410,33 @@ export async function runRollbackHook(command: string): Promise<{
   at: string;
 }> {
   const at = new Date().toISOString();
+
+  // SEC-009: Validate the command before execution.
+  const validation = validateRollbackHookCmd(command);
+  if (!validation.valid) {
+    return {
+      ok: false,
+      command,
+      exitCode: 1,
+      snippet: summarizeText(
+        `[SEC-009] Rollback hook rejected: ${validation.reason ?? 'Command did not pass allowlist validation.'}`
+      ),
+      at
+    };
+  }
+
+  // Split into executable + fixed argument array; never pass through a shell.
+  const parts = command.trim().split(/\s+/).filter(Boolean);
+  const file = parts[0];
+  const args = parts.slice(1);
+
   try {
-    const { stdout, stderr } = await exec(command, { cwd: process.cwd(), maxBuffer: 1024 * 1024 });
+    const { stdout, stderr } = await execFile(file, args, {
+      cwd: process.cwd(),
+      maxBuffer: 1024 * 1024,
+      // Explicitly do NOT use shell — execFile spawns the process directly.
+      shell: false
+    });
     const out = [stdout, stderr].filter(Boolean).join('\n').trim();
     return {
       ok: true,

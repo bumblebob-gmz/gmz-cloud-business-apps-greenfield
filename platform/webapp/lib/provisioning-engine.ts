@@ -211,6 +211,27 @@ async function persistPhases(
 }
 
 // ---------------------------------------------------------------------------
+// Health check scheme (ARCH-006)
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the URL scheme to use for tenant health check probes.
+ * Controlled by the PROVISION_HEALTH_CHECK_SCHEME env var (default: "https").
+ * Emits a console.warn at startup if the scheme is "http" (insecure).
+ */
+export function getHealthCheckScheme(): string {
+  const scheme = (process.env.PROVISION_HEALTH_CHECK_SCHEME ?? 'https').toLowerCase().trim();
+  if (scheme === 'http') {
+    console.warn(
+      '[provisioning-engine] WARNING: PROVISION_HEALTH_CHECK_SCHEME is set to "http". ' +
+      'Health check probes will use an unencrypted connection. ' +
+      'Set PROVISION_HEALTH_CHECK_SCHEME=https for production deployments.'
+    );
+  }
+  return scheme;
+}
+
+// ---------------------------------------------------------------------------
 // Per-phase execution
 // ---------------------------------------------------------------------------
 

@@ -1,10 +1,47 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { mkdir, readFile, appendFile } from 'node:fs/promises';
+import { mkdir, readFile, appendFile, writeFile } from 'node:fs/promises';
 import { isDatabaseEnabled } from './db/client.ts';
 
 const DATA_DIR = path.join(process.cwd(), '.data');
 const AUDIT_FILE = path.join(DATA_DIR, 'audit-events.jsonl');
+
+/** Maximum number of audit entries to keep in file-store mode. */
+export const MAX_AUDIT_ENTRIES = (() => {
+  const raw = process.env.AUDIT_MAX_ENTRIES;
+  if (!raw) return 100_000;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 100_000;
+})();
+
+/** When true, use date-stamped audit files (.data/audit-YYYY-MM-DD.jsonl). */
+const AUDIT_LOG_ROTATE = process.env.AUDIT_LOG_ROTATE === 'true';
+
+/** Returns the audit file path: date-stamped if rotation is enabled, otherwise fixed. */
+export function getAuditFilePath(date?: Date): string {
+  if (!AUDIT_LOG_ROTATE) return AUDIT_FILE;
+  const d = date ?? new Date();
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  return path.join(DATA_DIR, `audit-${yyyy}-${mm}-${dd}.jsonl`);
+}
+
+/**
+ * After appending, enforce MAX_AUDIT_ENTRIES by trimming the oldest entries
+ * from the given file if needed.
+ */
+async function enforceAuditCap(filePath: string): Promise<void> {
+  try {
+    const raw = await readFile(filePath, 'utf8');
+    const lines = raw.split('\n').filter(Boolean);
+    if (lines.length <= MAX_AUDIT_ENTRIES) return;
+    const trimmed = lines.slice(lines.length - MAX_AUDIT_ENTRIES);
+    await writeFile(filePath, `${trimmed.join('\n')}\n`, 'utf8');
+  } catch {
+    // best-effort; never throw
+  }
+}
 
 const REQUIRED_FIELDS = ['eventId', 'timestamp', 'correlationId', 'actor', 'tenantId', 'action', 'resource', 'outcome', 'source'] as const;
 const OUTCOMES = new Set(['success', 'failure', 'denied']);
@@ -151,7 +188,9 @@ export async function appendAuditEvent(event: AuditEvent): Promise<{ ok: boolean
 
   try {
     await mkdir(DATA_DIR, { recursive: true });
-    await appendFile(AUDIT_FILE, `${JSON.stringify(event)}\n`, 'utf8');
+    const filePath = getAuditFilePath();
+    await appendFile(filePath, `${JSON.stringify(event)}\n`, 'utf8');
+    await enforceAuditCap(filePath);
     return { ok: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown error';
@@ -196,7 +235,7 @@ export async function listAuditEvents(filtersOrLimit: number | Partial<AuditEven
   }
 
   try {
-    const raw = await readFile(AUDIT_FILE, 'utf8');
+    const raw = await readFile(getAuditFilePath(), 'utf8');
     const lines = raw.split('\n').filter(Boolean);
 
     const parsed = lines
