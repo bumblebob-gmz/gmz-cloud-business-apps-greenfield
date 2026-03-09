@@ -1,0 +1,42 @@
+name: IaC Security Lint
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "infra/opentofu/**"
+      - ".github/workflows/iac-security-lint.yml"
+  pull_request:
+    paths:
+      - "infra/opentofu/**"
+      - ".github/workflows/iac-security-lint.yml"
+
+jobs:
+  checkov:
+    name: "IaC security lint (checkov)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run checkov on infra/opentofu/
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infra/opentofu
+          framework: terraform
+          # Fail the job on HIGH or CRITICAL severity findings only
+          soft_fail_on: LOW,MEDIUM
+          # Output formats: produce SARIF for GitHub Security tab + CLI summary
+          output_format: cli,sarif
+          output_file_path: console,checkov-results.sarif
+          # Skip checks that don't apply to local OpenTofu/Proxmox context
+          skip_check: >-
+            CKV_TF_1,
+            CKV2_GHA_1
+
+      - name: Upload SARIF to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov-results.sarif
+          category: checkov-iac

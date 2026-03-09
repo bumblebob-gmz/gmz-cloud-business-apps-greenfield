@@ -5,16 +5,20 @@ on:
     paths:
       - 'catalog/**'
       - 'ops/scripts/validate_catalog.py'
+      - 'ops/tests/test_validate_catalog.py'
       - '.github/workflows/catalog-validator.yml'
   pull_request:
     paths:
       - 'catalog/**'
       - 'ops/scripts/validate_catalog.py'
+      - 'ops/tests/test_validate_catalog.py'
       - '.github/workflows/catalog-validator.yml'
 
 jobs:
   validate-catalog:
+    name: Validate App Catalog
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,5 +28,11 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Validate catalog
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Run validator unit tests
+        run: python3 -m pytest ops/tests/test_validate_catalog.py -v --tb=short
+
+      - name: Run catalog validator (field-level output)
         run: python3 ops/scripts/validate_catalog.py

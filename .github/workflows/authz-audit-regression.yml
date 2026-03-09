@@ -1,0 +1,48 @@
+name: Authz & Audit Regression Suite
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  authz-audit-regression:
+    name: "RBAC + Audit regression tests"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platform/webapp
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: platform/webapp/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run RBAC + Audit regression suite
+        run: |
+          node --experimental-strip-types --test \
+            tests/rbac-policy.test.mjs \
+            tests/auth-context.test.ts \
+            tests/token-rotation.test.ts \
+            tests/audit-filters.test.ts \
+            tests/audit-emit-provision-deploy.test.ts \
+            tests/tenant-policy-constraints.test.ts \
+          2>&1 | tee ../../test-report-authz-audit.txt
+        # Exit code mirrors the test runner result (non-zero on failures)
+
+      - name: Upload test report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: authz-audit-test-report
+          path: test-report-authz-audit.txt
+          retention-days: 30
