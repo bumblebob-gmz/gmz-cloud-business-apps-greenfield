@@ -3,35 +3,52 @@
   hosts: tenant
   become: true
   vars:
-    # Hook placeholders (can be overridden via inventory/group_vars)
+    # ── Snapshot (pre-update) ─────────────────────────────────
+    # Snapshot is taken by the CI pipeline before invoking this playbook.
+    # These vars are provided here for reference / direct-invocation use.
     pre_update_snapshot_enabled: false
     pre_update_snapshot_hook_cmd: ""
 
-    post_update_healthcheck_enabled: true
+    # ── Post-update health check ──────────────────────────────
+    # Health-check is handled by the CI pipeline after this playbook exits.
+    # Set post_update_healthcheck_enabled=true only for direct-invocation use
+    # (i.e. running this playbook outside of the nightly-updates CI workflow).
+    post_update_healthcheck_enabled: false
     post_update_healthcheck_hook_cmd: ""
 
+    # ── Rollback ──────────────────────────────────────────────
+    # Rollback is triggered by the CI pipeline when health-check fails.
+    # Set rollback_enabled=true only for direct-invocation use.
     rollback_enabled: false
+    # Override with PROVISION_ROLLBACK_HOOK_CMD value when calling directly.
     rollback_hook_cmd: ""
 
   tasks:
-    - name: Pre-update snapshot hook (placeholder)
+    # ── 1. Pre-update snapshot hook (direct-invocation only) ──
+    - name: Pre-update snapshot hook
       ansible.builtin.command: "{{ pre_update_snapshot_hook_cmd }}"
       when:
         - pre_update_snapshot_enabled | bool
         - pre_update_snapshot_hook_cmd | length > 0
       changed_when: true
+      tags: [snapshot]
 
+    # ── 2. Pull newest container images ───────────────────────
     - name: Pull newest container images
       community.docker.docker_compose_v2:
         project_src: /opt/gmz/apps
         pull: always
+      tags: [update]
 
+    # ── 3. Recreate updated containers ────────────────────────
     - name: Recreate updated containers
       community.docker.docker_compose_v2:
         project_src: /opt/gmz/apps
         state: present
+      tags: [update]
 
-    - name: Post-update health check hook (placeholder)
+    # ── 4. Post-update health check hook (direct-invocation) ──
+    - name: Post-update health check hook
       ansible.builtin.command: "{{ post_update_healthcheck_hook_cmd }}"
       register: post_update_healthcheck_result
       when:
@@ -39,17 +56,28 @@
         - post_update_healthcheck_hook_cmd | length > 0
       changed_when: false
       failed_when: post_update_healthcheck_result.rc != 0
+      tags: [healthcheck]
 
-    - name: Rollback hook on health check failure (placeholder)
+    - name: Note when no health check hook is configured (direct-invocation)
+      ansible.builtin.debug:
+        msg: >-
+          No post-update health check hook configured.
+          In CI, health-gating is handled by the nightly-updates.yml GitHub Actions workflow.
+          For direct invocation, set post_update_healthcheck_enabled=true and
+          post_update_healthcheck_hook_cmd to enable.
+      when:
+        - post_update_healthcheck_enabled | bool
+        - post_update_healthcheck_hook_cmd | length == 0
+      tags: [healthcheck]
+
+    # ── 5. Rollback hook on health check failure (direct-invocation) ──
+    - name: Rollback hook on health check failure
       ansible.builtin.command: "{{ rollback_hook_cmd }}"
       when:
         - rollback_enabled | bool
         - rollback_hook_cmd | length > 0
         - post_update_healthcheck_result is defined
+        - post_update_healthcheck_result.rc is defined
         - post_update_healthcheck_result.rc != 0
       changed_when: true
-
-    - name: Note when no health check hook is configured
-      ansible.builtin.debug:
-        msg: "No post-update health check hook configured; set post_update_healthcheck_hook_cmd to enable."
-      when: post_update_healthcheck_hook_cmd | length == 0
+      tags: [rollback]

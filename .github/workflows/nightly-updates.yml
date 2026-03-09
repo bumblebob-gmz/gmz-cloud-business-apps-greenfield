@@ -1,0 +1,298 @@
+name: Nightly Tenant Updates
+
+# Runs nightly; can also be triggered manually with optional tenant filter.
+on:
+  schedule:
+    # 02:00 UTC — outside EU business hours, before most maintenance windows open
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      tenant_host:
+        description: 'Single tenant host to update (leave blank to update all)'
+        required: false
+        default: ''
+      ssh_user:
+        description: 'SSH user on the tenant host'
+        required: false
+        default: 'debian'
+      dry_run:
+        description: 'Dry-run: snapshot + health-check only, skip Ansible update'
+        type: boolean
+        required: false
+        default: false
+
+env:
+  # Ansible inventory group used by the nightly-updates playbook
+  ANSIBLE_INVENTORY: automation/ansible/inventory
+  # Where snapshots are written inside the runner workspace
+  SNAPSHOT_BASE_DIR: /tmp/gmz-snapshots
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # 1. SNAPSHOT — capture tenant state before any changes
+  # ─────────────────────────────────────────────────────────────
+  snapshot:
+    name: Pre-update Snapshot
+    runs-on: ubuntu-latest
+    outputs:
+      snapshot_file: ${{ steps.snap.outputs.snapshot_file }}
+      tenant_host: ${{ steps.resolve.outputs.tenant_host }}
+      ssh_user: ${{ steps.resolve.outputs.ssh_user }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve target tenant
+        id: resolve
+        run: |
+          HOST="${{ github.event.inputs.tenant_host }}"
+          USER="${{ github.event.inputs.ssh_user || 'debian' }}"
+          # When no host is given (scheduled run) fall back to the first host
+          # from the Ansible inventory. Extend this step for multi-tenant runs.
+          if [[ -z "${HOST}" ]]; then
+            HOST=$(grep -E '^[a-zA-Z0-9]' "${ANSIBLE_INVENTORY}" \
+              | grep -v '^\[' | head -1 | awk '{print $1}' || true)
+            echo "No tenant_host input; resolved from inventory: ${HOST}" >&2
+          fi
+          if [[ -z "${HOST}" ]]; then
+            echo "::error::Could not resolve tenant host. Set tenant_host input or populate ${ANSIBLE_INVENTORY}."
+            exit 1
+          fi
+          echo "tenant_host=${HOST}" >> "${GITHUB_OUTPUT}"
+          echo "ssh_user=${USER}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.TENANT_SSH_PRIVATE_KEY }}
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Make scripts executable
+        run: chmod +x ops/scripts/tenant-snapshot.sh ops/scripts/tenant-healthcheck.sh ops/scripts/tenant-rollback.sh
+
+      - name: Take pre-update snapshot
+        id: snap
+        env:
+          SNAPSHOT_BASE_DIR: ${{ env.SNAPSHOT_BASE_DIR }}
+        run: |
+          HOST="${{ steps.resolve.outputs.tenant_host }}"
+          USER="${{ steps.resolve.outputs.ssh_user }}"
+          SNAPSHOT_FILE=$(ops/scripts/tenant-snapshot.sh "${HOST}" "${USER}")
+          echo "snapshot_file=${SNAPSHOT_FILE}" >> "${GITHUB_OUTPUT}"
+          echo "Snapshot: ${SNAPSHOT_FILE}"
+
+      - name: Upload snapshot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-update-snapshot
+          path: ${{ env.SNAPSHOT_BASE_DIR }}
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────
+  # 2. UPDATE — run Ansible nightly-updates playbook
+  # ─────────────────────────────────────────────────────────────
+  update:
+    name: Nightly Ansible Update
+    runs-on: ubuntu-latest
+    needs: snapshot
+    # Skip the actual update in dry-run mode; health-check still runs
+    if: ${{ github.event.inputs.dry_run != 'true' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.TENANT_SSH_PRIVATE_KEY }}
+
+      - name: Install Ansible
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ansible
+          ansible --version
+
+      - name: Install Ansible community.docker collection
+        run: ansible-galaxy collection install community.docker
+
+      - name: Run nightly-updates playbook
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+        run: |
+          TENANT_HOST="${{ needs.snapshot.outputs.tenant_host }}"
+          SSH_USER="${{ needs.snapshot.outputs.ssh_user }}"
+
+          ansible-playbook \
+            -i "${ANSIBLE_INVENTORY}" \
+            automation/ansible/playbooks/nightly-updates.yml \
+            --limit "${TENANT_HOST}" \
+            -e "ansible_user=${SSH_USER}" \
+            -e "post_update_healthcheck_enabled=false" \
+            -e "rollback_enabled=false"
+          # Health-check and rollback are handled by the dedicated CI jobs below
+          # to ensure proper artifact passing and structured failure reporting.
+
+  # ─────────────────────────────────────────────────────────────
+  # 3. HEALTH CHECK — gate rollback on post-update state
+  # ─────────────────────────────────────────────────────────────
+  healthcheck:
+    name: Post-update Health Check
+    runs-on: ubuntu-latest
+    needs: [snapshot, update]
+    # Run even when update is skipped (dry-run path); always runs after update.
+    if: ${{ always() && needs.snapshot.result == 'success' }}
+    outputs:
+      healthy: ${{ steps.check.outputs.healthy }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.TENANT_SSH_PRIVATE_KEY }}
+
+      - name: Make scripts executable
+        run: chmod +x ops/scripts/tenant-healthcheck.sh
+
+      - name: Post-update health check
+        id: check
+        env:
+          HEALTHCHECK_MIN_RUNNING: '1'
+          HEALTHCHECK_RETRIES: '3'
+          HEALTHCHECK_RETRY_DELAY: '15'
+        run: |
+          HOST="${{ needs.snapshot.outputs.tenant_host }}"
+          USER="${{ needs.snapshot.outputs.ssh_user }}"
+
+          if ops/scripts/tenant-healthcheck.sh "${HOST}" "${USER}"; then
+            echo "healthy=true" >> "${GITHUB_OUTPUT}"
+            echo "::notice::Health check PASSED for ${HOST}"
+          else
+            echo "healthy=false" >> "${GITHUB_OUTPUT}"
+            echo "::warning::Health check FAILED for ${HOST} — rollback will be triggered"
+          fi
+
+  # ─────────────────────────────────────────────────────────────
+  # 4. ROLLBACK — restore pre-update state when health gate fails
+  # ─────────────────────────────────────────────────────────────
+  rollback:
+    name: Automated Rollback
+    runs-on: ubuntu-latest
+    needs: [snapshot, update, healthcheck]
+    # Only runs when health check explicitly failed
+    if: ${{ needs.healthcheck.outputs.healthy == 'false' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.TENANT_SSH_PRIVATE_KEY }}
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Make scripts executable
+        run: chmod +x ops/scripts/tenant-rollback.sh ops/scripts/tenant-healthcheck.sh
+
+      - name: Download pre-update snapshot
+        uses: actions/download-artifact@v4
+        with:
+          name: pre-update-snapshot
+          path: /tmp/gmz-snapshots
+
+      - name: Locate snapshot file
+        id: locate
+        run: |
+          HOST="${{ needs.snapshot.outputs.tenant_host }}"
+          # Find the most recent snapshot for this host
+          SNAP=$(ls -t /tmp/gmz-snapshots/${HOST}-*.json 2>/dev/null | head -1 || true)
+          if [[ -z "${SNAP}" ]]; then
+            echo "::error::No snapshot file found for host ${HOST} — cannot rollback."
+            exit 1
+          fi
+          echo "snapshot_file=${SNAP}" >> "${GITHUB_OUTPUT}"
+          echo "Found snapshot: ${SNAP}"
+
+      - name: Execute rollback
+        id: rollback
+        env:
+          ROLLBACK_COMPOSE_DIR: /opt/gmz/apps
+          PROVISION_ROLLBACK_HOOK_CMD: ${{ secrets.PROVISION_ROLLBACK_HOOK_CMD }}
+        run: |
+          HOST="${{ needs.snapshot.outputs.tenant_host }}"
+          USER="${{ needs.snapshot.outputs.ssh_user }}"
+          SNAP="${{ steps.locate.outputs.snapshot_file }}"
+
+          # Primary rollback: restore from snapshot
+          ops/scripts/tenant-rollback.sh "${HOST}" "${USER}" "${SNAP}"
+
+          # Optional: invoke PROVISION_ROLLBACK_HOOK_CMD if configured
+          if [[ -n "${PROVISION_ROLLBACK_HOOK_CMD}" ]]; then
+            echo "[rollback] Invoking PROVISION_ROLLBACK_HOOK_CMD ..." >&2
+            eval "${PROVISION_ROLLBACK_HOOK_CMD}"
+          fi
+
+      - name: Post-rollback health verification
+        id: post_rollback_check
+        env:
+          HEALTHCHECK_MIN_RUNNING: '1'
+          HEALTHCHECK_RETRIES: '2'
+          HEALTHCHECK_RETRY_DELAY: '10'
+        run: |
+          HOST="${{ needs.snapshot.outputs.tenant_host }}"
+          USER="${{ needs.snapshot.outputs.ssh_user }}"
+
+          if ops/scripts/tenant-healthcheck.sh "${HOST}" "${USER}"; then
+            echo "::notice::Post-rollback health check PASSED for ${HOST}"
+          else
+            echo "::error::Post-rollback health check also FAILED. Manual intervention required for ${HOST}."
+            exit 1
+          fi
+
+  # ─────────────────────────────────────────────────────────────
+  # 5. REPORT — final pipeline status summary
+  # ─────────────────────────────────────────────────────────────
+  report:
+    name: Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [snapshot, update, healthcheck, rollback]
+    if: ${{ always() }}
+
+    steps:
+      - name: Emit summary
+        run: |
+          TENANT="${{ needs.snapshot.outputs.tenant_host }}"
+          HEALTHY="${{ needs.healthcheck.outputs.healthy }}"
+          SNAP_RESULT="${{ needs.snapshot.result }}"
+          UPDATE_RESULT="${{ needs.update.result }}"
+          HC_RESULT="${{ needs.healthcheck.result }}"
+          RB_RESULT="${{ needs.rollback.result }}"
+
+          echo "## Nightly Update Pipeline Summary" >> "${GITHUB_STEP_SUMMARY}"
+          echo "" >> "${GITHUB_STEP_SUMMARY}"
+          echo "| Stage       | Result           |" >> "${GITHUB_STEP_SUMMARY}"
+          echo "|-------------|------------------|" >> "${GITHUB_STEP_SUMMARY}"
+          echo "| Snapshot    | ${SNAP_RESULT}   |" >> "${GITHUB_STEP_SUMMARY}"
+          echo "| Update      | ${UPDATE_RESULT} |" >> "${GITHUB_STEP_SUMMARY}"
+          echo "| Health Check| ${HC_RESULT}     |" >> "${GITHUB_STEP_SUMMARY}"
+          echo "| Rollback    | ${RB_RESULT:-skipped} |" >> "${GITHUB_STEP_SUMMARY}"
+          echo "" >> "${GITHUB_STEP_SUMMARY}"
+
+          if [[ "${HEALTHY}" == "true" ]]; then
+            echo "✅ **${TENANT}** updated successfully and is healthy." >> "${GITHUB_STEP_SUMMARY}"
+          elif [[ "${RB_RESULT}" == "success" ]]; then
+            echo "⚠️  **${TENANT}** update failed health check — rolled back to pre-update snapshot." >> "${GITHUB_STEP_SUMMARY}"
+          elif [[ "${RB_RESULT}" == "failure" ]]; then
+            echo "🚨 **${TENANT}** rollback FAILED — manual intervention required!" >> "${GITHUB_STEP_SUMMARY}"
+          else
+            echo "ℹ️  Pipeline completed. Review individual job logs for details." >> "${GITHUB_STEP_SUMMARY}"
+          fi
