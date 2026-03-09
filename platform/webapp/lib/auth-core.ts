@@ -10,6 +10,14 @@ export type TrustedTokenEntry = {
   token: string;
   userId: string;
   role: UserRole;
+  tokenId?: string;
+  expiresAt?: string;
+};
+
+export type TrustedTokenHealthSummary = {
+  total: number;
+  expired: number;
+  active: number;
 };
 
 const DEFAULT_USER_ID = 'dev-user';
@@ -22,6 +30,21 @@ function normalizeRole(input: string | null | undefined): UserRole {
     return role;
   }
   return DEFAULT_ROLE;
+}
+
+function normalizeIsoTimestamp(input: unknown): string | null {
+  if (typeof input !== 'string') return null;
+  const value = input.trim();
+  if (!value) return null;
+
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return null;
+  return new Date(parsed).toISOString();
+}
+
+function isTrustedTokenExpired(entry: TrustedTokenEntry, now = Date.now()): boolean {
+  if (!entry.expiresAt) return false;
+  return Date.parse(entry.expiresAt) <= now;
 }
 
 export function resolveAuthMode(env: NodeJS.ProcessEnv = process.env): AuthMode {
@@ -41,14 +64,43 @@ export function parseTrustedTokensJson(raw: string | undefined): TrustedTokenEnt
         const token = typeof entry.token === 'string' ? entry.token.trim() : '';
         const userId = typeof entry.userId === 'string' ? entry.userId.trim() : '';
         const role = normalizeRole(typeof entry.role === 'string' ? entry.role : null);
+        const tokenId = typeof entry.tokenId === 'string' ? entry.tokenId.trim() : '';
+
+        let expiresAt: string | undefined;
+        if (entry.expiresAt != null) {
+          const normalized = normalizeIsoTimestamp(entry.expiresAt);
+          if (!normalized) return null;
+          expiresAt = normalized;
+        }
 
         if (!token || !userId) return null;
-        return { token, userId, role };
+
+        return {
+          token,
+          userId,
+          role,
+          ...(tokenId ? { tokenId } : {}),
+          ...(expiresAt ? { expiresAt } : {})
+        };
       })
       .filter((entry): entry is TrustedTokenEntry => Boolean(entry));
   } catch {
     return [];
   }
+}
+
+export function getTrustedTokenHealthSummary(
+  rawTrustedTokensJson: string | undefined,
+  now = Date.now()
+): TrustedTokenHealthSummary {
+  const trustedTokens = parseTrustedTokensJson(rawTrustedTokensJson);
+  const expired = trustedTokens.filter((entry) => isTrustedTokenExpired(entry, now)).length;
+
+  return {
+    total: trustedTokens.length,
+    expired,
+    active: trustedTokens.length - expired
+  };
 }
 
 function getBearerToken(request: Request): string | null {
@@ -65,7 +117,7 @@ function getAuthContextFromTrustedBearer(request: Request, env: NodeJS.ProcessEn
 
   const trustedTokens = parseTrustedTokensJson(env.WEBAPP_TRUSTED_TOKENS_JSON);
   const match = trustedTokens.find((entry) => entry.token === token);
-  if (!match) return null;
+  if (!match || isTrustedTokenExpired(match)) return null;
 
   return { userId: match.userId, role: match.role };
 }

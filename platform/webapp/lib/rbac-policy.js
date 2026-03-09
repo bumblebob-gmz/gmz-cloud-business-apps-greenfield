@@ -19,7 +19,8 @@ export const RBAC_POLICY = {
   'GET /api/provision/preflight': 'readonly',
   'POST /api/provision/tenant': 'technician',
   'POST /api/setup/plan': 'technician',
-  'GET /api/audit/events': 'admin'
+  'GET /api/audit/events': 'admin',
+  'GET /api/auth/health': 'admin'
 };
 
 /** @param {UserRole} role @param {UserRole} minimumRole */

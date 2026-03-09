@@ -38,6 +38,7 @@ Open: `http://localhost:3000`
 - `POST /api/setup/plan` → generates a dry-run setup plan (checks, commands, masked credentials)
 - `POST /api/provision/tenant` → creates a provisioning job, returns OpenTofu + Ansible command plan, and supports guarded execution
 - `GET /api/audit/events?limit=50` → returns latest internal audit events from local JSONL store (sanitized)
+- `GET /api/auth/health` → admin-only auth posture summary (mode + safe trusted-token counts + dev role switch state)
 
 ## Auth modes + RBAC (current MVP)
 
@@ -51,9 +52,16 @@ Open: `http://localhost:3000`
   - Requires `Authorization: Bearer <token>`
   - Token is validated against `WEBAPP_TRUSTED_TOKENS_JSON`
   - Example:
-    - `WEBAPP_TRUSTED_TOKENS_JSON=[{"token":"ops-admin-token","userId":"ops-admin","role":"admin"}]`
+    - `WEBAPP_TRUSTED_TOKENS_JSON=[{"token":"ops-admin-token","userId":"ops-admin","role":"admin","tokenId":"ops-admin-2026","expiresAt":"2026-12-31T23:59:59.000Z"}]`
+  - Supported trusted token fields:
+    - `token` (required)
+    - `userId` (required)
+    - `role` (required)
+    - `tokenId` (optional identifier for rotation tracking)
+    - `expiresAt` (optional ISO timestamp; expired tokens are rejected)
+  - Backward compatible: entries without `expiresAt` remain valid.
   - In this mode, `x-user-id` / `x-user-role` are ignored.
-  - Missing/invalid bearer token on protected endpoints returns `401`.
+  - Missing/invalid/expired bearer token on protected endpoints returns `401`.
 
 RBAC policy:
 
@@ -62,6 +70,8 @@ RBAC policy:
   - `GET /api/reports`, `GET /api/reports.csv`, `GET /api/provision/preflight`
 - Protected write endpoints require at least `technician`.
 - `GET /api/audit/events` requires `admin`.
+- `GET /api/auth/health` requires `admin`.
+- Auth denials (`401`/`403`) emit an audit event (`auth.guard.denied`) with operation, required/effective role, and auth mode.
 - RBAC denials return `403` with role + requiredRole in JSON body.
 
 Developer-only role tooling:

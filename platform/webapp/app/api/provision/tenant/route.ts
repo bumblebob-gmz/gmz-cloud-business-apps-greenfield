@@ -9,7 +9,7 @@ import {
 } from '@/lib/provisioning';
 import { appendAuditEvent, buildAuditEvent, getCorrelationIdFromRequest } from '@/lib/audit';
 import { findForbiddenSecretKeys, getExecutionSecretPresence } from '@/lib/secrets-policy';
-import { requireOperationRole } from '@/lib/auth-context';
+import { requireProtectedOperation } from '@/lib/auth-context';
 
 type ProvisionRequest = {
   tenantId?: string;
@@ -17,7 +17,7 @@ type ProvisionRequest = {
 };
 
 export async function POST(request: Request) {
-  const authz = requireOperationRole(request, 'POST /api/provision/tenant');
+  const authz = await requireProtectedOperation(request, 'POST /api/provision/tenant');
   if (!authz.ok) return authz.response;
 
   const correlationId = getCorrelationIdFromRequest(request);

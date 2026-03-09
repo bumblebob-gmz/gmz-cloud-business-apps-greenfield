@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createJob, listJobs } from '@/lib/data-store';
 import type { CreateJobInput, JobStatus } from '@/lib/types';
-import { requireOperationRole } from '@/lib/auth-context';
+import { requireProtectedOperation } from '@/lib/auth-context';
 
 export async function GET(request: Request) {
-  const authz = requireOperationRole(request, 'GET /api/jobs');
+  const authz = await requireProtectedOperation(request, 'GET /api/jobs');
   if (!authz.ok) return authz.response;
 
   const items = await listJobs();
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const authz = requireOperationRole(request, 'POST /api/jobs');
+  const authz = await requireProtectedOperation(request, 'POST /api/jobs');
   if (!authz.ok) return authz.response;
 
   const body = (await request.json()) as Partial<CreateJobInput>;

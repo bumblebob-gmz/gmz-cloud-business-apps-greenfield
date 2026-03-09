@@ -26,6 +26,7 @@ test('policy requirements for protected GET and POST endpoints', () => {
   assert.equal(getRequiredRoleForOperation('POST /api/tenants'), 'technician');
   assert.equal(getRequiredRoleForOperation('POST /api/jobs'), 'technician');
   assert.equal(getRequiredRoleForOperation('GET /api/audit/events'), 'admin');
+  assert.equal(getRequiredRoleForOperation('GET /api/auth/health'), 'admin');
 });
 
 test('denial helper contract returns consistent payload shape', () => {

@@ -174,9 +174,12 @@ Die WebApp unterstützt zwei Auth-Modi:
 - `WEBAPP_AUTH_MODE=trusted-bearer` (für sicherere Deployments)
   - Erwartet `Authorization: Bearer <token>`
   - Prüft gegen statische Token-Mapping-Env:
-    - `WEBAPP_TRUSTED_TOKENS_JSON=[{"token":"...","userId":"...","role":"admin"}]`
+    - `WEBAPP_TRUSTED_TOKENS_JSON=[{"token":"...","userId":"...","role":"admin","tokenId":"ops-admin-2026","expiresAt":"2026-12-31T23:59:59.000Z"}]`
+  - Unterstützte Felder je Token: `token`, `userId`, `role` (required), `tokenId`, `expiresAt` (optional, ISO-Zeitstempel)
+  - Abgelaufene Tokens (`expiresAt` in der Vergangenheit) werden abgewiesen.
+  - Rückwärtskompatibel: Einträge ohne `expiresAt` bleiben gültig.
   - Ignoriert `x-user-id` / `x-user-role` in diesem Modus.
-  - Fehlender/ungültiger Token auf geschützten Endpoints => `401 Unauthorized`.
+  - Fehlender/ungültiger/abgelaufener Token auf geschützten Endpoints => `401 Unauthorized`.
 
 RBAC-Rollen:
 
@@ -192,9 +195,10 @@ RBAC-Rollen:
   - `POST /api/jobs`
   - `POST /api/provision/tenant`
   - `POST /api/setup/plan`
-- `admin`: umfasst aktuell `technician` + Zugriff auf `GET /api/audit/events`
+- `admin`: umfasst aktuell `technician` + Zugriff auf `GET /api/audit/events` und `GET /api/auth/health`
 
 Bei fehlender Rolle liefern Endpoints `403` mit Rolle + benötigter Rolle im Response-Body.
+Auth-Guards schreiben bei `401`/`403` zusätzlich ein `auth.guard.denied`-Audit-Event (inkl. Operation, required/effective role, auth mode).
 
 Developer UX (absichtlich env-gated):
 

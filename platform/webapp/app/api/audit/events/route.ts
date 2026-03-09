@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { listAuditEvents } from '@/lib/audit';
-import { requireOperationRole } from '@/lib/auth-context';
+import { requireProtectedOperation } from '@/lib/auth-context';
 
 export async function GET(request: Request) {
-  const authz = requireOperationRole(request, 'GET /api/audit/events');
+  const authz = await requireProtectedOperation(request, 'GET /api/audit/events');
   if (!authz.ok) return authz.response;
 
   const url = new URL(request.url);

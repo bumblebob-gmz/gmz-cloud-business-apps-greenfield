@@ -5,24 +5,27 @@ import {
   buildDeniedPayload,
   getRequiredRoleForOperation,
   hasMinimumRole
-} from './rbac-policy';
+} from './rbac-policy.js';
 import {
   getAuthContextFromRequest,
+  getTrustedTokenHealthSummary,
   parseTrustedTokensJson,
   resolveAuthMode,
   type AuthContext,
   type AuthMode,
   type TrustedTokenEntry,
+  type TrustedTokenHealthSummary,
   type UserRole
-} from './auth-core';
+} from './auth-core.ts';
+import { appendAuditEvent, buildAuditEvent, getCorrelationIdFromRequest } from './audit.ts';
 
-export type { UserRole, AuthMode, AuthContext, TrustedTokenEntry };
+export type { UserRole, AuthMode, AuthContext, TrustedTokenEntry, TrustedTokenHealthSummary };
 
 export type RbacOperation = keyof typeof RBAC_POLICY;
 
 const UNAUTHORIZED_MESSAGE = 'Unauthorized: valid bearer token required for trusted-bearer mode.';
 
-export { getAuthContextFromRequest, parseTrustedTokensJson, resolveAuthMode, hasMinimumRole, getRequiredRoleForOperation };
+export { getAuthContextFromRequest, parseTrustedTokensJson, resolveAuthMode, hasMinimumRole, getRequiredRoleForOperation, getTrustedTokenHealthSummary };
 
 export function authorizeOperation(auth: AuthContext, operation: RbacOperation) {
   return authorizeOperationWithPolicy(auth, operation);
@@ -34,6 +37,58 @@ function buildUnauthorizedResponse() {
 
 export function buildForbiddenResponse(auth: AuthContext, operation: string, requiredRole: UserRole) {
   return NextResponse.json(buildDeniedPayload(auth, operation, requiredRole), { status: 403 });
+}
+
+async function appendDeniedAuditEvent(request: Request, params: {
+  operation: string;
+  requiredRole: UserRole;
+  effectiveRole?: UserRole;
+}) {
+  await appendAuditEvent(
+    buildAuditEvent({
+      correlationId: getCorrelationIdFromRequest(request),
+      actor: { type: 'user', id: 'unknown', ...(params.effectiveRole ? { role: params.effectiveRole } : {}) },
+      tenantId: 'system',
+      action: 'auth.guard.denied',
+      resource: 'auth',
+      outcome: 'denied',
+      source: { service: 'webapp', operation: params.operation },
+      details: {
+        operation: params.operation,
+        requiredRole: params.requiredRole,
+        effectiveRole: params.effectiveRole ?? null,
+        authMode: resolveAuthMode()
+      }
+    })
+  );
+}
+
+export async function requireProtectedOperation(request: Request, operation: RbacOperation) {
+  const auth = getAuthContextFromRequest(request);
+
+  if (!auth) {
+    const requiredRole = getRequiredRoleForOperation(operation);
+    await appendDeniedAuditEvent(request, { operation, requiredRole });
+    return { ok: false as const, response: buildUnauthorizedResponse() };
+  }
+
+  const authorization = authorizeOperation(auth, operation);
+  if (!authorization.ok) {
+    await appendDeniedAuditEvent(request, {
+      operation,
+      requiredRole: authorization.requiredRole,
+      effectiveRole: auth.role
+    });
+
+    return {
+      ok: false as const,
+      auth,
+      requiredRole: authorization.requiredRole,
+      response: buildForbiddenResponse(auth, operation, authorization.requiredRole)
+    };
+  }
+
+  return { ok: true as const, auth, requiredRole: authorization.requiredRole };
 }
 
 export function requireOperationRole(request: Request, operation: RbacOperation) {

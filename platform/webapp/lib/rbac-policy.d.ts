@@ -12,6 +12,7 @@ export const RBAC_POLICY: {
   readonly 'POST /api/provision/tenant': 'technician';
   readonly 'POST /api/setup/plan': 'technician';
   readonly 'GET /api/audit/events': 'admin';
+  readonly 'GET /api/auth/health': 'admin';
 };
 
 export function hasMinimumRole(role: UserRole, minimumRole: UserRole): boolean;
