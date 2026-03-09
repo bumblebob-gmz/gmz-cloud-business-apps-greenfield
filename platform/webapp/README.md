@@ -37,6 +37,7 @@ Open: `http://localhost:3000`
 - `GET /api/reports.csv` → downloads reports as CSV
 - `POST /api/setup/plan` → generates a dry-run setup plan (checks, commands, masked credentials)
 - `POST /api/provision/tenant` → creates a provisioning job, returns OpenTofu + Ansible command plan, and supports guarded execution
+- `GET /api/audit/events?limit=50` → returns latest internal audit events from local JSONL store (sanitized)
 
 ## Operator flow notes
 
@@ -78,6 +79,12 @@ PROVISION_EXECUTION_ENABLED=true
 
 When execution is enabled, commands run sequentially via child process and summarized output is stored in job details.
 
+### Secrets ingestion policy (provisioning)
+
+- Execution mode accepts infrastructure secrets **only** from environment variables.
+- Request payloads containing secret-like keys (e.g. `token`, `password`, `secret`) are rejected with `400`.
+- API responses expose only secret presence flags (e.g. `executionSecrets`) and never raw env secret values.
+
 ### Retry + rollback controls
 
 Optional environment variables for production-hardening:
@@ -88,6 +95,12 @@ Optional environment variables for production-hardening:
   If a failure happens after `tofu apply` succeeded, this command is executed once as rollback hook. If unset, rollback is skipped safely.
 
 Job details at `/jobs/[id]` include per-attempt timeline, retry metadata, and rollback outcome.
+
+### Audit events
+
+- Audit events are appended to `.data/audit-events.jsonl` as JSONL.
+- Envelope shape is validated at runtime against the documented contract fields in `docs/audit/audit-event.schema.json` (best-effort, no external validator dependency).
+- Provisioning and tenant-create APIs emit request/success/failure lifecycle events with `correlationId` propagation.
 
 ## Data persistence behavior
 

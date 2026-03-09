@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createTenant, listTenants } from '@/lib/data-store';
 import type { AuthMode, CreateTenantInput, TenantSize } from '@/lib/types';
+import { appendAuditEvent, buildAuditEvent, getCorrelationIdFromRequest } from '@/lib/audit';
 
 export async function GET() {
   const items = await listTenants();
@@ -8,7 +9,21 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const correlationId = getCorrelationIdFromRequest(request);
   const body = (await request.json()) as Partial<CreateTenantInput>;
+
+  await appendAuditEvent(
+    buildAuditEvent({
+      correlationId,
+      actor: { type: 'service', id: 'webapp-api' },
+      tenantId: body.name?.trim() || 'unknown',
+      action: 'tenant.create.requested',
+      resource: 'tenant',
+      outcome: 'success',
+      source: { service: 'webapp', operation: 'POST /api/tenants' },
+      details: { dryRun: false }
+    })
+  );
 
   if (!body.name || !body.customer || !body.region || !body.size || body.vlan == null || !body.authMode || !body.contactEmail || !body.maintenanceWindow) {
     return NextResponse.json({ error: 'Missing required tenant fields.' }, { status: 400 });
@@ -45,22 +60,52 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Local admin email is required.' }, { status: 400 });
   }
 
-  const { tenant, job } = await createTenant({
-    name: body.name,
-    customer: body.customer,
-    region: body.region,
-    size: body.size,
-    vlan,
-    authMode: body.authMode,
-    authConfig: {
-      entraTenantId: authConfig.entraTenantId,
-      ldapUrl: authConfig.ldapUrl,
-      localAdminEmail: authConfig.localAdminEmail
-    },
-    apps,
-    maintenanceWindow: body.maintenanceWindow,
-    contactEmail: body.contactEmail
-  });
+  try {
+    const { tenant, job } = await createTenant({
+      name: body.name,
+      customer: body.customer,
+      region: body.region,
+      size: body.size,
+      vlan,
+      authMode: body.authMode,
+      authConfig: {
+        entraTenantId: authConfig.entraTenantId,
+        ldapUrl: authConfig.ldapUrl,
+        localAdminEmail: authConfig.localAdminEmail
+      },
+      apps,
+      maintenanceWindow: body.maintenanceWindow,
+      contactEmail: body.contactEmail
+    });
 
-  return NextResponse.json({ item: tenant, job }, { status: 201 });
+    await appendAuditEvent(
+      buildAuditEvent({
+        correlationId,
+        actor: { type: 'service', id: 'webapp-api' },
+        tenantId: tenant.id,
+        action: 'tenant.create.success',
+        resource: 'tenant',
+        outcome: 'success',
+        source: { service: 'webapp', operation: 'POST /api/tenants' },
+        details: { tenantName: tenant.name, jobId: job.id }
+      })
+    );
+
+    return NextResponse.json({ item: tenant, job, correlationId }, { status: 201 });
+  } catch {
+    await appendAuditEvent(
+      buildAuditEvent({
+        correlationId,
+        actor: { type: 'service', id: 'webapp-api' },
+        tenantId: body.name?.trim() || 'unknown',
+        action: 'tenant.create.failure',
+        resource: 'tenant',
+        outcome: 'failure',
+        source: { service: 'webapp', operation: 'POST /api/tenants' },
+        details: { reason: 'create_tenant_failed' }
+      })
+    );
+
+    return NextResponse.json({ error: 'Failed to create tenant.', correlationId }, { status: 500 });
+  }
 }

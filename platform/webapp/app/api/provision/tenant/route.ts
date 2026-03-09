@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import { createJob, getTenantById, updateJob } from '@/lib/data-store';
 import {
   buildProvisionPlan,
-  createCorrelationId,
   getProvisionPreflight,
   materializeProvisionFiles,
   runProvisionCommands,
   runRollbackHook
 } from '@/lib/provisioning';
+import { appendAuditEvent, buildAuditEvent, getCorrelationIdFromRequest } from '@/lib/audit';
+import { findForbiddenSecretKeys, getExecutionSecretPresence } from '@/lib/secrets-policy';
 
 type ProvisionRequest = {
   tenantId?: string;
@@ -15,7 +16,46 @@ type ProvisionRequest = {
 };
 
 export async function POST(request: Request) {
+  const correlationId = getCorrelationIdFromRequest(request);
   const body = (await request.json().catch(() => ({}))) as ProvisionRequest;
+
+  const forbiddenKeys = findForbiddenSecretKeys(body);
+  if (forbiddenKeys.length > 0) {
+    await appendAuditEvent(
+      buildAuditEvent({
+        correlationId,
+        actor: { type: 'service', id: 'webapp-api' },
+        tenantId: body.tenantId?.trim() || 'unknown',
+        action: 'tenant.provision.failure',
+        resource: 'provisioning',
+        outcome: 'denied',
+        source: { service: 'webapp', operation: 'POST /api/provision/tenant' },
+        details: { reason: 'forbidden_secret_keys_in_request', fields: forbiddenKeys }
+      })
+    );
+
+    return NextResponse.json(
+      {
+        error: 'Secrets must not be provided in request payload. Use environment variables only.',
+        forbiddenFields: forbiddenKeys,
+        correlationId
+      },
+      { status: 400 }
+    );
+  }
+
+  await appendAuditEvent(
+    buildAuditEvent({
+      correlationId,
+      actor: { type: 'service', id: 'webapp-api' },
+      tenantId: body.tenantId?.trim() || 'unknown',
+      action: 'tenant.provision.requested',
+      resource: 'provisioning',
+      outcome: 'success',
+      source: { service: 'webapp', operation: 'POST /api/provision/tenant' },
+      details: { dryRun: body.dryRun ?? true }
+    })
+  );
 
   if (!body.tenantId) {
     return NextResponse.json({ error: 'tenantId is required.' }, { status: 400 });
@@ -23,11 +63,23 @@ export async function POST(request: Request) {
 
   const tenant = await getTenantById(body.tenantId);
   if (!tenant) {
+    await appendAuditEvent(
+      buildAuditEvent({
+        correlationId,
+        actor: { type: 'service', id: 'webapp-api' },
+        tenantId: body.tenantId,
+        action: 'tenant.provision.failure',
+        resource: 'provisioning',
+        outcome: 'failure',
+        source: { service: 'webapp', operation: 'POST /api/provision/tenant' },
+        details: { reason: 'tenant_not_found' }
+      })
+    );
+
     return NextResponse.json({ error: `Tenant not found: ${body.tenantId}` }, { status: 404 });
   }
 
   const dryRun = body.dryRun ?? true;
-  const correlationId = createCorrelationId();
   const preflight = getProvisionPreflight();
   const plan = buildProvisionPlan(tenant);
 
@@ -68,11 +120,25 @@ export async function POST(request: Request) {
   });
 
   if (dryRun) {
+    await appendAuditEvent(
+      buildAuditEvent({
+        correlationId,
+        actor: { type: 'service', id: 'webapp-api' },
+        tenantId: tenant.id,
+        action: 'tenant.provision.dryrun_planned',
+        resource: 'provisioning',
+        outcome: 'success',
+        source: { service: 'webapp', operation: 'POST /api/provision/tenant' },
+        details: { jobId: job.id }
+      })
+    );
+
     return NextResponse.json({
       mode: 'dry-run',
       message: 'Dry-run only. No commands executed.',
       correlationId,
       preflight,
+      executionSecrets: getExecutionSecretPresence(),
       job: { ...job, details: { ...job.details, plan: enrichedPlan, generatedFiles: files } },
       plan: enrichedPlan
     });
@@ -91,7 +157,23 @@ export async function POST(request: Request) {
       }
     });
 
-    return NextResponse.json({ error: reason, correlationId, jobId: job.id, preflight, plan: enrichedPlan }, { status: 403 });
+    await appendAuditEvent(
+      buildAuditEvent({
+        correlationId,
+        actor: { type: 'service', id: 'webapp-api' },
+        tenantId: tenant.id,
+        action: 'tenant.provision.failure',
+        resource: 'provisioning',
+        outcome: 'denied',
+        source: { service: 'webapp', operation: 'POST /api/provision/tenant' },
+        details: { reason: 'execution_disabled', jobId: job.id }
+      })
+    );
+
+    return NextResponse.json(
+      { error: reason, correlationId, jobId: job.id, preflight, executionSecrets: getExecutionSecretPresence(), plan: enrichedPlan },
+      { status: 403 }
+    );
   }
 
   if (preflight.missingForExecution.length > 0) {
@@ -107,12 +189,26 @@ export async function POST(request: Request) {
       }
     });
 
+    await appendAuditEvent(
+      buildAuditEvent({
+        correlationId,
+        actor: { type: 'service', id: 'webapp-api' },
+        tenantId: tenant.id,
+        action: 'tenant.provision.failure',
+        resource: 'provisioning',
+        outcome: 'failure',
+        source: { service: 'webapp', operation: 'POST /api/provision/tenant' },
+        details: { reason: 'missing_execution_env', missing: preflight.missingForExecution, jobId: job.id }
+      })
+    );
+
     return NextResponse.json(
       {
         error: `${reason} Provide them and retry, or run with dryRun=true.`,
         correlationId,
         jobId: job.id,
         preflight,
+        executionSecrets: getExecutionSecretPresence(),
         plan: enrichedPlan
       },
       { status: 400 }
@@ -120,6 +216,19 @@ export async function POST(request: Request) {
   }
 
   await updateJob(job.id, { status: 'Running' });
+  await appendAuditEvent(
+    buildAuditEvent({
+      correlationId,
+      actor: { type: 'service', id: 'webapp-api' },
+      tenantId: tenant.id,
+      action: 'tenant.provision.execution_started',
+      resource: 'provisioning',
+      outcome: 'success',
+      source: { service: 'webapp', operation: 'POST /api/provision/tenant' },
+      details: { jobId: job.id }
+    })
+  );
+
   const result = await runProvisionCommands(commands);
 
   const rollbackHook = process.env.PROVISION_ROLLBACK_HOOK_CMD?.trim();
@@ -136,6 +245,21 @@ export async function POST(request: Request) {
         attempted: false,
         reason: result.failedCommand ? 'Failure happened before apply completed; rollback skipped.' : 'Not needed.'
       };
+
+  if (rollbackNeeded) {
+    await appendAuditEvent(
+      buildAuditEvent({
+        correlationId,
+        actor: { type: 'service', id: 'webapp-api' },
+        tenantId: tenant.id,
+        action: rollback.attempted ? 'tenant.provision.rollback.result' : 'tenant.provision.rollback.attempted',
+        resource: 'provisioning',
+        outcome: rollback.attempted && 'ok' in rollback && rollback.ok === false ? 'failure' : 'success',
+        source: { service: 'webapp', operation: 'POST /api/provision/tenant' },
+        details: rollback
+      })
+    );
+  }
 
   const mergedLogs = [...result.logs];
   if (rollbackNeeded) {
@@ -172,10 +296,24 @@ export async function POST(request: Request) {
     }
   });
 
+  await appendAuditEvent(
+    buildAuditEvent({
+      correlationId,
+      actor: { type: 'service', id: 'webapp-api' },
+      tenantId: tenant.id,
+      action: success ? 'tenant.provision.success' : 'tenant.provision.failure',
+      resource: 'provisioning',
+      outcome: success ? 'success' : 'failure',
+      source: { service: 'webapp', operation: 'POST /api/provision/tenant' },
+      details: { jobId: job.id, failedStep: result.failedStep }
+    })
+  );
+
   return NextResponse.json({
     mode: 'execute',
     correlationId,
     preflight,
+    executionSecrets: getExecutionSecretPresence(),
     plan: enrichedPlan,
     job: updatedJob ?? job,
     success
