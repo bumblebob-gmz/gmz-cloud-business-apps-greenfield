@@ -162,18 +162,18 @@ gmz-cloud-business-apps/
 |---|---|---|
 | Authentik | Identity & Access | ✅ Certified Reference |
 | Nextcloud | Collaboration | ✅ Certified Reference |
-| Paperless-NGX | Dokumentenmanagement | ✅ Approved |
-| Bookstack | Wiki / Dokumentation | ✅ Approved |
+| Paperless-ngx | Dokumentenmanagement | ✅ Approved |
+| BookStack | Wiki / Dokumentation | ✅ Approved |
 | Vaultwarden | Passwort-Manager | ✅ Approved |
-| Documenso | Dokumentensignatur | 📋 Draft |
-| Joplin | Notizen | 📋 Draft |
-| IT-Tools | Dev-Toolbox | 📋 Draft |
-| Wiki.js | Wiki | 📋 Draft |
-| Snipe-IT | Asset-Management | 📋 Draft |
-| Searxng | Metasuchmaschine | 📋 Draft |
-| LibreTranslate | Übersetzung | 📋 Draft |
-| OpenWebUI | KI-Frontend | 📋 Draft |
-| Ollama | LLM-Runtime | 📋 Draft |
+| Documenso | Dokumentensignatur | ✅ Approved |
+| Joplin Server | Notizen / Sync | ✅ Approved |
+| IT-Tools | Dev-Toolbox | ✅ Approved |
+| Wiki.js | Wiki-Engine | ✅ Approved |
+| Snipe-IT | Asset-Management | ✅ Approved |
+| SearXNG | Metasuchmaschine | ✅ Approved |
+| LibreTranslate | Übersetzung | ✅ Approved |
+| Open WebUI | KI-Chat-Frontend | ✅ Approved |
+| Ollama | LLM-Runtime | ✅ Approved |
 
 ---
 
