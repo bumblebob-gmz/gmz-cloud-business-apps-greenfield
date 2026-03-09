@@ -165,7 +165,36 @@ Pro Job werden Artefakte unter `platform/webapp/.data/provisioning/<jobId>/` erz
 - `tenant.auto.tfvars`
 - `tenant.ini`
 
-## 8) Setup-Wizard / Architektur lesen
+## 8) Mock Auth + RBAC (WebApp API)
+
+Für die internen Mutations-Endpoints gilt ein leichtgewichtiges Header-basiertes RBAC (ohne externen IdP):
+
+- Header:
+  - `x-user-id` (optional, serverseitiger Default: `dev-user`)
+  - `x-user-role` (optional, serverseitiger Default: `technician`)
+- Rollen:
+  - `readonly`: nur Lesezugriffe (GET)
+  - `technician`: darf zusätzlich Mutationen ausführen auf:
+    - `POST /api/tenants`
+    - `POST /api/jobs`
+    - `POST /api/provision/tenant`
+    - `POST /api/setup/plan`
+  - `admin`: umfasst aktuell dieselben Rechte wie `technician` (explizit für zukünftige Management-Rechte vorbereitet)
+
+Bei fehlender Berechtigung liefern die Endpoints `403` mit Rolle und benötigter Rolle im Response-Body.
+
+Audit-Events verwenden für diese Flows den Actor aus dem Auth-Kontext:
+
+- `actor.type = "user"`
+- `actor.id = x-user-id` (oder Default)
+- `actor.role = x-user-role` (oder Default)
+
+Developer UX:
+
+- In der linken Navigation gibt es einen **Dev role**-Switcher (`admin` / `technician` / `readonly`).
+- Die WebApp setzt die Header für API-Calls clientseitig automatisch.
+
+## 9) Setup-Wizard / Architektur lesen
 
 - PRD: `docs/PRD.md`
 - Architektur (v1): `docs/ARCHITECTURE.md`

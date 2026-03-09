@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { listAuditEvents } from '@/lib/audit';
+import { requireMinimumRole } from '@/lib/auth-context';
 
 export async function GET(request: Request) {
+  const authz = requireMinimumRole(request, 'admin', 'GET /api/audit/events');
+  if (!authz.ok) return authz.response;
+
   const url = new URL(request.url);
   const requested = Number.parseInt(url.searchParams.get('limit') ?? '50', 10);
   const limit = Number.isFinite(requested) ? requested : 50;

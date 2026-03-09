@@ -9,6 +9,7 @@ import {
 } from '@/lib/provisioning';
 import { appendAuditEvent, buildAuditEvent, getCorrelationIdFromRequest } from '@/lib/audit';
 import { findForbiddenSecretKeys, getExecutionSecretPresence } from '@/lib/secrets-policy';
+import { requireMinimumRole } from '@/lib/auth-context';
 
 type ProvisionRequest = {
   tenantId?: string;
@@ -16,6 +17,9 @@ type ProvisionRequest = {
 };
 
 export async function POST(request: Request) {
+  const authz = requireMinimumRole(request, 'technician', 'POST /api/provision/tenant');
+  if (!authz.ok) return authz.response;
+
   const correlationId = getCorrelationIdFromRequest(request);
   const body = (await request.json().catch(() => ({}))) as ProvisionRequest;
 
@@ -24,7 +28,7 @@ export async function POST(request: Request) {
     await appendAuditEvent(
       buildAuditEvent({
         correlationId,
-        actor: { type: 'service', id: 'webapp-api' },
+        actor: { type: 'user', id: authz.auth.userId, role: authz.auth.role },
         tenantId: body.tenantId?.trim() || 'unknown',
         action: 'tenant.provision.failure',
         resource: 'provisioning',
@@ -47,7 +51,7 @@ export async function POST(request: Request) {
   await appendAuditEvent(
     buildAuditEvent({
       correlationId,
-      actor: { type: 'service', id: 'webapp-api' },
+      actor: { type: 'user', id: authz.auth.userId, role: authz.auth.role },
       tenantId: body.tenantId?.trim() || 'unknown',
       action: 'tenant.provision.requested',
       resource: 'provisioning',
@@ -66,7 +70,7 @@ export async function POST(request: Request) {
     await appendAuditEvent(
       buildAuditEvent({
         correlationId,
-        actor: { type: 'service', id: 'webapp-api' },
+        actor: { type: 'user', id: authz.auth.userId, role: authz.auth.role },
         tenantId: body.tenantId,
         action: 'tenant.provision.failure',
         resource: 'provisioning',
@@ -123,7 +127,7 @@ export async function POST(request: Request) {
     await appendAuditEvent(
       buildAuditEvent({
         correlationId,
-        actor: { type: 'service', id: 'webapp-api' },
+        actor: { type: 'user', id: authz.auth.userId, role: authz.auth.role },
         tenantId: tenant.id,
         action: 'tenant.provision.dryrun_planned',
         resource: 'provisioning',
@@ -160,7 +164,7 @@ export async function POST(request: Request) {
     await appendAuditEvent(
       buildAuditEvent({
         correlationId,
-        actor: { type: 'service', id: 'webapp-api' },
+        actor: { type: 'user', id: authz.auth.userId, role: authz.auth.role },
         tenantId: tenant.id,
         action: 'tenant.provision.failure',
         resource: 'provisioning',
@@ -192,7 +196,7 @@ export async function POST(request: Request) {
     await appendAuditEvent(
       buildAuditEvent({
         correlationId,
-        actor: { type: 'service', id: 'webapp-api' },
+        actor: { type: 'user', id: authz.auth.userId, role: authz.auth.role },
         tenantId: tenant.id,
         action: 'tenant.provision.failure',
         resource: 'provisioning',
@@ -219,7 +223,7 @@ export async function POST(request: Request) {
   await appendAuditEvent(
     buildAuditEvent({
       correlationId,
-      actor: { type: 'service', id: 'webapp-api' },
+      actor: { type: 'user', id: authz.auth.userId, role: authz.auth.role },
       tenantId: tenant.id,
       action: 'tenant.provision.execution_started',
       resource: 'provisioning',
@@ -250,7 +254,7 @@ export async function POST(request: Request) {
     await appendAuditEvent(
       buildAuditEvent({
         correlationId,
-        actor: { type: 'service', id: 'webapp-api' },
+        actor: { type: 'user', id: authz.auth.userId, role: authz.auth.role },
         tenantId: tenant.id,
         action: rollback.attempted ? 'tenant.provision.rollback.result' : 'tenant.provision.rollback.attempted',
         resource: 'provisioning',
@@ -299,7 +303,7 @@ export async function POST(request: Request) {
   await appendAuditEvent(
     buildAuditEvent({
       correlationId,
-      actor: { type: 'service', id: 'webapp-api' },
+      actor: { type: 'user', id: authz.auth.userId, role: authz.auth.role },
       tenantId: tenant.id,
       action: success ? 'tenant.provision.success' : 'tenant.provision.failure',
       resource: 'provisioning',

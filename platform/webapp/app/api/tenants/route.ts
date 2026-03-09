@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createTenant, listTenants } from '@/lib/data-store';
 import type { AuthMode, CreateTenantInput, TenantSize } from '@/lib/types';
 import { appendAuditEvent, buildAuditEvent, getCorrelationIdFromRequest } from '@/lib/audit';
+import { requireMinimumRole } from '@/lib/auth-context';
 
 export async function GET() {
   const items = await listTenants();
@@ -9,13 +10,16 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const authz = requireMinimumRole(request, 'technician', 'POST /api/tenants');
+  if (!authz.ok) return authz.response;
+
   const correlationId = getCorrelationIdFromRequest(request);
   const body = (await request.json()) as Partial<CreateTenantInput>;
 
   await appendAuditEvent(
     buildAuditEvent({
       correlationId,
-      actor: { type: 'service', id: 'webapp-api' },
+      actor: { type: 'user', id: authz.auth.userId, role: authz.auth.role },
       tenantId: body.name?.trim() || 'unknown',
       action: 'tenant.create.requested',
       resource: 'tenant',
@@ -81,7 +85,7 @@ export async function POST(request: Request) {
     await appendAuditEvent(
       buildAuditEvent({
         correlationId,
-        actor: { type: 'service', id: 'webapp-api' },
+        actor: { type: 'user', id: authz.auth.userId, role: authz.auth.role },
         tenantId: tenant.id,
         action: 'tenant.create.success',
         resource: 'tenant',
@@ -96,7 +100,7 @@ export async function POST(request: Request) {
     await appendAuditEvent(
       buildAuditEvent({
         correlationId,
-        actor: { type: 'service', id: 'webapp-api' },
+        actor: { type: 'user', id: authz.auth.userId, role: authz.auth.role },
         tenantId: body.name?.trim() || 'unknown',
         action: 'tenant.create.failure',
         resource: 'tenant',

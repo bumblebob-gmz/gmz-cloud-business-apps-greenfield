@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { DevRoleSwitch } from '@/components/dev-role-switch';
 
 const navItems = [
   { href: '/', label: 'Dashboard' },
@@ -35,6 +36,7 @@ export function Navigation() {
           );
         })}
       </nav>
+      <DevRoleSwitch />
     </aside>
   );
 }

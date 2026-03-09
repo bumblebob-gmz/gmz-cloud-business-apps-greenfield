@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createJob, listJobs } from '@/lib/data-store';
 import type { CreateJobInput, JobStatus } from '@/lib/types';
+import { requireMinimumRole } from '@/lib/auth-context';
 
 export async function GET() {
   const items = await listJobs();
@@ -8,6 +9,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const authz = requireMinimumRole(request, 'technician', 'POST /api/jobs');
+  if (!authz.ok) return authz.response;
+
   const body = (await request.json()) as Partial<CreateJobInput>;
 
   if (!body.tenant || !body.task) {

@@ -39,6 +39,15 @@ Open: `http://localhost:3000`
 - `POST /api/provision/tenant` → creates a provisioning job, returns OpenTofu + Ansible command plan, and supports guarded execution
 - `GET /api/audit/events?limit=50` → returns latest internal audit events from local JSONL store (sanitized)
 
+## Mock auth + RBAC (current MVP)
+
+- Request headers (optional):
+  - `x-user-id` (default: `dev-user`)
+  - `x-user-role` (`admin` | `technician` | `readonly`, default: `technician`)
+- Protected write endpoints require at least `technician` and return `403` on denial.
+- `GET /api/audit/events` currently requires `admin`.
+- In UI, a **Dev role** switch in the sidebar controls outgoing API role headers for local testing.
+
 ## Operator flow notes
 
 - Tenant wizard apps are now app catalog IDs:

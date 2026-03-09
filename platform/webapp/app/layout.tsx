@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { DevRoleProvider } from '@/components/dev-role-provider';
 
 export const metadata: Metadata = {
   title: 'GMZ Cloud Business Apps',
@@ -9,7 +10,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <DevRoleProvider />
+        {children}
+      </body>
     </html>
   );
 }
