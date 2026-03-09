@@ -25,6 +25,14 @@ type AuditEvent = {
   source?: { operation?: string };
 };
 
+type AuthAlert = {
+  id: string;
+  severity: 'critical' | 'warning' | 'info';
+  title: string;
+  recommendation: string;
+  metrics: { expired: number; expiringSoon: number; total: number; warningDays: number };
+};
+
 type RotationPlanResponse = {
   reason: string;
   checklist: string[];
@@ -47,15 +55,25 @@ type SimResponse = {
   };
 };
 
+type AuditFilters = {
+  limit: number;
+  outcome: '' | 'success' | 'failure' | 'denied';
+  actionContains: string;
+  operationContains: string;
+  since: string;
+};
+
 const EMPTY_SIM_INPUT: SimInput = { tokenId: '', userId: '', role: 'readonly', expiresAt: '' };
+const DEFAULT_FILTERS: AuditFilters = { limit: 50, outcome: '', actionContains: '', operationContains: '', since: '' };
 
 export default function AdminSecurityPage() {
   const [health, setHealth] = useState<AuthHealthResponse | null>(null);
   const [events, setEvents] = useState<AuditEvent[]>([]);
+  const [alerts, setAlerts] = useState<AuthAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionFilter, setActionFilter] = useState('');
-  const [outcomeFilter, setOutcomeFilter] = useState('');
+  const [auditFilters, setAuditFilters] = useState<AuditFilters>(DEFAULT_FILTERS);
+  const [auditLoading, setAuditLoading] = useState(false);
 
   const [planReason, setPlanReason] = useState('');
   const [planLoading, setPlanLoading] = useState(false);
@@ -73,19 +91,20 @@ export default function AdminSecurityPage() {
         setLoading(true);
         setError(null);
 
-        const [healthRes, auditRes] = await Promise.all([
+        const [healthRes, alertsRes] = await Promise.all([
           fetch('/api/auth/health', { cache: 'no-store' }),
-          fetch('/api/audit/events?limit=50', { cache: 'no-store' })
+          fetch('/api/auth/alerts', { cache: 'no-store' })
         ]);
 
         if (!healthRes.ok) throw new Error(formatAuthError(healthRes.status, 'auth health'));
-        if (!auditRes.ok) throw new Error(formatAuthError(auditRes.status, 'audit events'));
+        if (!alertsRes.ok) throw new Error(formatAuthError(alertsRes.status, 'auth alerts'));
 
         const healthData = (await healthRes.json()) as AuthHealthResponse;
-        const auditData = (await auditRes.json()) as { items?: AuditEvent[] };
+        const alertsData = (await alertsRes.json()) as { alerts?: AuthAlert[] };
 
         setHealth(healthData);
-        setEvents(auditData.items ?? []);
+        setAlerts(alertsData.alerts ?? []);
+        await loadAuditEvents(DEFAULT_FILTERS);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load admin security data.');
       } finally {
@@ -96,15 +115,45 @@ export default function AdminSecurityPage() {
     load();
   }, []);
 
-  const filteredEvents = useMemo(
-    () =>
-      events.filter((event) => {
-        const actionOk = event.action.toLowerCase().includes(actionFilter.trim().toLowerCase());
-        const outcomeOk = event.outcome.toLowerCase().includes(outcomeFilter.trim().toLowerCase());
-        return actionOk && outcomeOk;
-      }),
-    [events, actionFilter, outcomeFilter]
-  );
+  async function loadAuditEvents(filters: AuditFilters) {
+    try {
+      setAuditLoading(true);
+      const params = new URLSearchParams();
+      params.set('limit', String(filters.limit));
+      if (filters.outcome) params.set('outcome', filters.outcome);
+      if (filters.actionContains.trim()) params.set('actionContains', filters.actionContains.trim());
+      if (filters.operationContains.trim()) params.set('operationContains', filters.operationContains.trim());
+      if (filters.since.trim()) params.set('since', filters.since.trim());
+
+      const response = await fetch(`/api/audit/events?${params.toString()}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(formatAuthError(response.status, 'audit events'));
+
+      const data = (await response.json()) as { items?: AuditEvent[] };
+      setEvents(data.items ?? []);
+    } finally {
+      setAuditLoading(false);
+    }
+  }
+
+  async function applyAuditFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      setError(null);
+      await loadAuditEvents(auditFilters);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load audit events.');
+    }
+  }
+
+  const auditCsvHref = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('limit', String(auditFilters.limit));
+    if (auditFilters.outcome) params.set('outcome', auditFilters.outcome);
+    if (auditFilters.actionContains.trim()) params.set('actionContains', auditFilters.actionContains.trim());
+    if (auditFilters.operationContains.trim()) params.set('operationContains', auditFilters.operationContains.trim());
+    if (auditFilters.since.trim()) params.set('since', auditFilters.since.trim());
+    return `/api/audit/events.csv?${params.toString()}`;
+  }, [auditFilters]);
 
   async function requestPlan() {
     try {
@@ -184,6 +233,20 @@ export default function AdminSecurityPage() {
       </section>
 
       <section className="panel p-5 space-y-3">
+        <h2 className="text-base font-semibold text-ink">Risk alerts</h2>
+        {loading ? <p className="text-sm text-slate-600">Loading alerts…</p> : null}
+        {!loading && alerts.length === 0 ? <p className="text-sm text-slate-600">No alerts.</p> : null}
+        <div className="space-y-2">
+          {alerts.map((alert) => (
+            <div key={alert.id} className={`rounded-xl border p-3 text-sm ${alertTone(alert.severity)}`}>
+              <p className="font-semibold">{alert.title}</p>
+              <p className="mt-1">{alert.recommendation}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel p-5 space-y-3">
         <h2 className="text-base font-semibold text-ink">Rotation Planner</h2>
         <input
           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
@@ -231,25 +294,38 @@ export default function AdminSecurityPage() {
         ) : null}
       </section>
 
-      <section className="panel p-5">
+      <section className="panel p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-base font-semibold text-ink">Latest audit events</h2>
-          <div className="flex flex-wrap gap-2">
-            <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Filter action…" value={actionFilter} onChange={(event) => setActionFilter(event.target.value)} />
-            <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Filter outcome…" value={outcomeFilter} onChange={(event) => setOutcomeFilter(event.target.value)} />
-          </div>
+          <a href={auditCsvHref} className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700">
+            Export CSV
+          </a>
         </div>
 
-        {loading ? (
-          <p className="mt-3 text-sm text-slate-600">Loading audit events…</p>
+        <form className="grid gap-2 md:grid-cols-6" onSubmit={applyAuditFilters}>
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" type="number" min={1} max={200} value={auditFilters.limit} onChange={(e) => setAuditFilters((v) => ({ ...v, limit: Number(e.target.value) || 50 }))} placeholder="Limit" />
+          <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={auditFilters.outcome} onChange={(e) => setAuditFilters((v) => ({ ...v, outcome: e.target.value as AuditFilters['outcome'] }))}>
+            <option value="">Any outcome</option>
+            <option value="success">success</option>
+            <option value="failure">failure</option>
+            <option value="denied">denied</option>
+          </select>
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Action contains" value={auditFilters.actionContains} onChange={(e) => setAuditFilters((v) => ({ ...v, actionContains: e.target.value }))} />
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Operation contains" value={auditFilters.operationContains} onChange={(e) => setAuditFilters((v) => ({ ...v, operationContains: e.target.value }))} />
+          <input className="rounded-xl border border-slate-200 px-3 py-2 text-sm" type="datetime-local" value={auditFilters.since} onChange={(e) => setAuditFilters((v) => ({ ...v, since: e.target.value }))} />
+          <button className="rounded-xl bg-brand px-3 py-2 text-sm font-medium text-white" type="submit" disabled={auditLoading}>{auditLoading ? 'Loading…' : 'Apply filters'}</button>
+        </form>
+
+        {loading || auditLoading ? (
+          <p className="text-sm text-slate-600">Loading audit events…</p>
         ) : (
-          <div className="mt-4 overflow-x-auto">
+          <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] border-separate border-spacing-y-2 text-sm">
               <thead>
                 <tr className="table-head"><th className="px-3 py-2">Time</th><th className="px-3 py-2">Action</th><th className="px-3 py-2">Outcome</th><th className="px-3 py-2">Actor</th><th className="px-3 py-2">Operation</th></tr>
               </thead>
               <tbody>
-                {filteredEvents.map((event) => (
+                {events.map((event) => (
                   <tr key={event.eventId} className="bg-slate-50 text-slate-700">
                     <td className="px-3 py-2 whitespace-nowrap">{new Date(event.timestamp).toLocaleString()}</td>
                     <td className="px-3 py-2 font-mono text-xs">{event.action}</td>
@@ -287,4 +363,10 @@ function outcomeTone(outcome: AuditEvent['outcome']) {
   if (outcome === 'success') return 'bg-emerald-100 text-emerald-800';
   if (outcome === 'failure') return 'bg-rose-100 text-rose-800';
   return 'bg-amber-100 text-amber-800';
+}
+
+function alertTone(severity: AuthAlert['severity']) {
+  if (severity === 'critical') return 'border-rose-200 bg-rose-50 text-rose-900';
+  if (severity === 'warning') return 'border-amber-200 bg-amber-50 text-amber-900';
+  return 'border-emerald-200 bg-emerald-50 text-emerald-900';
 }

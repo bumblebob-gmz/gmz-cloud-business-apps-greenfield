@@ -13,7 +13,7 @@ Next.js + TypeScript + Tailwind MVP scaffold for tenant operations.
 - Reports page (API-driven + CSV export)
 - Jobs page (API-driven + quick create form)
 - Job detail page at `/jobs/[id]` with related tenant context
-- Admin Security page at `/admin/security` (auth health + latest audit events with client-side filters)
+- Admin Security page at `/admin/security` (auth health + token-risk alerts + server-side audit filters + CSV export)
 - Lightweight local JSON persistence (`.data/store.json`)
 - API routes under `app/api/*` with local data-flow behavior
 
@@ -38,8 +38,10 @@ Open: `http://localhost:3000`
 - `GET /api/reports.csv` → downloads reports as CSV
 - `POST /api/setup/plan` → generates a dry-run setup plan (checks, commands, masked credentials)
 - `POST /api/provision/tenant` → creates a provisioning job, returns OpenTofu + Ansible command plan, and supports guarded execution
-- `GET /api/audit/events?limit=50` → returns latest internal audit events from local JSONL store (sanitized)
+- `GET /api/audit/events` → returns internal audit events from local JSONL store (sanitized) with server-side filters: `limit`, `outcome`, `actionContains`, `operationContains`, `since`
+- `GET /api/audit/events.csv` → admin-only CSV export for audit events; supports same filters as JSON endpoint
 - `GET /api/auth/health` → admin-only auth posture summary (mode + safe trusted-token health counts: total/active/expired/expiringSoon + warningDays + dev role switch state)
+- `GET /api/auth/alerts` → admin-only actionable token-risk alerts from auth health (`critical|warning|info`, recommendation text, no secrets)
 - `POST /api/auth/rotation/plan` → admin-only safe rotation checklist with overlap/cutover guidance and current auth health summary (no token secrets)
 - `POST /api/auth/rotation/simulate` → admin-only metadata-only impact simulation (`tokenId`, `userId`, `role`, `expiresAt`), returns expired/expiringSoon/active counts and priority actions; rejects secret-like fields (`token`, `password`, `secret`) with `400`
 
@@ -75,7 +77,9 @@ RBAC policy:
   - `GET /api/reports`, `GET /api/reports.csv`, `GET /api/provision/preflight`
 - Protected write endpoints require at least `technician`.
 - `GET /api/audit/events` requires `admin`.
+- `GET /api/audit/events.csv` requires `admin`.
 - `GET /api/auth/health` requires `admin`.
+- `GET /api/auth/alerts` requires `admin`.
 - `POST /api/auth/rotation/plan` requires `admin`.
 - `POST /api/auth/rotation/simulate` requires `admin`.
 - Auth denials (`401`/`403`) emit an audit event (`auth.guard.denied`) with operation, required/effective role, and auth mode.

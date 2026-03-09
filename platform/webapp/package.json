@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:rbac": "node --experimental-strip-types --test tests/rbac-policy.test.mjs tests/auth-context.test.ts tests/token-rotation.test.ts"
+    "test:rbac": "node --experimental-strip-types --test tests/rbac-policy.test.mjs tests/auth-context.test.ts tests/token-rotation.test.ts tests/audit-filters.test.ts tests/auth-alerts.test.ts"
   },
   "dependencies": {
     "next": "14.2.5",

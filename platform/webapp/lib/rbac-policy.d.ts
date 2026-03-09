@@ -12,7 +12,9 @@ export const RBAC_POLICY: {
   readonly 'POST /api/provision/tenant': 'technician';
   readonly 'POST /api/setup/plan': 'technician';
   readonly 'GET /api/audit/events': 'admin';
+  readonly 'GET /api/audit/events.csv': 'admin';
   readonly 'GET /api/auth/health': 'admin';
+  readonly 'GET /api/auth/alerts': 'admin';
   readonly 'POST /api/auth/rotation/plan': 'admin';
   readonly 'POST /api/auth/rotation/simulate': 'admin';
 };

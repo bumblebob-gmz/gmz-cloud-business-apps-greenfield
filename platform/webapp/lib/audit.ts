@@ -22,6 +22,14 @@ export type AuditEvent = {
   details?: Record<string, unknown>;
 };
 
+export type AuditEventFilters = {
+  limit: number;
+  outcome?: AuditEvent['outcome'];
+  actionContains?: string;
+  operationContains?: string;
+  since?: string;
+};
+
 export function getCorrelationIdFromRequest(request: Request) {
   const header = request.headers.get('x-correlation-id')?.trim();
   if (header && header.length >= 8) return header;
@@ -34,6 +42,43 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function safeError(message: string) {
   return `audit_write_failed:${message.slice(0, 140)}`;
+}
+
+function sanitizeLimit(value: unknown, fallback = 50) {
+  const parsed = typeof value === 'number' ? value : Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(1, Math.min(200, parsed));
+}
+
+function sanitizeOutcome(value: unknown): AuditEvent['outcome'] | undefined {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (normalized === 'success' || normalized === 'failure' || normalized === 'denied') {
+    return normalized;
+  }
+  return undefined;
+}
+
+function sanitizeContains(value: unknown): string | undefined {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function sanitizeSince(value: unknown): string | undefined {
+  const raw = String(value ?? '').trim();
+  if (!raw) return undefined;
+  const parsed = Date.parse(raw);
+  if (Number.isNaN(parsed)) return undefined;
+  return new Date(parsed).toISOString();
+}
+
+export function parseAuditEventFilters(searchParams: URLSearchParams): AuditEventFilters {
+  return {
+    limit: sanitizeLimit(searchParams.get('limit'), 50),
+    outcome: sanitizeOutcome(searchParams.get('outcome')),
+    actionContains: sanitizeContains(searchParams.get('actionContains')),
+    operationContains: sanitizeContains(searchParams.get('operationContains')),
+    since: sanitizeSince(searchParams.get('since'))
+  };
 }
 
 export function validateAuditEnvelope(value: unknown): { ok: boolean; error?: string } {
@@ -108,27 +153,81 @@ export async function appendAuditEvent(event: AuditEvent): Promise<{ ok: boolean
   }
 }
 
-export async function listAuditEvents(limit = 50): Promise<AuditEvent[]> {
-  const bounded = Math.max(1, Math.min(200, limit));
+function matchesAuditFilters(event: AuditEvent, filters: AuditEventFilters): boolean {
+  if (filters.outcome && event.outcome !== filters.outcome) return false;
+  if (filters.actionContains && !event.action.toLowerCase().includes(filters.actionContains)) return false;
+  if (filters.operationContains && !event.source.operation.toLowerCase().includes(filters.operationContains)) return false;
+  if (filters.since && Date.parse(event.timestamp) < Date.parse(filters.since)) return false;
+  return true;
+}
+
+export function filterAuditEvents(events: AuditEvent[], filters: Partial<AuditEventFilters> = {}): AuditEvent[] {
+  const normalized: AuditEventFilters = {
+    limit: sanitizeLimit(filters.limit, 50),
+    outcome: sanitizeOutcome(filters.outcome),
+    actionContains: sanitizeContains(filters.actionContains),
+    operationContains: sanitizeContains(filters.operationContains),
+    since: sanitizeSince(filters.since)
+  };
+
+  return events.filter((event) => matchesAuditFilters(event, normalized)).slice(-normalized.limit);
+}
+
+export async function listAuditEvents(filtersOrLimit: number | Partial<AuditEventFilters> = 50): Promise<AuditEvent[]> {
+  const filters: AuditEventFilters = typeof filtersOrLimit === 'number'
+    ? { limit: sanitizeLimit(filtersOrLimit, 50) }
+    : {
+        limit: sanitizeLimit(filtersOrLimit.limit, 50),
+        outcome: sanitizeOutcome(filtersOrLimit.outcome),
+        actionContains: sanitizeContains(filtersOrLimit.actionContains),
+        operationContains: sanitizeContains(filtersOrLimit.operationContains),
+        since: sanitizeSince(filtersOrLimit.since)
+      };
 
   try {
     const raw = await readFile(AUDIT_FILE, 'utf8');
     const lines = raw.split('\n').filter(Boolean);
-    const selected = lines.slice(-bounded);
 
-    return selected
+    const parsed = lines
       .map((line) => {
         try {
-          const parsed = JSON.parse(line) as AuditEvent;
-          return redactValue(parsed) as AuditEvent;
+          return redactValue(JSON.parse(line) as AuditEvent) as AuditEvent;
         } catch {
           return null;
         }
       })
       .filter((entry): entry is AuditEvent => Boolean(entry));
+
+    return filterAuditEvents(parsed, filters);
   } catch {
     return [];
   }
+}
+
+function csvCell(value: unknown): string {
+  const text = String(value ?? '');
+  if (/[",\n]/.test(text)) return `"${text.replaceAll('"', '""')}"`;
+  return text;
+}
+
+export function toAuditEventsCsv(events: AuditEvent[]): string {
+  const header = ['timestamp', 'eventId', 'correlationId', 'tenantId', 'actorType', 'actorId', 'actorRole', 'action', 'resource', 'outcome', 'service', 'operation'];
+  const rows = events.map((event) => [
+    event.timestamp,
+    event.eventId,
+    event.correlationId,
+    event.tenantId,
+    event.actor.type,
+    event.actor.id,
+    event.actor.role ?? '',
+    event.action,
+    event.resource,
+    event.outcome,
+    event.source.service,
+    event.source.operation
+  ]);
+
+  return [header, ...rows].map((row) => row.map((cell) => csvCell(cell)).join(',')).join('\n');
 }
 
 export function buildAuditEvent(input: Omit<AuditEvent, 'eventId' | 'timestamp'>): AuditEvent {

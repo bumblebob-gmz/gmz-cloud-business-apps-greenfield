@@ -26,7 +26,9 @@ test('policy requirements for protected GET and POST endpoints', () => {
   assert.equal(getRequiredRoleForOperation('POST /api/tenants'), 'technician');
   assert.equal(getRequiredRoleForOperation('POST /api/jobs'), 'technician');
   assert.equal(getRequiredRoleForOperation('GET /api/audit/events'), 'admin');
+  assert.equal(getRequiredRoleForOperation('GET /api/audit/events.csv'), 'admin');
   assert.equal(getRequiredRoleForOperation('GET /api/auth/health'), 'admin');
+  assert.equal(getRequiredRoleForOperation('GET /api/auth/alerts'), 'admin');
   assert.equal(getRequiredRoleForOperation('POST /api/auth/rotation/plan'), 'admin');
   assert.equal(getRequiredRoleForOperation('POST /api/auth/rotation/simulate'), 'admin');
 });
