@@ -1,0 +1,7 @@
+checks:
+  - id: wiki-js-health
+    type: http
+    target: http://wiki-js.{tenant}.irongeeks.eu/healthz
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 10

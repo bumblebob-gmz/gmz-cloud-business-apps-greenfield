@@ -1,1 +1,23 @@
-# TODO: compose template for tenant deployment
+services:
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:${OPENWEBUI_VERSION}
+    restart: unless-stopped
+    environment:
+      OLLAMA_BASE_URL: https://${OLLAMA_HOST}
+      WEBUI_SECRET_KEY: ${OPENWEBUI_SECRET_KEY}
+      WEBUI_URL: https://${OPENWEBUI_HOST}
+      ENABLE_SIGNUP: "false"
+      DEFAULT_LOCALE: de-DE
+      ENABLE_COMMUNITY_SHARING: "false"
+      ENABLE_MESSAGE_RATING: "true"
+    volumes:
+      - openwebui_data:/app/backend/data
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.openwebui.rule: Host(`${OPENWEBUI_HOST}`)
+      traefik.http.routers.openwebui.entrypoints: websecure
+      traefik.http.routers.openwebui.tls.certresolver: ionos
+      traefik.http.services.openwebui.loadbalancer.server.port: "8080"
+
+volumes:
+  openwebui_data:

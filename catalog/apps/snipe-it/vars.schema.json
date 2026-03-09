@@ -1,7 +1,51 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Snipe-IT vars",
+  "title": "Snipe-IT tenant variables",
   "type": "object",
-  "properties": {},
-  "additionalProperties": false
+  "additionalProperties": false,
+  "required": ["SNIPEIT_HOST", "SNIPEIT_APP_KEY", "SNIPEIT_DB_PASSWORD", "SNIPEIT_DB_ROOT_PASSWORD", "SMTP_HOST", "SMTP_PORT", "SMTP_FROM", "SMTP_USER", "SMTP_PASS"],
+  "properties": {
+    "SNIPEIT_HOST": {
+      "type": "string",
+      "pattern": "^snipe-it\\.[a-z0-9-]+\\.irongeeks\\.eu$"
+    },
+    "SNIPEIT_VERSION": {
+      "type": "string",
+      "default": "7.0.13"
+    },
+    "SNIPEIT_APP_KEY": {
+      "type": "string",
+      "minLength": 32,
+      "description": "Laravel app key (base64:... format)"
+    },
+    "SNIPEIT_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 16
+    },
+    "SNIPEIT_DB_ROOT_PASSWORD": {
+      "type": "string",
+      "minLength": 16
+    },
+    "SMTP_HOST": {
+      "type": "string"
+    },
+    "SMTP_PORT": {
+      "type": "string",
+      "default": "587"
+    },
+    "SMTP_FROM": {
+      "type": "string",
+      "format": "email"
+    },
+    "SMTP_FROM_NAME": {
+      "type": "string",
+      "default": "Snipe-IT"
+    },
+    "SMTP_USER": {
+      "type": "string"
+    },
+    "SMTP_PASS": {
+      "type": "string"
+    }
+  }
 }

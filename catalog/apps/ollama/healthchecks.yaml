@@ -1,0 +1,7 @@
+checks:
+  - id: ollama-api
+    type: http
+    target: https://ollama.{tenant}.irongeeks.eu/api/version
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 10

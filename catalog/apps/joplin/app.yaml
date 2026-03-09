@@ -1,11 +1,21 @@
 id: joplin
 name: Joplin Server
-version: 0.1.0
-status: draft
+version: "3.3.13"
+status: approved
+category: productivity
+summary: "Self-hosted sync server for the Joplin note-taking app with end-to-end encryption support."
+website: https://joplinapp.org
+docsUrl: https://joplinapp.org/help/apps/sync/joplin_server/
+requires: []
 supportsBranding: false
 supportsSSO: true
-requires: []
+maintainer: gmz-platform
+healthcheck: healthchecks.yaml
+compose_template: compose.template.yml
+vars_schema: vars.schema.json
 exposes:
   - service: joplin
-    port: 8080
+    component: app
+    protocol: https
+    port: 22300
     hostPattern: joplin.{tenant}.irongeeks.eu

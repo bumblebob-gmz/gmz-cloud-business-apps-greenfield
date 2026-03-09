@@ -1,7 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "IT Tools vars",
+  "title": "IT-Tools tenant variables",
   "type": "object",
-  "properties": {},
-  "additionalProperties": false
+  "additionalProperties": false,
+  "required": ["IT_TOOLS_HOST"],
+  "properties": {
+    "IT_TOOLS_HOST": { "type": "string", "pattern": "^it-tools\\.[a-z0-9-]+\\.irongeeks\\.eu$" },
+    "IT_TOOLS_VERSION": { "type": "string", "default": "2024.5.13" }
+  }
 }

@@ -1,11 +1,21 @@
 id: searxng
 name: SearXNG
-version: 0.1.0
-status: draft
-supportsBranding: true
-supportsSSO: true
+version: "2025.1.15"
+status: approved
+category: productivity
+summary: "Privacy-respecting metasearch engine aggregating results from 70+ sources with no tracking."
+website: https://searxng.org
+docsUrl: https://docs.searxng.org
 requires: []
+supportsBranding: true
+supportsSSO: false
+maintainer: gmz-platform
+healthcheck: healthcheck.yaml
+compose_template: compose.template.yml
+vars_schema: vars.schema.json
 exposes:
   - service: searxng
+    component: app
+    protocol: https
     port: 8080
     hostPattern: searxng.{tenant}.irongeeks.eu

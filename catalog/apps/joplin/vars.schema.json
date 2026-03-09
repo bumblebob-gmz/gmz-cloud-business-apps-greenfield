@@ -1,7 +1,38 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Joplin Server vars",
+  "title": "Joplin Server tenant variables",
   "type": "object",
-  "properties": {},
-  "additionalProperties": false
+  "additionalProperties": false,
+  "required": ["JOPLIN_HOST", "JOPLIN_DB_PASSWORD", "SMTP_HOST", "SMTP_PORT", "SMTP_FROM", "SMTP_USER", "SMTP_PASS"],
+  "properties": {
+    "JOPLIN_HOST": {
+      "type": "string",
+      "pattern": "^joplin\\.[a-z0-9-]+\\.irongeeks\\.eu$"
+    },
+    "JOPLIN_VERSION": {
+      "type": "string",
+      "default": "3.3.13"
+    },
+    "JOPLIN_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 16
+    },
+    "SMTP_HOST": {
+      "type": "string"
+    },
+    "SMTP_PORT": {
+      "type": "string",
+      "default": "587"
+    },
+    "SMTP_FROM": {
+      "type": "string",
+      "format": "email"
+    },
+    "SMTP_USER": {
+      "type": "string"
+    },
+    "SMTP_PASS": {
+      "type": "string"
+    }
+  }
 }

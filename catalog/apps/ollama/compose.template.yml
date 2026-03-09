@@ -1,1 +1,21 @@
-# TODO: compose template for tenant deployment
+services:
+  ollama:
+    image: ollama/ollama:${OLLAMA_VERSION}
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: "0.0.0.0"
+      OLLAMA_KEEP_ALIVE: "24h"
+      OLLAMA_MAX_LOADED_MODELS: "2"
+    volumes:
+      - ollama_data:/root/.ollama
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.ollama.rule: Host(`${OLLAMA_HOST}`)
+      traefik.http.routers.ollama.entrypoints: websecure
+      traefik.http.routers.ollama.tls.certresolver: ionos
+      traefik.http.services.ollama.loadbalancer.server.port: "11434"
+      traefik.http.middlewares.ollama-auth.basicauth.users: "${OLLAMA_BASIC_AUTH}"
+      traefik.http.routers.ollama.middlewares: ollama-auth
+
+volumes:
+  ollama_data:

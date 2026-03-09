@@ -1,0 +1,9 @@
+type: http
+path: /health
+port: 8080
+scheme: http
+expected_status: 200
+timeout_seconds: 10
+interval_seconds: 30
+retries: 3
+startup_grace_seconds: 60

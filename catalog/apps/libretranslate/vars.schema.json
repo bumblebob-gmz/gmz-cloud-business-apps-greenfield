@@ -1,7 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "LibreTranslate vars",
+  "title": "LibreTranslate tenant variables",
   "type": "object",
-  "properties": {},
-  "additionalProperties": false
+  "additionalProperties": false,
+  "required": ["LIBRETRANSLATE_HOST"],
+  "properties": {
+    "LIBRETRANSLATE_HOST": { "type": "string", "pattern": "^libretranslate\\.[a-z0-9-]+\\.irongeeks\\.eu$" },
+    "LIBRETRANSLATE_VERSION": { "type": "string", "default": "1.7.2" },
+    "LIBRETRANSLATE_LANGUAGES": { "type": "string", "default": "de,en,fr,es,it", "description": "Comma-separated language codes to load (fewer = faster startup)" }
+  }
 }

@@ -1,1 +1,30 @@
-# TODO: compose template for tenant deployment
+services:
+  vaultwarden:
+    image: vaultwarden/server:${VAULTWARDEN_VERSION}
+    restart: unless-stopped
+    environment:
+      DOMAIN: https://${VAULTWARDEN_HOST}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_FROM: ${SMTP_FROM}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SECURITY: starttls
+      SMTP_USERNAME: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASS}
+      ADMIN_TOKEN: ${VAULTWARDEN_ADMIN_TOKEN}
+      SIGNUPS_ALLOWED: "false"
+      INVITATIONS_ALLOWED: "true"
+      EMERGENCY_ACCESS_ALLOWED: "true"
+      SENDS_ALLOWED: "true"
+      WEB_VAULT_ENABLED: "true"
+      WEBSOCKET_ENABLED: "true"
+    volumes:
+      - vaultwarden_data:/data
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.vaultwarden.rule: Host(`${VAULTWARDEN_HOST}`)
+      traefik.http.routers.vaultwarden.entrypoints: websecure
+      traefik.http.routers.vaultwarden.tls.certresolver: ionos
+      traefik.http.services.vaultwarden.loadbalancer.server.port: "80"
+
+volumes:
+  vaultwarden_data:

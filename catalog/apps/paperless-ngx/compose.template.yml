@@ -1,1 +1,55 @@
-# TODO: compose template for tenant deployment
+services:
+  paperless-broker:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - paperless_redis_data:/data
+
+  paperless-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: ${PAPERLESS_DB_PASSWORD}
+    volumes:
+      - paperless_db_data:/var/lib/postgresql/data
+
+  paperless-webserver:
+    image: ghcr.io/paperless-ngx/paperless-ngx:${PAPERLESS_VERSION}
+    restart: unless-stopped
+    depends_on:
+      - paperless-db
+      - paperless-broker
+    environment:
+      PAPERLESS_REDIS: redis://paperless-broker:6379
+      PAPERLESS_DBHOST: paperless-db
+      PAPERLESS_DBNAME: paperless
+      PAPERLESS_DBUSER: paperless
+      PAPERLESS_DBPASS: ${PAPERLESS_DB_PASSWORD}
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY}
+      PAPERLESS_URL: https://${PAPERLESS_HOST}
+      PAPERLESS_TIME_ZONE: Europe/Berlin
+      PAPERLESS_OCR_LANGUAGE: deu+eng
+      PAPERLESS_ADMIN_USER: ${PAPERLESS_ADMIN_USER}
+      PAPERLESS_ADMIN_PASSWORD: ${PAPERLESS_ADMIN_PASSWORD}
+      PAPERLESS_ADMIN_MAIL: ${PAPERLESS_ADMIN_MAIL}
+    volumes:
+      - paperless_data:/usr/src/paperless/data
+      - paperless_media:/usr/src/paperless/media
+      - paperless_export:/usr/src/paperless/export
+      - paperless_consume:/usr/src/paperless/consume
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.paperless-ngx.rule: Host(`${PAPERLESS_HOST}`)
+      traefik.http.routers.paperless-ngx.entrypoints: websecure
+      traefik.http.routers.paperless-ngx.tls.certresolver: ionos
+      traefik.http.services.paperless-ngx.loadbalancer.server.port: "8000"
+
+volumes:
+  paperless_redis_data:
+  paperless_db_data:
+  paperless_data:
+  paperless_media:
+  paperless_export:
+  paperless_consume:

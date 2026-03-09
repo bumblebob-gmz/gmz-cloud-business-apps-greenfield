@@ -1,1 +1,51 @@
-# TODO: compose template for tenant deployment
+services:
+  bookstack-db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${BOOKSTACK_DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: bookstack
+      MYSQL_USER: bookstack
+      MYSQL_PASSWORD: ${BOOKSTACK_DB_PASSWORD}
+    volumes:
+      - bookstack_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  bookstack:
+    image: lscr.io/linuxserver/bookstack:${BOOKSTACK_VERSION}
+    restart: unless-stopped
+    depends_on:
+      bookstack-db:
+        condition: service_healthy
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      APP_URL: https://${BOOKSTACK_HOST}
+      DB_HOST: bookstack-db
+      DB_PORT: "3306"
+      DB_DATABASE: bookstack
+      DB_USERNAME: bookstack
+      DB_PASSWORD: ${BOOKSTACK_DB_PASSWORD}
+      APP_LANG: de
+      MAIL_DRIVER: smtp
+      MAIL_HOST: ${SMTP_HOST}
+      MAIL_PORT: ${SMTP_PORT}
+      MAIL_FROM: ${SMTP_FROM}
+      MAIL_USERNAME: ${SMTP_USER}
+      MAIL_PASSWORD: ${SMTP_PASS}
+    volumes:
+      - bookstack_data:/config
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.bookstack.rule: Host(`${BOOKSTACK_HOST}`)
+      traefik.http.routers.bookstack.entrypoints: websecure
+      traefik.http.routers.bookstack.tls.certresolver: ionos
+      traefik.http.services.bookstack.loadbalancer.server.port: "6875"
+
+volumes:
+  bookstack_db_data:
+  bookstack_data:

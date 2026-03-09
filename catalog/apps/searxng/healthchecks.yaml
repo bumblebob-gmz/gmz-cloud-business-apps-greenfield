@@ -1,0 +1,7 @@
+checks:
+  - id: searxng-health
+    type: http
+    target: http://searxng.{tenant}.irongeeks.eu/healthz
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 10

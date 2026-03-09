@@ -1,0 +1,7 @@
+checks:
+  - id: documenso-web
+    type: http
+    target: https://documenso.{tenant}.irongeeks.eu/
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 10

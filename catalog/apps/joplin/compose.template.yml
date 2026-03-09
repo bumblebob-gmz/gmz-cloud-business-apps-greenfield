@@ -1,1 +1,47 @@
-# TODO: compose template for tenant deployment
+services:
+  joplin-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: joplin
+      POSTGRES_USER: joplin
+      POSTGRES_PASSWORD: ${JOPLIN_DB_PASSWORD}
+    volumes:
+      - joplin_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U joplin"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  joplin:
+    image: joplin/server:${JOPLIN_VERSION}
+    restart: unless-stopped
+    depends_on:
+      joplin-db:
+        condition: service_healthy
+    environment:
+      APP_PORT: "22300"
+      APP_BASE_URL: https://${JOPLIN_HOST}
+      DB_CLIENT: pg
+      POSTGRES_CONNECTION_STRING: postgresql://joplin:${JOPLIN_DB_PASSWORD}@joplin-db:5432/joplin
+      MAILER_ENABLED: "1"
+      MAILER_HOST: ${SMTP_HOST}
+      MAILER_PORT: ${SMTP_PORT}
+      MAILER_SECURITY: starttls
+      MAILER_AUTH_USER: ${SMTP_USER}
+      MAILER_AUTH_PASSWORD: ${SMTP_PASS}
+      MAILER_NOREPLY_NAME: Joplin
+      MAILER_NOREPLY_EMAIL: ${SMTP_FROM}
+    volumes:
+      - joplin_data:/home/joplin/data
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.joplin.rule: Host(`${JOPLIN_HOST}`)
+      traefik.http.routers.joplin.entrypoints: websecure
+      traefik.http.routers.joplin.tls.certresolver: ionos
+      traefik.http.services.joplin.loadbalancer.server.port: "22300"
+
+volumes:
+  joplin_db_data:
+  joplin_data:

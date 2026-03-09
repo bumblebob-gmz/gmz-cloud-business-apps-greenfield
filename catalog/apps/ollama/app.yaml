@@ -1,11 +1,21 @@
 id: ollama
 name: Ollama
-version: 0.1.0
-status: draft
+version: "0.6.2"
+status: approved
+category: ai
+summary: "Run large language models locally — Llama 3, Mistral, Gemma, and 100+ models with a simple REST API."
+website: https://ollama.com
+docsUrl: https://github.com/ollama/ollama/tree/main/docs
+requires: []
 supportsBranding: false
 supportsSSO: false
-requires: []
+maintainer: gmz-platform
+healthcheck: healthcheck.yaml
+compose_template: compose.template.yml
+vars_schema: vars.schema.json
 exposes:
   - service: ollama
-    port: 8080
+    component: api
+    protocol: https
+    port: 11434
     hostPattern: ollama.{tenant}.irongeeks.eu

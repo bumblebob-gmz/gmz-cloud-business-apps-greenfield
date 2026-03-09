@@ -162,9 +162,9 @@ gmz-cloud-business-apps/
 |---|---|---|
 | Authentik | Identity & Access | ✅ Certified Reference |
 | Nextcloud | Collaboration | ✅ Certified Reference |
-| Paperless-NGX | Dokumentenmanagement | ✅ Certified Reference |
-| Bookstack | Wiki / Dokumentation | ✅ Certified Reference |
-| Vaultwarden | Passwort-Manager | ✅ Certified Reference |
+| Paperless-NGX | Dokumentenmanagement | ✅ Approved |
+| Bookstack | Wiki / Dokumentation | ✅ Approved |
+| Vaultwarden | Passwort-Manager | ✅ Approved |
 | Documenso | Dokumentensignatur | 📋 Draft |
 | Joplin | Notizen | 📋 Draft |
 | IT-Tools | Dev-Toolbox | 📋 Draft |

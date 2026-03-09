@@ -1,1 +1,10 @@
-# TODO: compose template for tenant deployment
+services:
+  it-tools:
+    image: corentinth/it-tools:${IT_TOOLS_VERSION}
+    restart: unless-stopped
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.it-tools.rule: Host(`${IT_TOOLS_HOST}`)
+      traefik.http.routers.it-tools.entrypoints: websecure
+      traefik.http.routers.it-tools.tls.certresolver: ionos
+      traefik.http.services.it-tools.loadbalancer.server.port: "80"

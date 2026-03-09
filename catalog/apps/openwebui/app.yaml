@@ -1,11 +1,22 @@
 id: openwebui
-name: OpenWebUI
-version: 0.1.0
-status: draft
+name: Open WebUI
+version: "0.5.20"
+status: approved
+category: ai
+summary: "Extensible, self-hosted AI chat interface supporting Ollama, OpenAI-compatible APIs, and document RAG."
+website: https://openwebui.com
+docsUrl: https://docs.openwebui.com
+requires:
+  - ollama
 supportsBranding: true
 supportsSSO: true
-requires: []
+maintainer: gmz-platform
+healthcheck: healthcheck.yaml
+compose_template: compose.template.yml
+vars_schema: vars.schema.json
 exposes:
   - service: openwebui
+    component: app
+    protocol: https
     port: 8080
     hostPattern: openwebui.{tenant}.irongeeks.eu

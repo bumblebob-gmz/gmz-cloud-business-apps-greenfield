@@ -1,7 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Vaultwarden vars",
+  "title": "Vaultwarden tenant variables",
   "type": "object",
-  "properties": {},
-  "additionalProperties": false
+  "additionalProperties": false,
+  "required": ["VAULTWARDEN_HOST", "VAULTWARDEN_ADMIN_TOKEN", "SMTP_HOST", "SMTP_PORT", "SMTP_FROM", "SMTP_USER", "SMTP_PASS"],
+  "properties": {
+    "VAULTWARDEN_HOST": { "type": "string", "pattern": "^vaultwarden\\.[a-z0-9-]+\\.irongeeks\\.eu$", "description": "Public hostname" },
+    "VAULTWARDEN_VERSION": { "type": "string", "default": "1.32.7", "description": "Vaultwarden image tag" },
+    "VAULTWARDEN_ADMIN_TOKEN": { "type": "string", "minLength": 32, "description": "Admin panel token (argon2 hash or plain, openssl rand -hex 32)" },
+    "SMTP_HOST": { "type": "string", "description": "SMTP server hostname" },
+    "SMTP_PORT": { "type": "string", "default": "587" },
+    "SMTP_FROM": { "type": "string", "format": "email" },
+    "SMTP_USER": { "type": "string" },
+    "SMTP_PASS": { "type": "string" }
+  }
 }

@@ -1,0 +1,9 @@
+type: http
+path: /languages
+port: 5000
+scheme: http
+expected_status: 200
+timeout_seconds: 15
+interval_seconds: 30
+retries: 3
+startup_grace_seconds: 180

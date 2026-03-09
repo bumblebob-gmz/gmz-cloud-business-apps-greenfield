@@ -1,11 +1,21 @@
 id: bookstack
 name: BookStack
-version: 0.1.0
-status: draft
+version: "24.12"
+status: approved
+category: documentation
+summary: "Self-hosted wiki and documentation platform with page editor, LDAP/SAML SSO, and full-text search."
+website: https://www.bookstackapp.com
+docsUrl: https://www.bookstackapp.com/docs/
+requires: []
 supportsBranding: true
 supportsSSO: true
-requires: []
+maintainer: gmz-platform
+healthcheck: healthcheck.yaml
+compose_template: compose.template.yml
+vars_schema: vars.schema.json
 exposes:
   - service: bookstack
-    port: 8080
+    component: app
+    protocol: https
+    port: 6875
     hostPattern: bookstack.{tenant}.irongeeks.eu

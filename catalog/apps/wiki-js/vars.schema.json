@@ -1,7 +1,24 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Wiki.js vars",
+  "title": "Wiki.js tenant variables",
   "type": "object",
-  "properties": {},
-  "additionalProperties": false
+  "additionalProperties": false,
+  "required": ["WIKIJS_HOST", "WIKIJS_DB_PASSWORD"],
+  "properties": {
+    "WIKIJS_HOST": {
+      "type": "string",
+      "pattern": "^wiki-js\\.[a-z0-9-]+\\.irongeeks\\.eu$",
+      "description": "Public hostname"
+    },
+    "WIKIJS_VERSION": {
+      "type": "string",
+      "default": "2.5.303",
+      "description": "Wiki.js image tag"
+    },
+    "WIKIJS_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 16,
+      "description": "PostgreSQL password"
+    }
+  }
 }

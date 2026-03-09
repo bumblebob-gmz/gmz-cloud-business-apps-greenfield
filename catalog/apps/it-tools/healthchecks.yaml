@@ -1,0 +1,7 @@
+checks:
+  - id: it-tools-ui
+    type: http
+    target: http://it-tools.{tenant}.irongeeks.eu/
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 5

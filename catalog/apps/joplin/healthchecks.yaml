@@ -1,0 +1,7 @@
+checks:
+  - id: joplin-ping
+    type: http
+    target: http://joplin.{tenant}.irongeeks.eu/api/ping
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 10

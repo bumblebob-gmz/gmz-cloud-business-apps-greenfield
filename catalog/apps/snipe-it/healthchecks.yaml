@@ -1,0 +1,7 @@
+checks:
+  - id: snipe-it-health
+    type: http
+    target: http://snipe-it.{tenant}.irongeeks.eu/health
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 15

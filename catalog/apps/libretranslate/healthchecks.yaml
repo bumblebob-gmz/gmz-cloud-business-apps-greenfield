@@ -1,0 +1,7 @@
+checks:
+  - id: libretranslate-languages
+    type: http
+    target: http://libretranslate.{tenant}.irongeeks.eu/languages
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 15

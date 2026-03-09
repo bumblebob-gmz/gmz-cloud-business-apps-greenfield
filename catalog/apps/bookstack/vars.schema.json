@@ -1,7 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "BookStack vars",
+  "title": "BookStack tenant variables",
   "type": "object",
-  "properties": {},
-  "additionalProperties": false
+  "additionalProperties": false,
+  "required": ["BOOKSTACK_HOST", "BOOKSTACK_DB_PASSWORD", "BOOKSTACK_DB_ROOT_PASSWORD", "SMTP_HOST", "SMTP_PORT", "SMTP_FROM", "SMTP_USER", "SMTP_PASS"],
+  "properties": {
+    "BOOKSTACK_HOST": { "type": "string", "pattern": "^bookstack\\.[a-z0-9-]+\\.irongeeks\\.eu$", "description": "Public hostname" },
+    "BOOKSTACK_VERSION": { "type": "string", "default": "24.12", "description": "BookStack image tag" },
+    "BOOKSTACK_DB_PASSWORD": { "type": "string", "minLength": 16, "description": "MariaDB password for bookstack user" },
+    "BOOKSTACK_DB_ROOT_PASSWORD": { "type": "string", "minLength": 16, "description": "MariaDB root password" },
+    "SMTP_HOST": { "type": "string", "description": "SMTP server hostname" },
+    "SMTP_PORT": { "type": "string", "default": "587", "description": "SMTP port" },
+    "SMTP_FROM": { "type": "string", "format": "email", "description": "Sender email address" },
+    "SMTP_USER": { "type": "string", "description": "SMTP username" },
+    "SMTP_PASS": { "type": "string", "description": "SMTP password" }
+  }
 }

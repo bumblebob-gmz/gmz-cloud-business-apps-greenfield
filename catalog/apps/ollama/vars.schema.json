@@ -1,7 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Ollama vars",
+  "title": "Ollama tenant variables",
   "type": "object",
-  "properties": {},
-  "additionalProperties": false
+  "additionalProperties": false,
+  "required": ["OLLAMA_HOST", "OLLAMA_BASIC_AUTH"],
+  "properties": {
+    "OLLAMA_HOST": { "type": "string", "pattern": "^ollama\\.[a-z0-9-]+\\.irongeeks\\.eu$" },
+    "OLLAMA_VERSION": { "type": "string", "default": "0.6.2" },
+    "OLLAMA_BASIC_AUTH": { "type": "string", "description": "htpasswd format: user:$apr1$... — generate with: htpasswd -nb user password" }
+  }
 }

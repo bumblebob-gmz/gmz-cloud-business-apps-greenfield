@@ -1,7 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Paperless-ngx vars",
+  "title": "Paperless-ngx tenant variables",
   "type": "object",
-  "properties": {},
-  "additionalProperties": false
+  "additionalProperties": false,
+  "required": ["PAPERLESS_HOST", "PAPERLESS_DB_PASSWORD", "PAPERLESS_SECRET_KEY", "PAPERLESS_ADMIN_USER", "PAPERLESS_ADMIN_PASSWORD", "PAPERLESS_ADMIN_MAIL"],
+  "properties": {
+    "PAPERLESS_HOST": { "type": "string", "pattern": "^paperless-ngx\\.[a-z0-9-]+\\.irongeeks\\.eu$", "description": "Public hostname" },
+    "PAPERLESS_VERSION": { "type": "string", "default": "2.14.7", "description": "Paperless-ngx image tag" },
+    "PAPERLESS_DB_PASSWORD": { "type": "string", "minLength": 16, "description": "PostgreSQL password" },
+    "PAPERLESS_SECRET_KEY": { "type": "string", "minLength": 32, "description": "Django secret key (openssl rand -hex 32)" },
+    "PAPERLESS_ADMIN_USER": { "type": "string", "default": "admin", "description": "Initial admin username" },
+    "PAPERLESS_ADMIN_PASSWORD": { "type": "string", "minLength": 12, "description": "Initial admin password" },
+    "PAPERLESS_ADMIN_MAIL": { "type": "string", "format": "email", "description": "Admin email address" }
+  }
 }

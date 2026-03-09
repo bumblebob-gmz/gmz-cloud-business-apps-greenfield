@@ -1,11 +1,21 @@
 id: wiki-js
 name: Wiki.js
-version: 0.1.0
-status: draft
+version: "2.5.303"
+status: approved
+category: documentation
+summary: "Powerful, extensible wiki engine with Markdown, Git sync, SSO, and granular permissions."
+website: https://js.wiki
+docsUrl: https://docs.requarks.io
+requires: []
 supportsBranding: true
 supportsSSO: true
-requires: []
+maintainer: gmz-platform
+healthcheck: healthchecks.yaml
+compose_template: compose.template.yml
+vars_schema: vars.schema.json
 exposes:
   - service: wiki-js
-    port: 8080
+    component: app
+    protocol: https
+    port: 3000
     hostPattern: wiki-js.{tenant}.irongeeks.eu

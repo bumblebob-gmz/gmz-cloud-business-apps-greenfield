@@ -1,11 +1,21 @@
 id: snipe-it
 name: Snipe-IT
-version: 0.1.0
-status: draft
+version: "7.0.13"
+status: approved
+category: operations
+summary: "IT asset management system with hardware tracking, license management, LDAP/SAML SSO."
+website: https://snipeitapp.com
+docsUrl: https://snipe-it.readme.io/docs
+requires: []
 supportsBranding: true
 supportsSSO: true
-requires: []
+maintainer: gmz-platform
+healthcheck: healthchecks.yaml
+compose_template: compose.template.yml
+vars_schema: vars.schema.json
 exposes:
   - service: snipe-it
-    port: 8080
+    component: app
+    protocol: https
+    port: 80
     hostPattern: snipe-it.{tenant}.irongeeks.eu

@@ -1,11 +1,21 @@
 id: it-tools
-name: IT Tools
-version: 0.1.0
-status: draft
+name: IT-Tools
+version: "2024.5.13"
+status: approved
+category: developer-tools
+summary: "Collection of 60+ handy tools for developers and IT teams: encoders, converters, generators, and more."
+website: https://it-tools.tech
+docsUrl: https://github.com/CorentinTh/it-tools
+requires: []
 supportsBranding: false
 supportsSSO: false
-requires: []
+maintainer: gmz-platform
+healthcheck: healthcheck.yaml
+compose_template: compose.template.yml
+vars_schema: vars.schema.json
 exposes:
   - service: it-tools
-    port: 8080
+    component: app
+    protocol: https
+    port: 80
     hostPattern: it-tools.{tenant}.irongeeks.eu

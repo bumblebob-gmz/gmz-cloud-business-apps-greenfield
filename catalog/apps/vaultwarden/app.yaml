@@ -1,11 +1,21 @@
 id: vaultwarden
 name: Vaultwarden
-version: 0.1.0
-status: draft
+version: "1.32.7"
+status: approved
+category: security
+summary: "Lightweight Bitwarden-compatible password manager server with full API support and web vault."
+website: https://github.com/dani-garcia/vaultwarden
+docsUrl: https://github.com/dani-garcia/vaultwarden/wiki
+requires: []
 supportsBranding: true
 supportsSSO: true
-requires: []
+maintainer: gmz-platform
+healthcheck: healthcheck.yaml
+compose_template: compose.template.yml
+vars_schema: vars.schema.json
 exposes:
   - service: vaultwarden
-    port: 8080
+    component: app
+    protocol: https
+    port: 80
     hostPattern: vaultwarden.{tenant}.irongeeks.eu

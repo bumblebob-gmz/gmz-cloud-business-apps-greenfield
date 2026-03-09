@@ -1,1 +1,55 @@
-# TODO: compose template for tenant deployment
+services:
+  snipe-it-db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${SNIPEIT_DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: snipeit
+      MYSQL_USER: snipeit
+      MYSQL_PASSWORD: ${SNIPEIT_DB_PASSWORD}
+    volumes:
+      - snipeit_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  snipe-it:
+    image: snipe/snipe-it:${SNIPEIT_VERSION}
+    restart: unless-stopped
+    depends_on:
+      snipe-it-db:
+        condition: service_healthy
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: https://${SNIPEIT_HOST}
+      APP_KEY: ${SNIPEIT_APP_KEY}
+      DB_CONNECTION: mysql
+      DB_HOST: snipe-it-db
+      DB_PORT: "3306"
+      DB_DATABASE: snipeit
+      DB_USERNAME: snipeit
+      DB_PASSWORD: ${SNIPEIT_DB_PASSWORD}
+      MAIL_ENV_FROM_ADDR: ${SMTP_FROM}
+      MAIL_ENV_FROM_NAME: ${SMTP_FROM_NAME}
+      MAIL_ENV_DRIVER: smtp
+      MAIL_ENV_HOST: ${SMTP_HOST}
+      MAIL_ENV_PORT: ${SMTP_PORT}
+      MAIL_ENV_USERNAME: ${SMTP_USER}
+      MAIL_ENV_PASSWORD: ${SMTP_PASS}
+      APP_TIMEZONE: Europe/Berlin
+      APP_LOCALE: de
+    volumes:
+      - snipeit_data:/var/lib/snipeit
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.snipe-it.rule: Host(`${SNIPEIT_HOST}`)
+      traefik.http.routers.snipe-it.entrypoints: websecure
+      traefik.http.routers.snipe-it.tls.certresolver: ionos
+      traefik.http.services.snipe-it.loadbalancer.server.port: "80"
+
+volumes:
+  snipeit_db_data:
+  snipeit_data:

@@ -1,1 +1,29 @@
-# TODO: compose template for tenant deployment
+services:
+  searxng-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no
+    volumes:
+      - searxng_redis_data:/data
+
+  searxng:
+    image: searxng/searxng:${SEARXNG_VERSION}
+    restart: unless-stopped
+    depends_on:
+      - searxng-redis
+    environment:
+      SEARXNG_BASE_URL: https://${SEARXNG_HOST}/
+      SEARXNG_SECRET_KEY: ${SEARXNG_SECRET_KEY}
+      SEARXNG_REDIS_URL: redis://searxng-redis:6379/0
+    volumes:
+      - searxng_data:/etc/searxng
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.searxng.rule: Host(`${SEARXNG_HOST}`)
+      traefik.http.routers.searxng.entrypoints: websecure
+      traefik.http.routers.searxng.tls.certresolver: ionos
+      traefik.http.services.searxng.loadbalancer.server.port: "8080"
+
+volumes:
+  searxng_redis_data:
+  searxng_data:

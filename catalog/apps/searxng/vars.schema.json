@@ -1,7 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "SearXNG vars",
+  "title": "SearXNG tenant variables",
   "type": "object",
-  "properties": {},
-  "additionalProperties": false
+  "additionalProperties": false,
+  "required": ["SEARXNG_HOST", "SEARXNG_SECRET_KEY"],
+  "properties": {
+    "SEARXNG_HOST": { "type": "string", "pattern": "^searxng\\.[a-z0-9-]+\\.irongeeks\\.eu$" },
+    "SEARXNG_VERSION": { "type": "string", "default": "2025.1.15" },
+    "SEARXNG_SECRET_KEY": { "type": "string", "minLength": 32, "description": "Random secret key (openssl rand -hex 32)" }
+  }
 }

@@ -1,11 +1,21 @@
 id: paperless-ngx
 name: Paperless-ngx
-version: 0.1.0
-status: draft
+version: "2.14.7"
+status: approved
+category: documents
+summary: "Document management system with OCR, tagging, full-text search, and automatic document classification."
+website: https://docs.paperless-ngx.com
+docsUrl: https://docs.paperless-ngx.com/setup/
+requires: []
 supportsBranding: false
 supportsSSO: true
-requires: []
+maintainer: gmz-platform
+healthcheck: healthcheck.yaml
+compose_template: compose.template.yml
+vars_schema: vars.schema.json
 exposes:
   - service: paperless-ngx
-    port: 8080
+    component: webserver
+    protocol: https
+    port: 8000
     hostPattern: paperless-ngx.{tenant}.irongeeks.eu

@@ -1,7 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "OpenWebUI vars",
+  "title": "Open WebUI tenant variables",
   "type": "object",
-  "properties": {},
-  "additionalProperties": false
+  "additionalProperties": false,
+  "required": ["OPENWEBUI_HOST", "OPENWEBUI_SECRET_KEY", "OLLAMA_HOST"],
+  "properties": {
+    "OPENWEBUI_HOST": { "type": "string", "pattern": "^openwebui\\.[a-z0-9-]+\\.irongeeks\\.eu$" },
+    "OPENWEBUI_VERSION": { "type": "string", "default": "0.5.20" },
+    "OPENWEBUI_SECRET_KEY": { "type": "string", "minLength": 32, "description": "Random secret key (openssl rand -hex 32)" },
+    "OLLAMA_HOST": { "type": "string", "description": "Public Ollama hostname (e.g. ollama.tenant.irongeeks.eu)" }
+  }
 }
