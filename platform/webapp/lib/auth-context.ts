@@ -1,4 +1,11 @@
 import { NextResponse } from 'next/server';
+import {
+  RBAC_POLICY,
+  authorizeOperation as authorizeOperationWithPolicy,
+  buildDeniedPayload,
+  getRequiredRoleForOperation,
+  hasMinimumRole
+} from '@/lib/rbac-policy';
 
 export type UserRole = 'readonly' | 'technician' | 'admin';
 
@@ -7,14 +14,10 @@ export type AuthContext = {
   role: UserRole;
 };
 
+export type RbacOperation = keyof typeof RBAC_POLICY;
+
 const DEFAULT_USER_ID = 'dev-user';
 const DEFAULT_ROLE: UserRole = 'technician';
-
-const ROLE_RANK: Record<UserRole, number> = {
-  readonly: 1,
-  technician: 2,
-  admin: 3
-};
 
 function normalizeRole(input: string | null): UserRole {
   const role = input?.trim().toLowerCase();
@@ -31,8 +34,30 @@ export function getAuthContextFromRequest(request: Request): AuthContext {
   return { userId, role };
 }
 
-export function hasMinimumRole(role: UserRole, minimumRole: UserRole) {
-  return ROLE_RANK[role] >= ROLE_RANK[minimumRole];
+export { hasMinimumRole, getRequiredRoleForOperation };
+
+export function authorizeOperation(auth: AuthContext, operation: RbacOperation) {
+  return authorizeOperationWithPolicy(auth, operation);
+}
+
+export function buildForbiddenResponse(auth: AuthContext, operation: string, requiredRole: UserRole) {
+  return NextResponse.json(buildDeniedPayload(auth, operation, requiredRole), { status: 403 });
+}
+
+export function requireOperationRole(request: Request, operation: RbacOperation) {
+  const auth = getAuthContextFromRequest(request);
+  const authorization = authorizeOperation(auth, operation);
+
+  if (!authorization.ok) {
+    return {
+      ok: false as const,
+      auth,
+      requiredRole: authorization.requiredRole,
+      response: buildForbiddenResponse(auth, operation, authorization.requiredRole)
+    };
+  }
+
+  return { ok: true as const, auth, requiredRole: authorization.requiredRole };
 }
 
 export function requireMinimumRole(request: Request, minimumRole: UserRole, operation: string) {
@@ -42,15 +67,7 @@ export function requireMinimumRole(request: Request, minimumRole: UserRole, oper
     return {
       ok: false as const,
       auth,
-      response: NextResponse.json(
-        {
-          error: `Forbidden: ${operation} requires ${minimumRole} role.`,
-          role: auth.role,
-          requiredRole: minimumRole,
-          userId: auth.userId
-        },
-        { status: 403 }
-      )
+      response: buildForbiddenResponse(auth, operation, minimumRole)
     };
   }
 

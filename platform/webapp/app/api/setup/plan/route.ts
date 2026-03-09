@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireMinimumRole } from '@/lib/auth-context';
+import { requireOperationRole } from '@/lib/auth-context';
 
 type SetupPlanRequest = {
   preflight?: {
@@ -53,7 +53,7 @@ function maskIdentifier(value?: string) {
 }
 
 export async function POST(request: Request) {
-  const authz = requireMinimumRole(request, 'technician', 'POST /api/setup/plan');
+  const authz = requireOperationRole(request, 'POST /api/setup/plan');
   if (!authz.ok) return authz.response;
 
   const body = (await request.json()) as SetupPlanRequest;

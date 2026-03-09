@@ -44,8 +44,13 @@ Open: `http://localhost:3000`
 - Request headers (optional):
   - `x-user-id` (default: `dev-user`)
   - `x-user-role` (`admin` | `technician` | `readonly`, default: `technician`)
-- Protected write endpoints require at least `technician` and return `403` on denial.
-- `GET /api/audit/events` currently requires `admin`.
+- Protected read endpoints require at least `readonly`:
+  - `GET /api/tenants`, `GET /api/jobs`, `GET /api/deployments`
+  - `GET /api/reports`, `GET /api/reports.csv`, `GET /api/provision/preflight`
+- Protected write endpoints require at least `technician`.
+- `GET /api/audit/events` requires `admin`.
+- All denials return `403` with role + requiredRole in the JSON body.
+- Policy enforcement is centralized in `lib/rbac-policy.js` + `lib/auth-context.ts`.
 - In UI, a **Dev role** switch in the sidebar controls outgoing API role headers for local testing.
 
 ## Operator flow notes

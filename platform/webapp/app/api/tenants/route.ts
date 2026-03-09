@@ -2,15 +2,18 @@ import { NextResponse } from 'next/server';
 import { createTenant, listTenants } from '@/lib/data-store';
 import type { AuthMode, CreateTenantInput, TenantSize } from '@/lib/types';
 import { appendAuditEvent, buildAuditEvent, getCorrelationIdFromRequest } from '@/lib/audit';
-import { requireMinimumRole } from '@/lib/auth-context';
+import { requireOperationRole } from '@/lib/auth-context';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const authz = requireOperationRole(request, 'GET /api/tenants');
+  if (!authz.ok) return authz.response;
+
   const items = await listTenants();
   return NextResponse.json({ items });
 }
 
 export async function POST(request: Request) {
-  const authz = requireMinimumRole(request, 'technician', 'POST /api/tenants');
+  const authz = requireOperationRole(request, 'POST /api/tenants');
   if (!authz.ok) return authz.response;
 
   const correlationId = getCorrelationIdFromRequest(request);

@@ -173,13 +173,19 @@ Für die internen Mutations-Endpoints gilt ein leichtgewichtiges Header-basierte
   - `x-user-id` (optional, serverseitiger Default: `dev-user`)
   - `x-user-role` (optional, serverseitiger Default: `technician`)
 - Rollen:
-  - `readonly`: nur Lesezugriffe (GET)
-  - `technician`: darf zusätzlich Mutationen ausführen auf:
+  - `readonly`: Lesezugriffe auf geschützte GET-Endpunkte:
+    - `GET /api/tenants`
+    - `GET /api/jobs`
+    - `GET /api/deployments`
+    - `GET /api/reports`
+    - `GET /api/reports.csv`
+    - `GET /api/provision/preflight`
+  - `technician`: umfasst `readonly` + Mutationen auf:
     - `POST /api/tenants`
     - `POST /api/jobs`
     - `POST /api/provision/tenant`
     - `POST /api/setup/plan`
-  - `admin`: umfasst aktuell dieselben Rechte wie `technician` (explizit für zukünftige Management-Rechte vorbereitet)
+  - `admin`: umfasst aktuell `technician` + Zugriff auf `GET /api/audit/events`
 
 Bei fehlender Berechtigung liefern die Endpoints `403` mit Rolle und benötigter Rolle im Response-Body.
 

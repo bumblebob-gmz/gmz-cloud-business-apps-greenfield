@@ -1,4 +1,5 @@
 import { listReports } from '@/lib/data-store';
+import { requireOperationRole } from '@/lib/auth-context';
 
 function escapeCsvValue(value: string) {
   const needsQuotes = /[",\n]/.test(value);
@@ -6,7 +7,10 @@ function escapeCsvValue(value: string) {
   return needsQuotes ? `"${escaped}"` : escaped;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const authz = requireOperationRole(request, 'GET /api/reports.csv');
+  if (!authz.ok) return authz.response;
+
   const reports = await listReports();
 
   const header = ['id', 'title', 'owner', 'period', 'generatedAt'];
