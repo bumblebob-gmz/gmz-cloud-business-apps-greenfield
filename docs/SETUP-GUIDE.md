@@ -1,815 +1,756 @@
-# GMZ Cloud Business Apps – Platform Setup Guide
+# GMZ Cloud Business Apps – Vollständiges Handbuch
 
-> **Sprache:** Deutsch | **Version:** 1.0.0 | **Stand:** März 2026  
-> Dieses Dokument beschreibt die vollständige Einrichtung der GMZ Cloud Business Apps Plattform von der Hardware-Vorbereitung bis zum ersten produktiven Tenant.
+**Version 2.0.0 | März 2026**
+
+> **Dieses Dokument ist die EINZIGE offizielle Anlaufstelle** für Installation, Administration und Benutzung von GMZ Cloud Business Apps.
+> Alle anderen READMEs und Teilanleitungen verweisen hierher.
 
 ---
 
 ## Inhaltsverzeichnis
 
-1. [Überblick](#1-überblick)
-2. [Voraussetzungen](#2-voraussetzungen)
-3. [Initiales Setup Management-VM](#3-initiales-setup-management-vm)
-4. [Traefik deployen](#4-traefik-deployen)
-5. [Monitoring Stack deployen](#5-monitoring-stack-deployen)
-6. [WebApp deployen](#6-webapp-deployen)
-7. [Ersten Tenant provisionieren](#7-ersten-tenant-provisionieren)
-8. [App auf Tenant deployen](#8-app-auf-tenant-deployen)
-9. [Authentik SSO](#9-authentik-sso)
-10. [Nightly Updates](#10-nightly-updates)
-11. [Sicherheits-Konfiguration](#11-sicherheits-konfiguration)
-12. [Backup-Strategie](#12-backup-strategie)
-13. [Troubleshooting](#13-troubleshooting)
-14. [Umgebungsvariablen-Referenz](#14-umgebungsvariablen-referenz)
+- [Teil I: Installation & Erstkonfiguration](#teil-i-installation--erstkonfiguration)
+  - [1. Überblick](#1-überblick)
+  - [2. Voraussetzungen](#2-voraussetzungen)
+  - [3. Debian 13 installieren](#3-debian-13-installieren)
+  - [4. Management-VM einrichten](#4-management-vm-einrichten)
+  - [5. Traefik deployen](#5-traefik-deployen)
+  - [6. Monitoring Stack deployen](#6-monitoring-stack-deployen)
+  - [7. WebApp deployen](#7-webapp-deployen)
+  - [8. Ersten Tenant provisionieren](#8-ersten-tenant-provisionieren)
+  - [9. Apps deployen](#9-apps-deployen)
+  - [10. Authentik SSO einrichten](#10-authentik-sso-einrichten)
+  - [11. Nightly Updates einrichten](#11-nightly-updates-einrichten)
+- [Teil II: Admin-Handbuch](#teil-ii-admin-handbuch)
+  - [12. Tenants verwalten](#12-tenants-verwalten)
+  - [13. Apps verwalten](#13-apps-verwalten)
+  - [14. Benutzer & Rollen (RBAC)](#14-benutzer--rollen-rbac)
+  - [15. Monitoring & Alerting](#15-monitoring--alerting)
+  - [16. Wartung & Updates](#16-wartung--updates)
+  - [17. Sicherheits-Konfiguration](#17-sicherheits-konfiguration)
+- [Teil III: Benutzerhandbuch](#teil-iii-benutzerhandbuch)
+  - [18. Erste Schritte](#18-erste-schritte)
+  - [19. Tenant-Übersicht](#19-tenant-übersicht)
+  - [20. Apps nutzen](#20-apps-nutzen)
+  - [21. Support & Troubleshooting (Endbenutzer)](#21-support--troubleshooting-endbenutzer)
+- [Teil IV: Referenz](#teil-iv-referenz)
+  - [22. Troubleshooting (technisch)](#22-troubleshooting-technisch)
+  - [23. Umgebungsvariablen-Referenz](#23-umgebungsvariablen-referenz)
+  - [24. Schnell-Referenz](#24-schnell-referenz)
 
 ---
+
+# Teil I: Installation & Erstkonfiguration
 
 ## 1. Überblick
 
 ### Was ist GMZ Cloud Business Apps?
 
-GMZ Cloud Business Apps ist eine selbst gehostete Multi-Tenant-Plattform, die es Managed-Service-Providern (MSPs) und IT-Dienstleistern ermöglicht, cloudbasierte Business-Applikationen vollautomatisch für Kunden bereitzustellen. Die Plattform kombiniert Infrastructure-as-Code (OpenTofu), Konfigurations-Management (Ansible) und eine moderne Web-Verwaltungsoberfläche zu einem durchgängigen Lifecycle-Management-System.
+GMZ Cloud Business Apps ist eine selbst gehostete Multi-Tenant-Plattform zur Verwaltung und Bereitstellung von Cloud-Geschäftsanwendungen. Über ein zentrales Web-Portal (Control Plane) können IT-Administratoren Mandanten (Tenants) anlegen, Geschäftsanwendungen aus einem Katalog deployen und den Betrieb überwachen – alles auf eigener Infrastruktur, ohne Abhängigkeit von externen Cloud-Anbietern.
 
 **Kernfunktionen:**
-- Automatisiertes Provisionieren von Tenant-VMs auf Proxmox VE
-- Katalogbasiertes Deployment von Business-Apps (Nextcloud, Gitea, Vaultwarden, Odoo, Zammad u. v. m.)
-- Zentrales Reverse-Proxy- und TLS-Management über Traefik v3
-- Single Sign-On via Authentik für alle Tenants
-- Vollständiges Monitoring mit Prometheus, Loki und Grafana
-- Nightly-Updates mit automatischem Snapshot und Rollback
+- Multi-Tenant-Verwaltung mit isolierten VMs pro Mandant
+- App-Katalog mit vorkonfigurierten Geschäftsanwendungen (Nextcloud, Vaultwarden, Gitea, …)
+- Automatische TLS-Zertifikate via Let's Encrypt (DNS-01, Wildcard)
+- Integriertes Monitoring (Prometheus, Grafana, Loki)
+- SSO-Integration via Authentik (OIDC)
+- Vollständig automatisiertes Provisioning via Ansible + OpenTofu
 
-### Architektur-Diagram
+### Architektur
 
 ```
-Internet
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  IONOS DNS (Wildcard *.apps.example.com → öffentliche IP)       │
-└─────────────────────────────────────────────────────────────────┘
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Firewall / NAT (Port 80, 443 → Management-VM)                  │
-└─────────────────────────────────────────────────────────────────┘
-    │
-    ▼
-┌─────────────────────────────── Proxmox Node ────────────────────┐
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  Management-VM (Debian 13, 8 GB RAM, 100 GB SSD)        │   │
-│  │                                                          │   │
-│  │  ┌──────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐  │   │
-│  │  │ Traefik  │ │ WebApp   │ │ Authentik │ │Monitoring│  │   │
-│  │  │  :443    │ │  :3000   │ │  :9000    │ │Grafana   │  │   │
-│  │  │  :80     │ │          │ │           │ │:3001     │  │   │
-│  │  └────┬─────┘ └──────────┘ └───────────┘ └──────────┘  │   │
-│  │       │  Docker-Netzwerk: mgmt-net                       │   │
-│  └───────┼─────────────────────────────────────────────────┘   │
-│          │                                                       │
-│          │  VLAN-Trunk (802.1Q)                                 │
-│          ▼                                                       │
-│  ┌────────────────────┐  ┌────────────────────┐                 │
-│  │ Tenant-VM 101      │  │ Tenant-VM 102      │  ...            │
-│  │ VLAN 101           │  │ VLAN 102           │                 │
-│  │ 4–16 GB RAM        │  │ 4–16 GB RAM        │                 │
-│  │ Docker Apps        │  │ Docker Apps        │                 │
-│  │ Node-Exporter      │  │ Node-Exporter      │                 │
-│  │ Traefik-Agent      │  │ Traefik-Agent      │                 │
-│  └────────────────────┘  └────────────────────┘                 │
-│                                                                  │
-│  Shared Storage: NFS / Ceph (optional)                          │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                          INTERNET                                    │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │ HTTPS (443) / HTTP (80)
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                       PROXMOX VE 8.x NODE                           │
+│                                                                      │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │              MANAGEMENT-VM (Debian 13, gmzadmin)             │   │
+│  │                                                               │   │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │   │
+│  │  │   Traefik    │  │  GMZ WebApp  │  │  Monitoring      │  │   │
+│  │  │  (Reverse    │  │  (Next.js    │  │  Prometheus       │  │   │
+│  │  │   Proxy +    │  │   Port 3000) │  │  Grafana          │  │   │
+│  │  │   TLS)       │  │              │  │  Loki             │  │   │
+│  │  └──────┬───────┘  └──────┬───────┘  └──────────────────┘  │   │
+│  │         │                 │                                   │   │
+│  │         │ Route /         │ Ansible / API                    │   │
+│  └─────────┼─────────────────┼───────────────────────────────── ┘   │
+│            │                 │                                        │
+│  ┌─────────┼─────────────────┼────────────────────────────────────┐ │
+│  │  VLAN 20 (Tenant-Netz)    │                                     │ │
+│  │         │                 ▼                                     │ │
+│  │  ┌──────▼─────────────────────────────────────────────────┐   │ │
+│  │  │  Tenant-VMs (Debian 13, Cloud-Init, User: debian)       │   │ │
+│  │  │                                                          │   │ │
+│  │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐    │   │ │
+│  │  │  │  Tenant A   │  │  Tenant B   │  │  Tenant C   │    │   │ │
+│  │  │  │  (Nextcloud │  │  (Gitea,    │  │  (Vault-    │    │   │ │
+│  │  │  │   Vault-    │  │   Nextcloud)│  │   warden)   │    │   │ │
+│  │  │  │   warden)   │  │             │  │             │    │   │ │
+│  │  │  └─────────────┘  └─────────────┘  └─────────────┘    │   │ │
+│  │  └──────────────────────────────────────────────────────── ┘   │ │
+│  └─────────────────────────────────────────────────────────────── ┘ │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Tech-Stack
 
-| Schicht | Technologie | Version | Zweck |
-|---------|-------------|---------|-------|
-| Hypervisor | Proxmox VE | 8.x | VM-Lifecycle, Snapshots, Storage |
-| IaC | OpenTofu | 1.6+ | Proxmox-VM-Provisionierung |
-| Konfig-Mgmt | Ansible | 2.15+ | OS-Härtung, App-Deployment |
-| Container | Docker + Compose | 24+ | App-Isolation per Tenant |
-| Reverse Proxy | Traefik | 3.x | TLS, Routing, Middleware |
-| Auth | Authentik | 2024.x | SSO, OIDC, User-Management |
-| Monitoring | Prometheus + Grafana | latest | Metriken, Dashboards |
-| Log-Aggregation | Loki + Promtail | latest | Zentrales Logging |
-| Alerting | Alertmanager | latest | Teams/Slack/E-Mail Alerts |
-| DNS | IONOS API | v1 | Automatische DNS-Einträge |
-| CI/CD | GitHub Actions | – | Nightly Updates, Tests |
-| WebApp | Node.js + Express | 20+ | Management-UI und API |
-| Datenbank | SQLite / PostgreSQL | – | WebApp-State |
+| Komponente        | Technologie                          | Zweck                                  |
+|-------------------|--------------------------------------|----------------------------------------|
+| Control Plane UI  | Next.js 14 (React)                   | Web-Interface für Admins               |
+| Reverse Proxy     | Traefik v3                           | TLS-Terminierung, Routing              |
+| Provisioning      | Ansible + OpenTofu                   | VM-Erstellung und -Konfiguration       |
+| Hypervisor        | Proxmox VE 8.x                       | VM-Verwaltung                          |
+| Tenant-OS         | Debian 13 "Trixie" (Cloud-Init)      | Basis-System für Tenant-VMs            |
+| Container Runtime | Docker CE + Docker Compose v2        | App-Container auf Tenant-VMs           |
+| Monitoring        | Prometheus + Grafana + Loki          | Metriken, Dashboards, Logs             |
+| SSO               | Authentik                            | OIDC-Provider für alle Apps            |
+| TLS-Zertifikate   | Let's Encrypt DNS-01 (IONOS API)     | Wildcard-Zertifikate                   |
+| DNS               | IONOS DNS API                        | Automatische DNS-Einträge              |
 
 ---
 
 ## 2. Voraussetzungen
 
-### 2.1 Hardware-Anforderungen
+### 2.1 Hardware
 
-#### Proxmox-Node (Pflicht)
+#### Proxmox-Node (Hypervisor)
 
-| Ressource | Minimum | Empfohlen |
-|-----------|---------|-----------|
-| CPU | 8 Kerne (Intel VT-x / AMD-V) | 16+ Kerne |
-| RAM | 32 GB ECC | 64 GB ECC |
-| System-SSD | 120 GB SSD (RAID 1) | 240 GB NVMe RAID |
-| VM-Storage | 500 GB SSD | 2 TB NVMe oder Ceph-Cluster |
-| Netzwerk | 1 GbE (2 Ports) | 10 GbE |
-| IPMI / BMC | empfohlen (iDRAC, iLO) | |
+| Komponente | Minimum       | Empfohlen          |
+|------------|---------------|--------------------|
+| CPU        | 8 Kerne       | 16+ Kerne          |
+| RAM        | 32 GB         | 64 GB+             |
+| Disk       | 500 GB SSD    | 1–2 TB NVMe        |
+| Netzwerk   | 1 GbE         | 10 GbE             |
+| OS         | Proxmox VE 8.x | Proxmox VE 8.2+   |
 
-> **Hinweis:** Für Produktivbetrieb mit >10 Tenants wird ein zweiter Proxmox-Node für HA (High Availability) dringend empfohlen.
+#### Management-VM (Control Plane)
 
-#### Management-VM
+| Komponente | Minimum  | Empfohlen   |
+|------------|----------|-------------|
+| vCPU       | 2        | 4–8         |
+| RAM        | 4 GB     | 8–16 GB     |
+| Disk       | 40 GB    | 60–100 GB   |
+| OS         | Debian 13 "Trixie" | Debian 13 |
 
-| Ressource | Minimum | Empfohlen |
-|-----------|---------|-----------|
-| vCPU | 4 | 8 |
-| RAM | 8 GB | 16 GB |
-| Disk | 60 GB | 100 GB |
-| Netzwerk | VLAN-Tag Management | |
+#### Tenant-VMs (Größenklassen)
 
-#### Tenant-VMs (je nach Größe)
+| Größe | vCPU | RAM   | Disk   | Empfohlen für              |
+|-------|------|-------|--------|----------------------------|
+| XS    | 1    | 1 GB  | 20 GB  | Einzelne leichte App       |
+| S     | 2    | 2 GB  | 40 GB  | 1–2 Apps (z.B. Vaultwarden)|
+| M     | 2    | 4 GB  | 60 GB  | Standard (Nextcloud etc.)  |
+| L     | 4    | 8 GB  | 100 GB | Mehrere Apps, viele Nutzer |
+| XL    | 8    | 16 GB | 200 GB | Intensive Workloads        |
 
-| Größe | vCPU | RAM | Disk | Tenants |
-|-------|------|-----|------|---------|
-| XS | 1 | 4 GB | 40 GB | Dev/Test |
-| S | 2 | 8 GB | 80 GB | <10 User |
-| M | 4 | 12 GB | 160 GB | 10–50 User |
-| L | 8 | 16 GB | 320 GB | 50–200 User |
-| XL | 16 | 32 GB | 640 GB | 200+ User |
+### 2.2 Netzwerk
 
-### 2.2 Software-Anforderungen
+#### VLAN-Setup
 
-#### Proxmox-Node
+| VLAN | ID | Beschreibung                                | Subnetz           |
+|------|----|---------------------------------------------|-------------------|
+| Mgmt | 10 | Management-VM, Proxmox-API                  | 10.10.10.0/24     |
+| Tenant | 20 | Tenant-VMs (isoliert, kein direkter Zugang) | 10.20.0.0/16    |
+| Public | – | Öffentliche IP für Traefik (Port 80/443)   | je nach Provider  |
 
-```bash
-# Proxmox VE 8.x (Debian Bookworm basiert)
-# Download: https://www.proxmox.com/en/downloads
+#### DNS-Konfiguration (Wildcard)
 
-# Debian 13 Cloud-Init Template erstellen (auf Proxmox-Node ausführen)
-wget https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2
-
-qm create 9000 --name debian13-template --memory 2048 --cores 2 \
-  --net0 virtio,bridge=vmbr0 --serial0 socket --vga serial0
-
-qm importdisk 9000 debian-13-genericcloud-amd64.qcow2 local-lvm
-
-qm set 9000 --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-9000-disk-0 \
-  --ide2 local-lvm:cloudinit --boot c --bootdisk scsi0 \
-  --ipconfig0 ip=dhcp --agent enabled=1
-
-qm template 9000
-```
-
-#### Management-VM – Softwareversionen
-
-| Software | Version | Installation |
-|----------|---------|--------------|
-| Debian | 13 (Trixie) | ISO/Template |
-| Docker Engine | 24+ | apt (official repo) |
-| Docker Compose | v2.24+ | als Docker-Plugin |
-| OpenTofu | 1.6+ | apt / binary |
-| Ansible | 2.15+ | pip3 |
-| Python | 3.11+ | System |
-| Node.js | 20 LTS | nodesource repo |
-| npm | 10+ | mit Node.js |
-| Git | 2.43+ | apt |
-| jq | 1.7+ | apt |
-
-### 2.3 Netzwerk-Anforderungen
-
-#### VLAN-Setup (UniFi oder managed Switch)
-
-- **Management-VLAN:** VLAN 10 – für Management-VM, Proxmox-API
-- **Tenant-VLANs:** VLAN 101–200 – je ein VLAN pro Tenant (isoliert)
-- **Monitoring-VLAN:** VLAN 20 – Node-Exporter-Traffic
-- **Trunk-Port:** Proxmox-Node erhält alle VLANs als Tagged (Trunk)
+Für automatische Tenant-Subdomains wird ein DNS-Wildcard-Eintrag benötigt:
 
 ```
-UniFi Switch Konfiguration (Beispiel):
-Port 1 (Uplink)     → All VLANs Tagged
-Port 2 (Proxmox)    → VLAN 10 Untagged, VLANs 20, 101-200 Tagged
-Port 3 (Firewall)   → VLAN 10 Untagged, VLAN 20 Tagged
+*.tenants.example.com  → A  →  <Public-IP der Management-VM>
+mgmt.example.com       → A  →  <Public-IP der Management-VM>
 ```
 
-#### DNS-Konfiguration (IONOS)
+> **IONOS DNS API:** Das Projekt nutzt den IONOS DNS API-Provider für Traefik, um DNS-01 Challenges für Let's Encrypt Wildcard-Zertifikate automatisch zu lösen. Kein manuelles DNS-Update nötig.
 
-Folgende DNS-Einträge müssen manuell oder via API gesetzt werden:
+#### Firewall-Ports (auf der Management-VM)
 
-```
-# A-Record für die Management-VM
-mgmt.example.com.          300  IN  A     203.0.113.10
+| Port | Protokoll | Richtung | Zweck                    |
+|------|-----------|----------|--------------------------|
+| 22   | TCP       | Eingehend | SSH-Zugang (nur Admin)   |
+| 80   | TCP       | Eingehend | HTTP (Traefik → HTTPS)   |
+| 443  | TCP       | Eingehend | HTTPS (Traefik)          |
 
-# Wildcard für alle Tenant-Apps
-*.apps.example.com.        300  IN  A     203.0.113.10
+> Alle anderen Ports sind per UFW blockiert. Tenant-VMs sind nicht direkt aus dem Internet erreichbar.
 
-# Authentik SSO
-auth.example.com.          300  IN  A     203.0.113.10
-
-# Grafana Monitoring
-monitoring.example.com.    300  IN  A     203.0.113.10
-```
-
-#### Firewall / Port-Freigaben
-
-| Port | Protokoll | Zweck | Quelle |
-|------|-----------|-------|--------|
-| 80 | TCP | HTTP → Redirect zu HTTPS | Internet |
-| 443 | TCP | HTTPS (Traefik) | Internet |
-| 22 | TCP | SSH Management | VPN / eigene IP |
-| 8006 | TCP | Proxmox Web-UI | VPN / eigene IP |
-| 9090 | TCP | Prometheus (intern) | Management-VLAN |
-| 3000 | TCP | WebApp (intern) | Management-VLAN |
-
-### 2.4 API-Keys und Zugangsdaten
-
-Folgende Zugangsdaten müssen vor dem Setup beschafft werden:
+### 2.3 API-Keys beschaffen
 
 #### Proxmox API-Token
 
-```bash
-# In Proxmox Web-UI:
-# Datacenter → Permissions → API Tokens → Add
-# User: root@pam oder dedizierter User
-# Token ID: terraform
-# Privilege Separation: deaktivieren (für vollständige Rechte)
+1. In der Proxmox-Weboberfläche: **Datacenter → API Tokens → Add**
+2. User: `root@pam` oder dedizierter API-User
+3. Token-Name: `gmz-webapp`
+4. Berechtigungen: `VM.Allocate`, `VM.Clone`, `VM.Config.*`, `VM.PowerMgmt`, `Datastore.AllocateSpace`, `SDN.Use`
+5. Token-Secret notieren (wird nur einmal angezeigt)
 
-# Resultat:
-PROXMOX_TOKEN_ID="root@pam!terraform"
-PROXMOX_TOKEN_SECRET="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-```
+Format im .env: `PROVISION_PROXMOX_API_TOKEN=user@pve!tokenname=secret`
 
 #### IONOS DNS API-Key
 
-```bash
-# IONOS Developer Console: https://developer.hosting.ionos.de/keys
-# API-Key erstellen → Public Prefix + Secret Key notieren
+1. IONOS Developer-Portal: https://developer.hosting.ionos.de/
+2. API-Schlüssel erstellen (Prefix + Secret)
+3. Format: `IONOS_API_KEY=PREFIX.SECRET`
 
-IONOS_API_KEY="public_prefix.secret_key"
+#### SMTP-Zugangsdaten (optional, für Benachrichtigungen)
+
+Wird für Authentik und App-Benachrichtigungen benötigt:
+- SMTP-Host, Port, User, Passwort
+- TLS-Einstellung (StartTLS oder SSL/TLS)
+
+---
+
+## 3. Debian 13 installieren
+
+Debian 13 "Trixie" ist ab März 2026 der aktuelle Stable-Zweig.
+Offizielle Downloadseite: https://www.debian.org/distrib/
+
+### 3.1 Option A: Bare-Metal / ISO-Installation
+
+#### Schritt 1: ISO herunterladen
+
+```bash
+# Als gmzadmin (auf einem beliebigen Linux-System):
+wget https://cdimage.debian.org/cdimage/release/current/amd64/iso-cd/debian-13.0.0-amd64-netinst.iso
 ```
 
-#### SMTP-Zugangsdaten
+> Aktuelle ISO-URL immer auf https://www.debian.org/distrib/ prüfen. Bei Trixie als Stable-Release lautet der Pfad wie oben. Als tägliches Build (falls noch Testing):
+> `https://cdimage.debian.org/cdimage/daily-builds/daily/arch-latest/amd64/iso-cd/debian-testing-amd64-netinst.iso`
+
+SHA256-Prüfsumme verifizieren:
+```bash
+# Als gmzadmin:
+sha256sum debian-13.0.0-amd64-netinst.iso
+# Vergleichen mit: https://cdimage.debian.org/cdimage/release/current/amd64/iso-cd/SHA256SUMS
+```
+
+#### Schritt 2: Bootmedium erstellen
+
+**Unter Linux (dd):**
+```bash
+# Als root (ACHTUNG: /dev/sdX durch das korrekte USB-Gerät ersetzen!):
+dd if=debian-13.0.0-amd64-netinst.iso of=/dev/sdX bs=4M status=progress
+sync
+```
+
+**Unter Windows:** Rufus (https://rufus.ie) oder Ventoy (https://www.ventoy.net)
+
+#### Schritt 3: Debian-Installer durchlaufen
+
+Booten Sie vom USB-Medium. Im Installer:
+
+1. **Sprache:** Deutsch
+2. **Ort:** Deutschland
+3. **Tastaturbelegung:** Deutsch
+4. **Hostname:** `mgmt-vm` (oder Wunschname, z.B. `gmz-mgmt`)
+5. **Domäne:** Ihre Domain, z.B. `example.com`
+6. **Root-Passwort:** Stark wählen (min. 20 Zeichen, Sonderzeichen). Root-Login wird später deaktiviert.
+7. **Neuen Benutzer anlegen:**
+   - Vollständiger Name: `GMZ Admin`
+   - Benutzername: `gmzadmin`
+   - Passwort: Sicher wählen
+8. **Partitionierung:**
+   - Methode: „Geführt – gesamte Festplatte verwenden mit LVM"
+   - Separate `/home`-Partition: **Nein** (alles auf `/`)
+   - LVM bestätigen: **Ja**
+   - Alle Änderungen auf Disk schreiben: **Ja**
+9. **Paketquellen:** Deutschland / deb.debian.org
+10. **Beliebtheitswettbewerb:** Nach Wunsch
+11. **Softwareauswahl:** **NUR** folgende anklicken:
+    - ☑ SSH-Server
+    - ☑ Standard-Systemwerkzeuge
+    - **KEIN Desktop** (GNOME, KDE etc. abwählen!)
+12. **GRUB:** Auf `/dev/sda` (oder das Haupt-Laufwerk) installieren
+
+#### Schritt 4: Neustart
+
+System neu starten, USB-Medium entfernen.
+
+#### Schritt 5: Erster SSH-Login
 
 ```bash
-# Für Alertmanager und Authentik E-Mail-Versand
-SMTP_HOST="smtp.example.com"
-SMTP_PORT="587"
-SMTP_USER="noreply@example.com"
-SMTP_PASSWORD="sicheres-passwort"
-SMTP_FROM="GMZ Cloud <noreply@example.com>"
+# Vom eigenen Rechner (als normaler Nutzer):
+ssh gmzadmin@<IP-der-Management-VM>
+```
+
+#### Schritt 6: sudo installieren (falls nicht bereits vorhanden)
+
+Wenn `sudo` nicht verfügbar ist (minimales Debian-Install):
+
+```bash
+# Als root (su - um Root-Session zu öffnen):
+su -
+apt install -y sudo
+usermod -aG sudo gmzadmin
+exit
+# Neu einloggen damit Gruppe aktiv wird:
+exit
+ssh gmzadmin@<IP>
 ```
 
 ---
 
-## 3. Initiales Setup Management-VM
+### 3.2 Option B: Proxmox-VM aus ISO (für Management-VM)
 
-### 3.1 Debian 13 installieren
+Diese Option ist geeignet, wenn die Management-VM direkt auf dem Proxmox-Hypervisor laufen soll.
 
-Entweder via Proxmox-Template (empfohlen) oder manuell per ISO.
+#### Schritt 1: ISO in Proxmox hochladen
+
+1. Proxmox-Weboberfläche öffnen: `https://<proxmox-ip>:8006`
+2. **Storage** (z.B. `local`) → **ISO Images** → **Upload**
+3. Debian 13 ISO hochladen
+
+#### Schritt 2: VM in Proxmox erstellen
+
+In der Proxmox-GUI: **Create VM**
+
+| Einstellung       | Wert                                      |
+|-------------------|-------------------------------------------|
+| VM ID             | z.B. `100`                                |
+| Name              | `mgmt-vm`                                 |
+| ISO               | Debian 13 ISO (wie hochgeladen)           |
+| Disk-Controller   | VirtIO SCSI                               |
+| Disk-Größe        | 60–100 GB                                 |
+| CPU               | 4–8 vCPU (Typ: host)                      |
+| RAM               | 8–16 GB (kein Ballooning für Produktion)  |
+| Netzwerk          | VirtIO, Bridge: vmbr0, VLAN-Tag: 10       |
+| QEMU Agent        | Aktiviert                                 |
+
+#### Schritt 3: VM starten und Debian installieren
+
+VM starten → Konsole öffnen → Debian-Installer wie in [3.1 Schritt 3](#schritt-3-debian-installer-durchlaufen) beschrieben.
+
+#### Schritt 4: QEMU Guest Agent installieren
+
+Nach der Debian-Installation:
 
 ```bash
-# Via Proxmox Web-UI oder CLI:
-qm clone 9000 100 --name mgmt-vm --full true
-qm set 100 --memory 8192 --cores 4 --net0 virtio,bridge=vmbr0,tag=10
-qm resize 100 scsi0 +60G
-qm set 100 --ipconfig0 ip=10.10.10.10/24,gw=10.10.10.1
-qm set 100 --nameserver 1.1.1.1 --searchdomain example.com
-qm set 100 --sshkeys ~/.ssh/id_ed25519.pub
-qm start 100
+# Als gmzadmin:
+sudo apt install -y qemu-guest-agent
+sudo systemctl enable --now qemu-guest-agent
 ```
 
-### 3.2 System härten
+Danach in der Proxmox-GUI: VM → **Summary** → IP-Adresse sollte sichtbar sein.
 
-#### SSH absichern
+---
+
+### 3.3 Debian 13 Cloud-Init-Template für Tenant-VMs erstellen
+
+Dieses Template (VMID 9000) wird als Basis für alle Tenant-VMs geklont. Es muss **einmalig auf dem Proxmox-Node** eingerichtet werden.
 
 ```bash
-# Als root auf der Management-VM:
-ssh root@10.10.10.10
+# Als root auf dem Proxmox-Node:
+cd /var/lib/vz/template/iso/
 
-# SSH-Konfiguration absichern
-cat > /etc/ssh/sshd_config.d/10-hardening.conf << 'EOF'
-PermitRootLogin prohibit-password
+# Debian 13 Generic Cloud Image herunterladen
+wget https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2
+
+# Checksumme prüfen (empfohlen):
+wget https://cloud.debian.org/images/cloud/trixie/latest/SHA512SUMS
+sha512sum -c SHA512SUMS --ignore-missing
+
+# VM erstellen (VMID 9000)
+qm create 9000 \
+  --name debian13-cloud-template \
+  --memory 2048 \
+  --cores 2 \
+  --net0 virtio,bridge=vmbr0 \
+  --serial0 socket \
+  --vga serial0 \
+  --scsihw virtio-scsi-pci \
+  --agent enabled=1
+
+# Disk importieren (in den lokalen LVM-Storage)
+qm importdisk 9000 debian-13-genericcloud-amd64.qcow2 local-lvm
+
+# Disk anschließen + Boot-Reihenfolge setzen
+qm set 9000 \
+  --scsi0 local-lvm:vm-9000-disk-0,discard=on \
+  --ide2 local-lvm:cloudinit \
+  --boot order=scsi0 \
+  --ipconfig0 ip=dhcp
+
+# Cloud-Init konfigurieren
+# (Hinweis: SSH-Key hier eintragen, damit Ansible sich verbinden kann)
+qm set 9000 \
+  --ciuser debian \
+  --sshkeys /root/.ssh/authorized_keys \
+  --ciupgrade 1
+
+# Als Template konvertieren (Template kann nicht mehr gestartet werden, nur geklont!)
+qm template 9000
+
+echo "✅ Template VMID 9000 erfolgreich erstellt."
+```
+
+> **Wichtig:** Der Standard-Benutzer in Tenant-VMs ist `debian` (Debian Cloud-Init Standard). Ansible-Playbooks verwenden diesen Benutzer: `ansible_user=debian`.
+
+---
+
+## 4. Management-VM einrichten
+
+Alle folgenden Schritte werden auf der Management-VM ausgeführt. Der interaktive Installations-Wizard (`ops/scripts/install-wizard.sh`) kann die Schritte 4.6–4.11 automatisieren.
+
+### 4.1 System aktualisieren
+
+```bash
+# Als gmzadmin:
+sudo apt update && sudo apt full-upgrade -y
+sudo apt install -y curl wget git jq unzip htop tmux vim
+```
+
+### 4.2 Benutzer gmzadmin einrichten (falls nicht im Installer angelegt)
+
+Dieser Schritt ist nur nötig, wenn `gmzadmin` nicht bereits während der Debian-Installation angelegt wurde.
+
+```bash
+# Als root:
+useradd -m -s /bin/bash gmzadmin
+usermod -aG sudo gmzadmin
+passwd gmzadmin
+
+# SSH-Key hinterlegen (eigenen Public Key eintragen!)
+mkdir -p /home/gmzadmin/.ssh
+echo "ssh-ed25519 AAAA...IHR_PUBLIC_KEY hier@rechner" >> /home/gmzadmin/.ssh/authorized_keys
+chmod 700 /home/gmzadmin/.ssh
+chmod 600 /home/gmzadmin/.ssh/authorized_keys
+chown -R gmzadmin:gmzadmin /home/gmzadmin/.ssh
+```
+
+### 4.3 SSH härten
+
+> **⚠️ WICHTIG:** Stellen Sie **vor** diesem Schritt sicher, dass der SSH-Key-Login als `gmzadmin` funktioniert! Nach dem Deaktivieren der Passwort-Authentifizierung ist kein Passwort-Login mehr möglich.
+
+```bash
+# Als gmzadmin:
+sudo tee /etc/ssh/sshd_config.d/10-hardening.conf << 'EOF'
+PermitRootLogin no
 PasswordAuthentication no
 PubkeyAuthentication yes
-AuthorizedKeysFile .ssh/authorized_keys
-X11Forwarding no
-AllowAgentForwarding no
-AllowTcpForwarding no
 MaxAuthTries 3
-LoginGraceTime 30
+X11Forwarding no
+AllowTcpForwarding no
 ClientAliveInterval 300
 ClientAliveCountMax 2
-Protocol 2
-Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com
-MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
-KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org
 EOF
-
-systemctl restart ssh
-
-# Dedizierter Deploy-User anlegen
-useradd -m -s /bin/bash -G sudo deploy
-mkdir -p /home/deploy/.ssh
-cp /root/.ssh/authorized_keys /home/deploy/.ssh/
-chown -R deploy:deploy /home/deploy/.ssh
-chmod 700 /home/deploy/.ssh
-chmod 600 /home/deploy/.ssh/authorized_keys
+sudo systemctl restart ssh
 ```
 
-#### UFW Firewall konfigurieren
-
+**Testen (in einem anderen Terminal, bevor das aktuelle geschlossen wird):**
 ```bash
-apt-get install -y ufw
-
-# Standardregeln
-ufw default deny incoming
-ufw default allow outgoing
-
-# Erlaubte Ports
-ufw allow 22/tcp    comment 'SSH'
-ufw allow 80/tcp    comment 'HTTP Traefik'
-ufw allow 443/tcp   comment 'HTTPS Traefik'
-
-# Monitoring aus Management-VLAN
-ufw allow from 10.10.0.0/16 to any port 9090 comment 'Prometheus'
-ufw allow from 10.10.0.0/16 to any port 3000 comment 'WebApp'
-ufw allow from 10.10.0.0/16 to any port 3001 comment 'Grafana'
-
-# Aktivieren
-ufw --force enable
-ufw status verbose
+# Als gmzadmin (vom eigenen Rechner, neues Terminal):
+ssh -o PasswordAuthentication=no gmzadmin@<IP>
+# → Muss ohne Passwort funktionieren
 ```
 
-#### Unattended Upgrades
+### 4.4 UFW-Firewall einrichten
 
 ```bash
-apt-get install -y unattended-upgrades apt-listchanges
-
-cat > /etc/apt/apt.conf.d/50unattended-upgrades << 'EOF'
-Unattended-Upgrade::Allowed-Origins {
-    "${distro_id}:${distro_codename}";
-    "${distro_id}:${distro_codename}-security";
-    "${distro_id}ESMApps:${distro_codename}-apps-security";
-    "${distro_id}ESM:${distro_codename}-infra-security";
-};
-Unattended-Upgrade::AutoFixInterruptedDpkg "true";
-Unattended-Upgrade::MinimalSteps "true";
-Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
-Unattended-Upgrade::Remove-New-Unused-Dependencies "true";
-Unattended-Upgrade::Automatic-Reboot "false";
-Unattended-Upgrade::Mail "admin@example.com";
-EOF
-
-systemctl enable unattended-upgrades
-systemctl start unattended-upgrades
+# Als gmzadmin:
+sudo apt install -y ufw
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow 22/tcp comment 'SSH'
+sudo ufw allow 80/tcp comment 'HTTP Traefik'
+sudo ufw allow 443/tcp comment 'HTTPS Traefik'
+sudo ufw --force enable
+sudo ufw status verbose
 ```
 
-### 3.3 Docker installieren
+Erwartete Ausgabe:
+```
+Status: active
+To                         Action      From
+--                         ------      ----
+22/tcp                     ALLOW IN    Anywhere  (SSH)
+80/tcp                     ALLOW IN    Anywhere  (HTTP Traefik)
+443/tcp                    ALLOW IN    Anywhere  (HTTPS Traefik)
+```
+
+### 4.5 Automatische Sicherheitsupdates
 
 ```bash
-# Offizielle Docker-Installation (Debian)
-apt-get update
-apt-get install -y ca-certificates curl gnupg lsb-release
+# Als gmzadmin:
+sudo apt install -y unattended-upgrades
+sudo dpkg-reconfigure -plow unattended-upgrades
+```
 
-install -m 0755 -d /etc/apt/keyrings
+Im Dialog „Automatische Updates aktivieren?" → **Ja** auswählen.
+
+### 4.6 Docker installieren
+
+Docker wird über das offizielle Docker-Repository installiert (nicht das veraltete Paket aus Debian-Quellen).
+
+```bash
+# Als gmzadmin:
+sudo apt install -y ca-certificates curl gnupg
+sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/debian/gpg \
-  | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-chmod a+r /etc/apt/keyrings/docker.gpg
+  | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-  https://download.docker.com/linux/debian $(lsb_release -cs) stable" \
-  > /etc/apt/sources.list.d/docker.list
+  https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list
 
-apt-get update
-apt-get install -y docker-ce docker-ce-cli containerd.io \
-  docker-buildx-plugin docker-compose-plugin
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# Deploy-User zur Docker-Gruppe hinzufügen
-usermod -aG docker deploy
+# gmzadmin zur docker-Gruppe hinzufügen (WICHTIG!)
+# Nach dieser Zeile ist KEIN sudo mehr für docker-Befehle nötig.
+sudo usermod -aG docker gmzadmin
 
-# Docker-Daemon-Konfiguration
-cat > /etc/docker/daemon.json << 'EOF'
-{
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "10m",
-    "max-file": "3"
-  },
-  "default-address-pools": [
-    {"base": "172.20.0.0/16", "size": 24}
-  ],
-  "live-restore": true,
-  "userland-proxy": false
-}
-EOF
+# Gruppe in aktueller Shell aktivieren (oder neu einloggen):
+newgrp docker
 
-systemctl enable docker
-systemctl restart docker
-
-# Test
+# Verifizieren – KEIN sudo!
 docker run --rm hello-world
 docker compose version
 ```
 
-### 3.4 OpenTofu installieren
+> **Hinweis:** Nach `newgrp docker` oder nach einem Neustart/Re-Login sind alle Docker-Befehle als `gmzadmin` ohne `sudo` ausführbar. Dies ist der korrekte Betrieb.
+
+### 4.7 OpenTofu installieren
+
+OpenTofu ist der Open-Source-Fork von Terraform und wird für die VM-Provisionierung auf Proxmox verwendet.
 
 ```bash
-# OpenTofu via apt-Repository (empfohlen)
-curl -fsSL https://apt.releases.hashicorp.com/gpg \
-  | gpg --dearmor -o /usr/share/keyrings/opentofu-archive-keyring.gpg
+# Als gmzadmin:
+TOFU_VERSION="1.7.0"
+ARCH=$(dpkg --print-architecture)
+curl -fsSL "https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_${ARCH}.deb" \
+  -o /tmp/opentofu.deb
+sudo dpkg -i /tmp/opentofu.deb
+rm /tmp/opentofu.deb
 
-# Alternativ: direktes Binary (wenn kein offizielles Repo verfügbar)
-TOFU_VERSION="1.6.2"
-curl -fsSL "https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_linux_amd64.zip" \
-  -o /tmp/opentofu.zip
-
-unzip /tmp/opentofu.zip -d /tmp/opentofu
-mv /tmp/opentofu/tofu /usr/local/bin/tofu
-chmod +x /usr/local/bin/tofu
-rm -rf /tmp/opentofu*
-
-# Verifizieren
+# Verifizieren:
 tofu version
-# → OpenTofu v1.6.2
-
-# Autocomplete einrichten (optional)
-tofu -install-autocomplete
+# Erwartete Ausgabe: OpenTofu v1.7.x
 ```
 
-### 3.5 Ansible installieren
+> Aktuelle Version prüfen: https://github.com/opentofu/opentofu/releases
+
+### 4.8 Ansible installieren
+
+Ansible wird über `pipx` installiert (empfohlen, da keine Root-Rechte für die Installation selbst nötig sind und keine Konflikte mit System-Python entstehen).
 
 ```bash
-# Python und pip aktualisieren
-apt-get install -y python3 python3-pip python3-venv
+# Als gmzadmin:
+sudo apt install -y python3 python3-pip pipx
+pipx install --include-deps ansible
+pipx ensurepath
 
-# Ansible via pip (aktuelle Version)
-python3 -m pip install --break-system-packages \
-  ansible==9.* \
-  ansible-lint \
-  jmespath \
-  netaddr \
-  passlib
+# Neue Shell starten oder PATH neu laden:
+source ~/.bashrc
 
-# Verifizieren
+# Verifizieren:
 ansible --version
-# → ansible [core 2.16.x]
+# Erwartete Ausgabe: ansible [core 2.16.x]
 
-# Ansible-Konfiguration
-mkdir -p /etc/ansible
-cat > /etc/ansible/ansible.cfg << 'EOF'
-[defaults]
-inventory = /opt/gmz/infrastructure/inventory
-host_key_checking = False
-retry_files_enabled = False
-stdout_callback = yaml
-callbacks_enabled = profile_tasks
-interpreter_python = auto_silent
-forks = 10
-
-[ssh_connection]
-ssh_args = -o ControlMaster=auto -o ControlPersist=60s -o StrictHostKeyChecking=no
-pipelining = True
-EOF
+# Benötigte Collections installieren:
+ansible-galaxy collection install community.docker community.general
 ```
 
-### 3.6 Repository klonen
+### 4.9 Node.js 20 LTS installieren
+
+Die WebApp benötigt Node.js 20 LTS.
 
 ```bash
-# SSH-Key für GitHub generieren (falls noch nicht vorhanden)
-sudo -u deploy ssh-keygen -t ed25519 -C "deploy@mgmt-vm" -f /home/deploy/.ssh/github_ed25519 -N ""
-echo "GitHub Deploy Key (public):"
-cat /home/deploy/.ssh/github_ed25519.pub
-# → Diesen Key in GitHub unter Settings → Deploy Keys hinzufügen
+# Als gmzadmin:
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
 
-# Repository klonen
-sudo -u deploy bash << 'EOF'
-git clone git@github.com:gmz-it/gmz-cloud-business-apps.git /opt/gmz
+# Verifizieren:
+node --version   # → v20.x.x
+npm --version    # → 10.x.x
+```
+
+### 4.10 Repository klonen
+
+```bash
+# Als gmzadmin:
+# Verzeichnis erstellen (sudo für /opt/, dann Eigentümer auf gmzadmin setzen):
+sudo mkdir -p /opt/gmz
+sudo chown gmzadmin:gmzadmin /opt/gmz
+
+# Repository klonen – KEIN sudo!
+git clone https://github.com/bumblebob-gmz/gmz-cloud-business-apps-greenfield.git /opt/gmz
 cd /opt/gmz
-git checkout main
-EOF
 
-# Verzeichnisrechte
-chown -R deploy:deploy /opt/gmz
-ls -la /opt/gmz
+# Verzeichnisrechte prüfen:
+ls -la /opt/gmz/
+# → Alle Einträge sollten gmzadmin:gmzadmin gehören
 ```
 
-### 3.7 Umgebungsvariablen konfigurieren
+### 4.11 Umgebungsvariablen (.env) konfigurieren
 
 ```bash
-# .env aus Template erstellen
-sudo -u deploy cp /opt/gmz/.env.example /opt/gmz/.env
+# Als gmzadmin – KEIN sudo:
+cp /opt/gmz/platform/webapp/.env.example /opt/gmz/platform/webapp/.env
+chmod 600 /opt/gmz/platform/webapp/.env
 
-# .env editieren – ALLE Werte befüllen
-sudo -u deploy nano /opt/gmz/.env
+# .env befüllen (Pflichtfelder, siehe Tabelle unten):
+nano /opt/gmz/platform/webapp/.env
 ```
 
-Mindest-Konfiguration für `.env`:
+**Mindest-.env für Produktionsbetrieb:**
 
-```dotenv
-# === Proxmox ===
-PROXMOX_URL=https://10.10.10.1:8006/api2/json
-PROXMOX_TOKEN_ID=root@pam!terraform
-PROXMOX_TOKEN_SECRET=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-PROXMOX_NODE=pve01
-PROXMOX_STORAGE=local-lvm
-PROXMOX_TEMPLATE_ID=9000
+```bash
+# ─── Authentifizierung ──────────────────────────────────────────────
+# Für Produktion: trusted-bearer (API-Token-Authentifizierung)
+# Optionen: trusted-bearer | jwt | none (nur Dev!)
+WEBAPP_AUTH_MODE=trusted-bearer
 
-# === Netzwerk ===
-MANAGEMENT_VLAN=10
-TENANT_VLAN_START=101
-TENANT_VLAN_END=200
-MANAGEMENT_NETWORK=10.10.10.0/24
-TENANT_NETWORK_BASE=10.20
+# Admin-API-Token (sicher generieren: openssl rand -hex 32)
+WEBAPP_TRUSTED_TOKENS_JSON='{"admin":{"role":"admin","token":"IHR_SICHERER_TOKEN_HIER"}}'
 
-# === DNS (IONOS) ===
-IONOS_API_KEY=public_prefix.secret_key
-BASE_DOMAIN=apps.example.com
-MGMT_DOMAIN=mgmt.example.com
+# ─── Sicherheit ─────────────────────────────────────────────────────
+# Verschlüsselungsschlüssel für Benachrichtigungen (32 Byte hex)
+WEBAPP_NOTIFICATION_ENCRYPTION_KEY=IHR_32_BYTE_SCHLUESSEL
 
-# === SMTP ===
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=noreply@example.com
-SMTP_PASSWORD=sicheres-passwort
-SMTP_FROM=GMZ Cloud <noreply@example.com>
+# ─── Proxmox API ────────────────────────────────────────────────────
+PROVISION_PROXMOX_ENDPOINT=https://proxmox.example.com:8006/api2/json
+PROVISION_PROXMOX_API_TOKEN=root@pam!gmz-webapp=IHR_TOKEN_SECRET
+PROVISION_PROXMOX_NODE=pve
 
-# === WebApp ===
-WEBAPP_PORT=3000
-WEBAPP_SECRET=$(openssl rand -hex 32)
-WEBAPP_TRUSTED_BEARER=$(openssl rand -hex 48)
-WEBAPP_ADMIN_EMAIL=admin@example.com
-WEBAPP_ADMIN_PASSWORD=$(openssl rand -base64 16)
+# ─── Tenant-Template ────────────────────────────────────────────────
+PROVISION_TEMPLATE_VMID=9000
+PROVISION_TENANT_VLAN=20
 
-# === Datenbank ===
-WEBAPP_DB_TYPE=sqlite
-WEBAPP_DB_PATH=/opt/gmz/data/webapp.db
+# ─── SSH-Key für Tenant-VMs ─────────────────────────────────────────
+PROVISION_SSH_PUBLIC_KEY=ssh-ed25519 AAAA...IHR_PUBLIC_KEY
 
-# === Authentik ===
-AUTHENTIK_SECRET_KEY=$(openssl rand -hex 32)
-AUTHENTIK_DOMAIN=auth.example.com
-AUTHENTIK_ADMIN_EMAIL=admin@example.com
+# ─── Domain-Konfiguration ───────────────────────────────────────────
+WEBAPP_BASE_DOMAIN=example.com
+WEBAPP_TENANT_SUBDOMAIN_TEMPLATE=*.tenants.example.com
 
-# === Monitoring ===
-GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 16)
-GRAFANA_DOMAIN=monitoring.example.com
-ALERTMANAGER_TEAMS_WEBHOOK=https://outlook.office.com/webhook/...
+# ─── Umgebung ───────────────────────────────────────────────────────
+NODE_ENV=production
+```
+
+Token sicher generieren:
+```bash
+# Als gmzadmin – KEIN sudo:
+openssl rand -hex 32
+# → Ausgabe als WEBAPP_TRUSTED_TOKENS_JSON-Token verwenden
+```
+
+> **Sicherheit:** Die `.env`-Datei enthält Secrets und muss mit `chmod 600` geschützt sein. Sie darf **niemals** in Git committet werden (ist in `.gitignore` eingetragen).
+
+---
+
+## 5. Traefik deployen
+
+Traefik übernimmt TLS-Terminierung, HTTP→HTTPS-Weiterleitung und das Routing zu den Tenant-Apps. Die Konfiguration erfolgt über Ansible.
+
+```bash
+# Als gmzadmin – KEIN sudo für Ansible:
+cd /opt/gmz
+
+# Inventory-Datei für die Management-VM prüfen/anlegen:
+cat automation/ansible/inventory/management.yml
+# → Muss localhost oder die Management-VM-IP enthalten
+
+# Traefik deployen:
+ansible-playbook automation/ansible/deploy-traefik.yml \
+  -e acme_email=admin@example.com \
+  -e ionos_api_key=PREFIX.SECRET \
+  -i automation/ansible/inventory/management.yml
+```
+
+**Was das Playbook macht:**
+1. Traefik-Konfigurationsverzeichnis anlegen
+2. `traefik.yml` (statische Konfiguration) schreiben
+3. IONOS DNS-Provider für Let's Encrypt konfigurieren
+4. Wildcard-Zertifikat für `*.tenants.example.com` und `mgmt.example.com` anfordern
+5. Traefik als Docker-Container starten
+
+**Traefik-Status prüfen:**
+```bash
+# Als gmzadmin – KEIN sudo für docker:
+docker ps | grep traefik
+docker logs traefik --tail 50
+```
+
+**Zertifikat-Status prüfen:**
+```bash
+# Als gmzadmin – KEIN sudo für docker:
+docker exec traefik cat /etc/traefik/acme.json | python3 -m json.tool | grep -A2 "main"
 ```
 
 ---
 
-## 4. Traefik deployen
+## 6. Monitoring Stack deployen
 
-### 4.1 IONOS API-Key vorbereiten
-
-Der IONOS API-Key wird für die DNS-01-Challenge benötigt, damit Traefik automatisch Let's Encrypt Wildcard-Zertifikate ausstellen kann.
+Prometheus, Grafana und Loki werden als Docker-Compose-Stack auf der Management-VM betrieben.
 
 ```bash
-# IONOS-Credentials in separater Datei speichern (wird von Traefik gemountet)
-sudo -u deploy mkdir -p /opt/gmz/infrastructure/traefik/secrets
+# Als gmzadmin – KEIN sudo für docker (gmzadmin ist in docker-Gruppe!):
+cd /opt/gmz/infra/monitoring
 
-cat > /opt/gmz/infrastructure/traefik/secrets/ionos.env << 'EOF'
-IONOS_API_KEY=public_prefix.secret_key
-EOF
-
-chmod 600 /opt/gmz/infrastructure/traefik/secrets/ionos.env
-```
-
-### 4.2 Traefik via Ansible deployen
-
-```bash
-cd /opt/gmz/infrastructure
-
-# Inventory prüfen
-ansible-inventory --list | jq '.management'
-
-# Dry-Run (--check)
-ansible-playbook playbooks/deploy-traefik.yml --check -v
-
-# Deployment ausführen
-ansible-playbook playbooks/deploy-traefik.yml \
-  --extra-vars "env=production" \
-  -v
-
-# Erwartete Ausgabe:
-# PLAY RECAP *************
-# mgmt-vm : ok=12  changed=8  unreachable=0  failed=0
-```
-
-Das Playbook führt folgende Schritte aus:
-1. Docker-Netzwerk `traefik-proxy` anlegen
-2. Traefik-Konfigurationsverzeichnis erstellen (`/opt/traefik/`)
-3. `traefik.yml` mit IONOS DNS-Provider generieren
-4. `docker-compose.yml` für Traefik deployen
-5. Container starten und Health-Check durchführen
-
-### 4.3 TLS verifizieren
-
-```bash
-# Zertifikats-Status prüfen (nach ~2 Minuten)
-sudo -u deploy docker exec traefik \
-  cat /acme/acme.json | jq '.letsencrypt.Certificates[].domain'
-
-# Alternativ via curl:
-curl -v https://mgmt.example.com 2>&1 | grep -E "subject:|issuer:|expire"
-
-# Traefik-Logs auf Fehler prüfen
-docker logs traefik --tail 50 | grep -i "error\|acme\|certificate"
-
-# Erfolgreicher ACME-Log sieht so aus:
-# time="..." level=info msg="... Certificate obtained successfully"
-```
-
-### 4.4 Traefik Dashboard
-
-Das Traefik-Dashboard ist passwortgeschützt und nur über Traefik selbst erreichbar:
-
-```
-URL: https://traefik.mgmt.example.com/dashboard/
-Benutzer: admin
-Passwort: <TRAEFIK_DASHBOARD_PASSWORD aus .env>
-```
-
-Wichtige Dashboard-Bereiche:
-- **Routers:** Alle konfigurierten Routes und TLS-Status
-- **Services:** Backend-Health-Status aller Services
-- **Middlewares:** Aktive Rate-Limiter, Auth-Middleware
-- **Entrypoints:** HTTP/HTTPS-Eingehende Verbindungen
-
----
-
-## 5. Monitoring Stack deployen
-
-### 5.1 Stack starten
-
-```bash
-cd /opt/gmz/infrastructure/monitoring
-
-# Konfigurationsdateien aus Templates generieren
-./scripts/generate-config.sh
-
-# Stack im Hintergrund starten
+# Stack starten:
 docker compose up -d
 
-# Status prüfen
+# Status prüfen:
 docker compose ps
-# NAME              IMAGE                    STATUS
-# prometheus        prom/prometheus:latest   Up (healthy)
-# grafana           grafana/grafana:latest   Up (healthy)
-# loki              grafana/loki:latest      Up
-# alertmanager      prom/alertmanager:latest Up
-# promtail          grafana/promtail:latest  Up
-
-# Logs prüfen
-docker compose logs --tail 20
 ```
 
-### 5.2 Grafana-Passwort setzen
+Erwartete Container:
+```
+NAME                STATUS    PORTS
+prometheus          running   9090/tcp
+grafana             running   3001/tcp
+loki                running   3100/tcp
+promtail            running
+alertmanager        running   9093/tcp
+```
+
+**Erste Anmeldung Grafana:**
+- URL: `https://monitoring.example.com` (via Traefik) oder direkt `http://<IP>:3001`
+- Benutzer: `admin`
+- Passwort: in `infra/monitoring/.env` konfigurieren (Variable `GRAFANA_ADMIN_PASSWORD`)
 
 ```bash
-# Initiales Passwort aus .env verwenden oder manuell setzen
-docker exec grafana grafana-cli admin reset-admin-password "neues-sicheres-passwort"
-
-# Grafana-URL
-echo "Grafana: https://monitoring.example.com"
-echo "Login: admin / $(grep GRAFANA_ADMIN_PASSWORD /opt/gmz/.env | cut -d= -f2)"
+# Als gmzadmin – KEIN sudo:
+echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)" >> /opt/gmz/infra/monitoring/.env
+chmod 600 /opt/gmz/infra/monitoring/.env
+docker compose restart grafana
 ```
-
-**Erste Schritte in Grafana:**
-1. Login unter `https://monitoring.example.com`
-2. **Connections → Data Sources:**
-   - Prometheus: `http://prometheus:9090`
-   - Loki: `http://loki:3100`
-3. **Dashboards → Import:** IDs aus `monitoring/dashboards/` laden
-
-### 5.3 Alertmanager Teams-Webhook konfigurieren
-
-```bash
-# Webhook-URL in .env eintragen
-# ALERTMANAGER_TEAMS_WEBHOOK=https://outlook.office.com/webhook/xxx/IncomingWebhook/yyy/zzz
-
-# Alertmanager-Konfiguration prüfen
-docker exec alertmanager amtool check-config /etc/alertmanager/alertmanager.yml
-
-# Test-Alert senden
-curl -X POST http://localhost:9093/api/v1/alerts \
-  -H "Content-Type: application/json" \
-  -d '[{
-    "labels": {"alertname": "TestAlert", "severity": "warning"},
-    "annotations": {"summary": "Dies ist ein Test-Alert"}
-  }]'
-
-# Im Teams-Kanal sollte innerhalb von 30 Sekunden eine Nachricht erscheinen
-```
-
-### 5.4 Vorkonfigurierte Dashboards
-
-Nach dem Import sind folgende Dashboards verfügbar:
-
-| Dashboard | Grafana-ID | Inhalt |
-|-----------|-----------|--------|
-| Node Exporter Full | 1860 | CPU, RAM, Disk, Netzwerk aller VMs |
-| Docker Containers | 193 | Container-Ressourcen |
-| Traefik | 17346 | Request-Rate, Latenz, Error-Rate |
-| Authentik | custom | SSO-Logins, Fehler |
-| GMZ Tenant Overview | custom | Tenant-Status, App-Health |
 
 ---
 
-## 6. WebApp deployen
+## 7. WebApp deployen
 
-### 6.1 Abhängigkeiten installieren
-
-```bash
-cd /opt/gmz/webapp
-
-# Node.js-Version prüfen
-node --version
-# → v20.x.x
-
-# Abhängigkeiten installieren (Production)
-npm ci --omit=dev
-
-# Datenbank initialisieren
-npm run db:migrate
-
-# Initialer Admin-Account
-npm run seed:admin
-```
-
-### 6.2 Umgebungsvariablen
-
-Alle `WEBAPP_*`-Variablen müssen in `/opt/gmz/.env` gesetzt sein. Für die WebApp sind folgende kritisch:
-
-```dotenv
-# Server
-WEBAPP_HOST=0.0.0.0
-WEBAPP_PORT=3000
-WEBAPP_BASE_URL=https://mgmt.example.com
-
-# Sicherheit
-WEBAPP_SECRET=<64-Zeichen-Hex-String>
-WEBAPP_TRUSTED_BEARER=<96-Zeichen-Hex-String>
-WEBAPP_SESSION_TIMEOUT=3600
-WEBAPP_RATE_LIMIT_WINDOW=60000
-WEBAPP_RATE_LIMIT_MAX=100
-
-# Datenbank
-WEBAPP_DB_TYPE=sqlite
-WEBAPP_DB_PATH=/opt/gmz/data/webapp.db
-# Für PostgreSQL:
-# WEBAPP_DB_TYPE=postgres
-# WEBAPP_DB_URL=postgresql://user:pass@localhost:5432/gmzdb
-
-# Proxmox-Integration
-WEBAPP_PROXMOX_URL=https://10.10.10.1:8006
-WEBAPP_PROXMOX_TOKEN_ID=root@pam!terraform
-WEBAPP_PROXMOX_TOKEN_SECRET=<token>
-WEBAPP_PROXMOX_VERIFY_SSL=false
-
-# Authentik-Integration
-WEBAPP_AUTHENTIK_URL=https://auth.example.com
-WEBAPP_AUTHENTIK_CLIENT_ID=<oidc-client-id>
-WEBAPP_AUTHENTIK_CLIENT_SECRET=<oidc-client-secret>
-
-# Feature-Flags
-WEBAPP_FEATURE_AUTO_DNS=true
-WEBAPP_FEATURE_AUTO_SNAPSHOT=true
-WEBAPP_FEATURE_NIGHTLY_UPDATES=true
-WEBAPP_MAX_TENANTS=50
-```
-
-### 6.3 Trusted-Bearer-Authentifizierung
-
-Der `WEBAPP_TRUSTED_BEARER`-Token wird für interne Service-zu-Service-Kommunikation verwendet (z. B. Ansible-Jobs, die den WebApp-Status zurückmelden):
+### 7.1 Dependencies installieren und bauen
 
 ```bash
-# Token generieren und in .env eintragen
-BEARER=$(openssl rand -hex 48)
-echo "WEBAPP_TRUSTED_BEARER=$BEARER" >> /opt/gmz/.env
-
-# API mit Bearer-Token aufrufen (intern)
-curl -H "Authorization: Bearer $BEARER" \
-  http://localhost:3000/api/internal/health
-
-# Ansible-Playbooks nutzen diesen Token automatisch via Umgebungsvariable
-```
-
-### 6.4 Production Build erstellen
-
-```bash
-cd /opt/gmz/webapp
-
-# TypeScript kompilieren / Assets bundlen
+# Als gmzadmin – KEIN sudo:
+cd /opt/gmz/platform/webapp
+npm ci
 npm run build
-
-# Build-Artefakte prüfen
-ls -la dist/
 ```
 
-### 6.5 systemd-Service einrichten
+> **Hinweis:** `npm run build` führt `next build` aus. Die Anwendung wird anschließend mit `npm run start` (= `next start`) gestartet. Es gibt **kein** `dist/server.js` – der Start erfolgt ausschließlich über `npm run start`.
+
+### 7.2 Daten-Verzeichnis erstellen
 
 ```bash
-cat > /etc/systemd/system/gmz-webapp.service << 'EOF'
+# Als gmzadmin:
+# sudo für /opt/gmz/data anlegen (falls außerhalb von /opt/gmz):
+sudo mkdir -p /opt/gmz/data
+sudo chown gmzadmin:gmzadmin /opt/gmz/data
+chmod 750 /opt/gmz/data
+```
+
+### 7.3 systemd-Service einrichten
+
+```bash
+# Als gmzadmin (sudo für systemd):
+sudo tee /etc/systemd/system/gmz-webapp.service << 'EOF'
 [Unit]
 Description=GMZ Cloud Business Apps WebApp
 After=network.target docker.service
@@ -817,1080 +758,1230 @@ Wants=docker.service
 
 [Service]
 Type=simple
-User=deploy
-Group=deploy
-WorkingDirectory=/opt/gmz/webapp
-EnvironmentFile=/opt/gmz/.env
-ExecStart=/usr/bin/node dist/server.js
+User=gmzadmin
+Group=gmzadmin
+WorkingDirectory=/opt/gmz/platform/webapp
+EnvironmentFile=/opt/gmz/platform/webapp/.env
+ExecStart=/usr/bin/npm run start
 Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=gmz-webapp
-
-# Sicherheits-Härting
 NoNewPrivileges=yes
 PrivateTmp=yes
-ProtectSystem=strict
-ReadWritePaths=/opt/gmz/data /tmp
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-systemctl daemon-reload
-systemctl enable gmz-webapp
-systemctl start gmz-webapp
+sudo systemctl daemon-reload
+sudo systemctl enable gmz-webapp
+sudo systemctl start gmz-webapp
+sudo systemctl status gmz-webapp
+```
 
-# Status prüfen
-systemctl status gmz-webapp
+Erwartete Ausgabe:
+```
+● gmz-webapp.service - GMZ Cloud Business Apps WebApp
+     Loaded: loaded (/etc/systemd/system/gmz-webapp.service; enabled)
+     Active: active (running) since ...
+```
+
+**WebApp-Logs live verfolgen:**
+```bash
+# Als gmzadmin:
 journalctl -u gmz-webapp -f
 ```
 
-### 6.6 Traefik-Route für WebApp
+**WebApp erreichbar unter:**
+- Direkt: `http://localhost:3000` (nur lokal)
+- Via Traefik: `https://mgmt.example.com`
 
-```yaml
-# /opt/traefik/dynamic/webapp.yml
-http:
-  routers:
-    webapp:
-      rule: "Host(`mgmt.example.com`)"
-      entryPoints:
-        - websecure
-      service: webapp
-      middlewares:
-        - security-headers
-        - rate-limit
-      tls:
-        certResolver: letsencrypt
+---
 
-  services:
-    webapp:
-      loadBalancer:
-        servers:
-          - url: "http://host-gateway:3000"
-        healthCheck:
-          path: /api/health
-          interval: "30s"
-          timeout: "5s"
+## 8. Ersten Tenant provisionieren
+
+### 8.1 Über die WebApp (empfohlen)
+
+1. WebApp öffnen: `https://mgmt.example.com`
+2. Mit Admin-API-Token einloggen (aus `.env`: `WEBAPP_TRUSTED_TOKENS_JSON`)
+3. **Tenants** → **Neuer Tenant**
+4. Pflichtfelder ausfüllen:
+   - **Name:** Eindeutiger Bezeichner (z.B. `kunde-gmbh`)
+   - **Anzeigename:** z.B. `Kunde GmbH`
+   - **Größe:** XS / S / M / L / XL (siehe Tabelle in 2.1)
+   - **VLAN-ID:** Automatisch vergeben oder manuell (20–4094)
+   - **Admin-E-Mail:** E-Mail des Tenant-Admins
+5. **Tenant erstellen** klicken
+
+Der Provisioning-Job wird gestartet und durchläuft folgende Phasen:
+```
+pending → provisioning → configuring → active
 ```
 
+### 8.2 Provisioning-Prozess (im Hintergrund)
+
+Was automatisch passiert:
+1. **OpenTofu** klont VM aus Template VMID 9000 in Proxmox
+2. **Cloud-Init** konfiguriert Hostname, SSH-Key, Netzwerk auf der neuen VM
+3. **Ansible** (`provision-tenant.yml`) installiert auf der Tenant-VM:
+   - Docker (`roles/docker-runtime`: installiert `docker.io` + `docker-compose-v2`)
+   - Common Hardening (`roles/common-hardening`: SSH-Härtung, Updates)
+   - Traefik-Konfiguration für Tenant-Subdomain
+4. DNS-Eintrag wird über IONOS API angelegt
+
+### 8.3 Job-Status verfolgen
+
+In der WebApp: **Tenants** → Tenant auswählen → **Jobs** Tab
+
+Oder per CLI:
 ```bash
-# Route aktivieren (Traefik lädt dynamic configs automatisch)
-docker exec traefik wget -qO- http://localhost:8080/api/http/routers/webapp@file
+# Als gmzadmin:
+journalctl -u gmz-webapp -f | grep -i "tenant\|provision"
 ```
 
 ---
 
-## 7. Ersten Tenant provisionieren
+## 9. Apps deployen
 
-### 7.1 Tenant-Wizard in der WebApp
+### 9.1 App aus dem Katalog deployen
 
-Navigiere zu `https://mgmt.example.com` und melde dich mit den Admin-Zugangsdaten an.
+1. WebApp: **Tenants** → Tenant auswählen → **Apps** → **App deployen**
+2. App aus dem Katalog wählen (z.B. `nextcloud`, `vaultwarden`, `gitea`, `authentik`)
+3. App-spezifische Variablen konfigurieren:
+   - Domains werden automatisch vorgeschlagen: `nextcloud.tenants.example.com`
+   - Admin-Passwort setzen
+   - Speichergröße wählen
+4. **Deployen** klicken
 
-**Pfad:** Tenants → Neu erstellen
+### 9.2 Katalog-Apps
 
-#### Pflichtfelder im Wizard
+Verfügbare Apps befinden sich unter `catalog/apps/`. Jede App hat eine `app.yml` mit Metadaten und eine `compose.yml` mit der Docker-Konfiguration.
 
-| Feld | Beschreibung | Beispiel |
-|------|-------------|---------|
-| **Name** | Eindeutiger technischer Bezeichner (lowercase, no spaces) | `acme-corp` |
-| **Customer** | Anzeigename des Kunden | `ACME Corporation GmbH` |
-| **VLAN** | VLAN-ID (101–200, automatisch vergeben oder manuell) | `101` |
-| **Size** | VM-Größe (XS/S/M/L/XL) | `M` |
-| **Region** | Proxmox-Node (bei Multi-Node) | `pve01` |
-| **Apps** | Initiale Apps aus Katalog | `nextcloud`, `vaultwarden` |
-| **Admin Email** | Erster Tenant-Admin | `admin@acme-corp.example.com` |
-| **Subdomain** | Präfix für `*.apps.example.com` | `acme` |
+| App         | Beschreibung                    | Mindest-VM-Größe |
+|-------------|--------------------------------|-----------------|
+| nextcloud   | Datei-Cloud, Kalender, Kontakte | M               |
+| vaultwarden | Passwort-Manager (Bitwarden)    | XS              |
+| gitea       | Git-Server                      | S               |
+| authentik   | SSO / Identity Provider         | M               |
+| paperless   | Dokumenten-Management           | S               |
 
-### 7.2 Provisionierungs-Job verfolgen
+### 9.3 Deploy-Job verfolgen
 
-Nach dem Klick auf „Tenant erstellen" startet ein Hintergrund-Job:
-
-```
-Job: PROV-20260301-001
-Status: Running
-Fortschritt: ████████░░ 80%
-
-✅ VLAN 101 konfiguriert
-✅ DNS-Einträge erstellt (*.acme.apps.example.com)
-✅ OpenTofu: VM 101 erstellt (10.20.101.10)
-✅ VM gestartet, Cloud-Init abgeschlossen
-✅ Ansible: OS gehärtet
-✅ Ansible: Docker installiert
-✅ Ansible: Traefik-Agent konfiguriert
-✅ Ansible: Node-Exporter konfiguriert
-✅ Ansible: Prometheus-Target registriert
-🔄 Ansible: Nextcloud deployen...
-```
-
-Logs können über die WebApp-UI oder direkt eingesehen werden:
-
-```bash
-# Job-Logs direkt
-journalctl -u gmz-webapp | grep "PROV-20260301-001"
-
-# Ansible-Output
-tail -f /opt/gmz/logs/ansible/prov-20260301-001.log
-
-# OpenTofu-State
-cat /opt/gmz/infrastructure/tofu/tenants/acme-corp/terraform.tfstate | jq '.resources[].type'
-```
-
-### 7.3 Proxmox verifizieren
-
-```bash
-# Proxmox CLI (auf Proxmox-Node)
-qm list | grep -i acme
-# → 101  acme-corp    running   8192  20.00
-
-# VM-Details
-qm config 101
-
-# Netzwerk prüfen
-qm agent 101 network-get-interfaces
-
-# Ping testen
-ping -c3 10.20.101.10
-
-# SSH-Test
-ssh deploy@10.20.101.10 "docker ps && uptime"
-```
+**Tenant** → **Jobs** Tab → Job auswählen → Live-Log
 
 ---
 
-## 8. App auf Tenant deployen
+## 10. Authentik SSO einrichten
 
-### 8.1 App-Katalog
+Authentik wird als OIDC-Provider für alle Tenant-Apps und optional für die GMZ WebApp selbst eingesetzt.
 
-Verfügbare Apps im Katalog (`/opt/gmz/apps/catalog/`):
+### 10.1 Authentik als App deployen
 
-| App | Kategorie | Standard-Port | Ressourcen |
-|-----|-----------|--------------|------------|
-| Nextcloud | Collaboration | 8080 | 2GB RAM, 20GB+ |
-| Vaultwarden | Passwort-Manager | 8080 | 256MB RAM |
-| Gitea | Git-Hosting | 3000 | 512MB RAM |
-| Zammad | Helpdesk/Ticketing | 3000 | 4GB RAM |
-| Odoo CE | ERP | 8069 | 4GB RAM |
-| Mattermost | Chat | 8065 | 2GB RAM |
-| Uptime Kuma | Monitoring | 3001 | 256MB RAM |
-| Portainer CE | Docker-UI | 9000 | 256MB RAM |
-| Paperless-ngx | Dokumentenmanagement | 8000 | 1GB RAM |
-| Wordpress | CMS | 80 | 512MB RAM |
-
-### 8.2 App-Variablen konfigurieren
+Authentik wird wie jede andere App über den Katalog deployed (Schritt 9). Empfehlung: Als eigene „System"-App außerhalb eines Tenants auf der Management-VM.
 
 ```bash
-# Via WebApp-UI: Tenant → Apps → App hinzufügen → Nextcloud
-# Oder via API:
-
-curl -X POST https://mgmt.example.com/api/tenants/acme-corp/apps \
-  -H "Authorization: Bearer $WEBAPP_TRUSTED_BEARER" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "app": "nextcloud",
-    "vars": {
-      "NEXTCLOUD_ADMIN_USER": "admin",
-      "NEXTCLOUD_ADMIN_PASSWORD": "sicheres-passwort",
-      "NEXTCLOUD_DOMAIN": "nextcloud.acme.apps.example.com",
-      "NEXTCLOUD_DB_TYPE": "postgres",
-      "NEXTCLOUD_STORAGE_SIZE": "100G",
-      "SMTP_HOST": "smtp.example.com",
-      "SMTP_PORT": "587",
-      "SMTP_USER": "noreply@acme.example.com"
-    }
-  }'
-```
-
-### 8.3 Deploy-Job ausführen
-
-```bash
-# Ansible-Playbook für App-Deployment
-ansible-playbook playbooks/deploy-app.yml \
-  --limit "tenant-acme-corp" \
-  --extra-vars "app=nextcloud tenant=acme-corp" \
-  -v
-
-# Job-Status in WebApp: Tenants → acme-corp → Apps → nextcloud → Logs
-```
-
-### 8.4 Traefik-Route auf Tenant
-
-Das App-Deployment erstellt automatisch eine Traefik-Konfiguration auf der Tenant-VM:
-
-```yaml
-# /opt/traefik/dynamic/nextcloud.yml (auf Tenant-VM)
-http:
-  routers:
-    nextcloud:
-      rule: "Host(`nextcloud.acme.apps.example.com`)"
-      entryPoints:
-        - websecure
-      service: nextcloud
-      middlewares:
-        - nextcloud-redirectregex
-        - security-headers
-      tls:
-        certResolver: letsencrypt
-
-  services:
-    nextcloud:
-      loadBalancer:
-        servers:
-          - url: "http://nextcloud:8080"
-```
-
----
-
-## 9. Authentik SSO
-
-### 9.1 Authentik deployen
-
-```bash
-cd /opt/gmz/infrastructure
-
-# Authentik-Stack starten
-ansible-playbook playbooks/deploy-authentik.yml -v
-
-# Alternativ manuell:
-cd /opt/gmz/infrastructure/authentik
+# Als gmzadmin – KEIN sudo für docker:
+cd /opt/gmz/infra/authentik
 docker compose up -d
-
-# Logs prüfen
-docker compose logs -f authentik-server
-# Warten bis: "... Starting server on ..."
+docker compose ps
 ```
 
-### 9.2 Admin-Account einrichten
+### 10.2 Authentik Admin-Account einrichten
+
+1. Authentik öffnen: `https://auth.example.com`
+2. Ersten Start-Wizard durchlaufen
+3. Admin-Passwort setzen
+4. E-Mail-Integration konfigurieren (SMTP-Settings)
+
+### 10.3 OIDC-Provider für GMZ WebApp konfigurieren
+
+In Authentik:
+1. **Applications** → **Providers** → **Create** → OAuth2/OpenID Connect Provider
+2. Name: `gmz-webapp`
+3. Client ID: notieren
+4. Client Secret: notieren
+5. Redirect URI: `https://mgmt.example.com/api/auth/callback/authentik`
+
+In `.env` der WebApp:
+```bash
+# Als gmzadmin – KEIN sudo:
+nano /opt/gmz/platform/webapp/.env
+```
+
+Hinzufügen:
+```bash
+WEBAPP_AUTH_MODE=jwt
+NEXTAUTH_URL=https://mgmt.example.com
+NEXTAUTH_SECRET=IHR_NEXTAUTH_SECRET
+AUTHENTIK_CLIENT_ID=IHR_CLIENT_ID
+AUTHENTIK_CLIENT_SECRET=IHR_CLIENT_SECRET
+AUTHENTIK_ISSUER=https://auth.example.com/application/o/gmz-webapp/
+```
 
 ```bash
-# Initiales Setup-Passwort setzen
-docker exec authentik-worker ak create_recovery_key 10 akadmin
-
-# URL aufrufen
-echo "Authentik Setup: https://auth.example.com/if/flow/initial-setup/"
+# Als gmzadmin (sudo für systemd-Neustart):
+sudo systemctl restart gmz-webapp
 ```
 
-**Im Browser:**
-1. `https://auth.example.com/if/flow/initial-setup/` aufrufen
-2. E-Mail: `admin@example.com`
-3. Passwort setzen (aus `AUTHENTIK_ADMIN_PASSWORD` in `.env`)
-4. Login unter `https://auth.example.com`
+### 10.4 OIDC-Gruppen → WebApp-Rollen
 
-### 9.3 OIDC Provider einrichten
+Authentik-Gruppen werden auf WebApp-Rollen gemappt:
 
-**Pfad:** Admin UI → Applications → Providers → Create → OAuth2/OIDC Provider
-
-Konfiguration für die GMZ WebApp:
-
-```
-Name: GMZ WebApp
-Client Type: Confidential
-Client ID: gmz-webapp (wird automatisch generiert)
-Client Secret: (wird automatisch generiert, in WEBAPP_AUTHENTIK_CLIENT_SECRET eintragen)
-
-Redirect URIs:
-  https://mgmt.example.com/auth/callback
-
-Scopes:
-  openid, email, profile, groups
-
-Signing Key: authentik Self-signed Certificate
-```
-
-**Application erstellen:**
-```
-Name: GMZ Cloud Management
-Slug: gmz-cloud
-Provider: GMZ WebApp (oben erstellt)
-Policy: default-provider-authorization-implicit-consent
-```
-
-### 9.4 User-Management
-
-```bash
-# User via Authentik API anlegen
-AUTHENTIK_TOKEN=$(cat /opt/gmz/data/authentik-api-token)
-
-curl -X POST https://auth.example.com/api/v3/core/users/ \
-  -H "Authorization: Bearer $AUTHENTIK_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "max.mustermann",
-    "name": "Max Mustermann",
-    "email": "max.mustermann@example.com",
-    "groups": ["gmz-admins"],
-    "is_active": true
-  }'
-
-# Passwort setzen (User erhält E-Mail mit Setup-Link)
-curl -X POST https://auth.example.com/api/v3/core/users/{id}/set_password/ \
-  -H "Authorization: Bearer $AUTHENTIK_TOKEN" \
-  -d '{"password": "temporaeres-passwort"}'
-```
-
-**RBAC-Gruppen in Authentik:**
-
-| Gruppe | Berechtigungen |
-|--------|---------------|
-| `gmz-admins` | Vollzugriff auf alle Tenants |
-| `gmz-operators` | Tenants ansehen, Apps deployen |
-| `gmz-viewers` | Nur lesender Zugriff |
-| `tenant-{name}-admin` | Admin für spezifischen Tenant |
+| Authentik-Gruppe | WebApp-Rolle  | Berechtigungen                    |
+|------------------|---------------|-----------------------------------|
+| `gmz-admins`     | `admin`       | Vollzugriff, Tenant-Verwaltung    |
+| `gmz-operators`  | `technician`  | Tenant-Ops, App-Verwaltung        |
+| `gmz-readonly`   | `readonly`    | Nur Lesen, keine Änderungen       |
 
 ---
 
-## 10. Nightly Updates
+## 11. Nightly Updates einrichten
 
-### 10.1 GitHub Actions Workflow
+### 11.1 GitHub Actions Workflow
 
-Der Nightly-Update-Workflow wird automatisch jeden Tag um 02:00 Uhr ausgeführt:
+Im Repository unter `.github/workflows/nightly-update.yml` ist ein Workflow definiert, der:
+1. Jeden Tag um 02:00 Uhr läuft
+2. Alle Docker-Images auf neue Versionen prüft
+3. Änderungen als PR öffnet (optional)
+4. Auf der Management-VM deployt (via SSH-Action)
+
+### 11.2 Proxmox VM-Snapshots vor Updates
+
+```bash
+# Als root auf dem Proxmox-Node (vor jedem Update):
+# Snapshot der Management-VM erstellen:
+qm snapshot <VMID> "pre-update-$(date +%Y%m%d)" --vmstate 0
+
+# Snapshot der Tenant-VMs (Beispiel):
+for vmid in $(qm list | awk 'NR>1 {print $1}' | grep -v "^9000$"); do
+  qm snapshot $vmid "pre-update-$(date +%Y%m%d)" --vmstate 0
+  echo "Snapshot für VM $vmid erstellt"
+done
+```
+
+### 11.3 Rollback nach fehlgeschlagenem Update
+
+```bash
+# Als root auf dem Proxmox-Node:
+# Snapshot wiederherstellen:
+qm rollback <VMID> "pre-update-YYYYMMDD"
+qm start <VMID>
+```
+
+---
+
+# Teil II: Admin-Handbuch
+
+## 12. Tenants verwalten
+
+### Tenant anlegen
+
+**Pflichtfelder:**
+| Feld          | Beschreibung                              | Beispiel           |
+|---------------|-------------------------------------------|--------------------|
+| `name`        | Technischer Name (lowercase, kein Leerzeichen) | `kunde-gmbh`  |
+| `displayName` | Anzeigename                               | `Kunde GmbH`       |
+| `size`        | VM-Größe (XS/S/M/L/XL)                   | `M`                |
+| `adminEmail`  | E-Mail des Tenant-Admins                  | `it@kunde.de`      |
+
+**Optionale Felder:**
+| Feld       | Beschreibung                  | Standard           |
+|------------|-------------------------------|--------------------|
+| `vlanId`   | VLAN-ID (20–4094)             | Automatisch        |
+| `ipv4Cidr` | IP-Bereich für Tenant         | `10.20.X.0/24`     |
+| `notes`    | Notizen für Admins            | –                  |
+
+### Tenant-Status verstehen
+
+| Status         | Bedeutung                                              |
+|----------------|--------------------------------------------------------|
+| `pending`      | Provisioning in Warteschlange                          |
+| `provisioning` | VM wird gerade erstellt (OpenTofu)                    |
+| `configuring`  | Ansible konfiguriert die VM                            |
+| `active`       | Bereit, Apps können deployed werden                   |
+| `updating`     | Update oder Konfigurationsänderung läuft               |
+| `error`        | Fehler beim Provisioning (Details im Job-Log)          |
+| `suspended`    | Manuell deaktiviert (VM läuft, Apps nicht erreichbar)  |
+| `terminated`   | Gelöscht (VM zerstört, Daten gelöscht)                 |
+
+### Tenant deaktivieren (Suspend)
+
+WebApp: **Tenants** → Tenant → **Aktionen** → **Deaktivieren**
+
+Effekt: Traefik-Routing wird entfernt, Apps nicht mehr erreichbar. VM läuft weiter.
+
+### Tenant löschen
+
+> ⚠️ **Unwiderruflich!** Alle Daten werden gelöscht!
+
+WebApp: **Tenants** → Tenant → **Aktionen** → **Löschen**
+→ Bestätigungsdialog: Tenant-Namen eingeben
+
+Was gelöscht wird:
+- Proxmox-VM (und alle Disks)
+- DNS-Einträge
+- Monitoring-Konfiguration
+- Alle App-Daten
+
+**Vorher empfohlen:** Backup erstellen (Proxmox-Snapshot oder Backup-Job).
+
+### VLAN- und IP-Verwaltung
+
+VLANs und IP-Bereiche werden automatisch vergeben:
+- VLAN-Range: 20–4094 (konfigurierbar in `.env`)
+- IP-Range: `10.20.0.0/16` (je Tenant ein `/24`-Subnetz)
+
+Manuelle Anpassung möglich in: **Tenant** → **Netzwerk** → **Bearbeiten**
+
+### Logs eines Tenants abrufen
+
+**Via WebApp:** Tenant → **Events**-Tab
+
+**Via CLI (Management-VM):**
+```bash
+# Als gmzadmin:
+journalctl -u gmz-webapp -f | grep "tenant-name"
+```
+
+**Direkter Zugriff auf Tenant-VM (via SSH):**
+```bash
+# Als gmzadmin – KEIN sudo für SSH:
+ssh -i ~/.ssh/id_ed25519 debian@<tenant-vm-ip>
+# debian ist der Cloud-Init Standard-User auf Tenant-VMs!
+```
+
+---
+
+## 13. Apps verwalten
+
+### App aus Katalog deployen
+
+1. **Tenant** auswählen → **Apps** → **+ App deployen**
+2. App aus Liste wählen
+3. Konfigurationsformular ausfüllen
+4. **Deployen** klicken → Job-Status verfolgen
+
+### App-Konfiguration ändern
+
+**WebApp:** App → **Konfiguration** → Felder ändern → **Speichern**
+
+Die Änderung wird als neuer Deploy-Job ausgeführt (Rolling Restart).
+
+### App neu starten / stoppen
+
+**WebApp:** App → **Aktionen** → **Neustart** / **Stoppen** / **Starten**
+
+**Direkt auf der Tenant-VM:**
+```bash
+# Als gmzadmin auf der Management-VM (SSH zur Tenant-VM):
+ssh debian@<tenant-vm-ip>
+# Auf der Tenant-VM (als debian, kein sudo für docker nötig nach Ansible-Setup):
+cd /opt/apps/nextcloud
+docker compose restart
+docker compose ps
+```
+
+### App-Logs abrufen
+
+**WebApp:** App → **Logs** Tab (Live-Streaming)
+
+**CLI auf Tenant-VM:**
+```bash
+# Als gmzadmin (SSH zur Tenant-VM, dann dort):
+ssh debian@<tenant-vm-ip>
+cd /opt/apps/<app-name>
+docker compose logs -f --tail 100
+```
+
+### App löschen / Daten sichern
+
+> ⚠️ **Vor dem Löschen immer Backup erstellen!**
+
+**Backup (auf Tenant-VM):**
+```bash
+# Auf der Tenant-VM als debian:
+cd /opt/apps/<app-name>
+docker compose stop
+tar -czf /tmp/<app-name>-backup-$(date +%Y%m%d).tar.gz data/
+# Backup auf Management-VM kopieren:
+scp /tmp/<app-name>-backup-*.tar.gz gmzadmin@<mgmt-ip>:/opt/gmz/backups/
+```
+
+**App löschen:**
+WebApp: App → **Aktionen** → **Löschen** → Bestätigen
+
+---
+
+## 14. Benutzer & Rollen (RBAC)
+
+### Rollen
+
+| Rolle       | Beschreibung                                     | Erlaubte Aktionen                              |
+|-------------|--------------------------------------------------|------------------------------------------------|
+| `admin`     | Vollständiger Systemzugriff                      | Alles: Tenants, Apps, Benutzer, Konfiguration  |
+| `technician`| Technischer Operator                             | Tenants/Apps verwalten, keine Benutzer-Admin   |
+| `readonly`  | Nur-Lesen-Zugriff                                | Alles anzeigen, nichts ändern                  |
+
+### API-Token erstellen
+
+**Modus: `trusted-bearer`**
+
+In `.env`:
+```bash
+WEBAPP_TRUSTED_TOKENS_JSON='{
+  "admin-prod": {"role": "admin", "token": "IHR_ADMIN_TOKEN"},
+  "monitoring": {"role": "readonly", "token": "IHR_MONITORING_TOKEN"},
+  "cicd": {"role": "technician", "token": "IHR_CICD_TOKEN"}
+}'
+```
+
+Token generieren:
+```bash
+# Als gmzadmin – KEIN sudo:
+openssl rand -hex 32
+```
+
+Nach Änderung der `.env`:
+```bash
+# Als gmzadmin (sudo für systemd):
+sudo systemctl restart gmz-webapp
+```
+
+### Token-Rotation ohne Downtime
+
+1. Neuen Token generieren: `openssl rand -hex 32`
+2. In `.env` alten und neuen Token **gleichzeitig** eintragen (temporär zwei Tokens mit gleicher Rolle)
+3. Service neu starten: `sudo systemctl restart gmz-webapp`
+4. Alle Clients auf neuen Token umstellen
+5. Alten Token aus `.env` entfernen
+6. Service neu starten
+
+### Modus: `jwt` (OIDC mit Authentik)
+
+Bei `WEBAPP_AUTH_MODE=jwt` werden Authentik-Gruppen auf Rollen gemappt (siehe [Abschnitt 10.4](#104-oidc-gruppen--webapp-rollen)).
+
+---
+
+## 15. Monitoring & Alerting
+
+### Grafana-Dashboards öffnen
+
+URL: `https://monitoring.example.com` oder `http://<IP>:3001`
+
+Vorkonfigurierte Dashboards:
+- **GMZ Overview:** Alle Tenants, VM-Status, CPU/RAM-Übersicht
+- **Tenant Detail:** Ressourcen einer einzelnen Tenant-VM
+- **App Health:** Container-Status aller Apps
+- **Traefik:** HTTP-Anfragen, Response-Times, Error-Rates
+- **System:** Management-VM CPU, RAM, Disk
+
+### Alert-Regeln konfigurieren
+
+Alert-Regeln liegen in `infra/monitoring/prometheus/alerts/`:
 
 ```yaml
-# .github/workflows/nightly-update.yml
-name: Nightly Update
-
-on:
-  schedule:
-    - cron: '0 2 * * *'   # 02:00 UTC täglich
-  workflow_dispatch:        # Manueller Trigger
-
-jobs:
-  update:
-    runs-on: self-hosted    # Läuft auf Management-VM
-    timeout-minutes: 120
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Pre-Update Snapshot
-        run: |
-          ansible-playbook playbooks/snapshot-all.yml \
-            --extra-vars "snapshot_name=nightly-$(date +%Y%m%d)"
-
-      - name: Update Management-VM
-        run: |
-          ansible-playbook playbooks/update-mgmt.yml
-
-      - name: Update Tenant VMs
-        run: |
-          ansible-playbook playbooks/update-tenants.yml \
-            --extra-vars "update_type=security_only"
-
-      - name: Update Docker Images
-        run: |
-          ansible-playbook playbooks/update-docker.yml
-
-      - name: Health Check
-        run: |
-          ./scripts/health-check-all.sh
-
-      - name: Notify Teams
-        if: always()
-        uses: ./.github/actions/notify-teams
-        with:
-          webhook: ${{ secrets.TEAMS_WEBHOOK }}
-          status: ${{ job.status }}
+# Beispiel: infra/monitoring/prometheus/alerts/tenant.yml
+groups:
+  - name: tenant-alerts
+    rules:
+      - alert: TenantVMDown
+        expr: up{job="tenant"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Tenant VM {{ $labels.instance }} ist nicht erreichbar"
 ```
 
-### 10.2 Maintenance Window konfigurieren
-
+Nach Änderungen:
 ```bash
-# Maintenance-Window in WebApp konfigurieren
-# Settings → Maintenance Window
-
-# Oder via .env:
-WEBAPP_MAINTENANCE_WINDOW_START="02:00"
-WEBAPP_MAINTENANCE_WINDOW_END="04:00"
-WEBAPP_MAINTENANCE_TIMEZONE="Europe/Berlin"
-
-# Während Maintenance Window:
-# - Traefik zeigt Wartungsseite
-# - Neue Deployments werden geblockt
-# - Updates laufen durch
+# Als gmzadmin – KEIN sudo für docker:
+cd /opt/gmz/infra/monitoring
+docker compose restart prometheus
 ```
 
-### 10.3 Automatische Snapshots
+### Microsoft Teams-Webhook einrichten
 
-```bash
-# Snapshot aller Tenant-VMs erstellen
-ansible-playbook playbooks/snapshot-all.yml \
-  --extra-vars "snapshot_name=before-update-$(date +%Y%m%d)"
+In `infra/monitoring/alertmanager/config.yml`:
 
-# Proxmox CLI (manuell):
-for vmid in $(pvesh get /nodes/pve01/qemu --output-format json | jq '.[].vmid'); do
-  qm snapshot $vmid "nightly-$(date +%Y%m%d)" --vmstate false
-  echo "Snapshot erstellt: VM $vmid"
-done
-
-# Alte Snapshots bereinigen (>7 Tage)
-./scripts/cleanup-snapshots.sh --older-than 7d
+```yaml
+receivers:
+  - name: 'teams-alerts'
+    msteams_configs:
+      - webhook_url: 'https://outlook.office.com/webhook/...'
+        title: '{{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
 ```
 
-### 10.4 Rollback-Prozedur
+```bash
+# Als gmzadmin – KEIN sudo für docker:
+docker compose restart alertmanager
+```
+
+### Prometheus-Scraping-Targets prüfen
 
 ```bash
-# Rollback für einzelne Tenant-VM
-TENANT="acme-corp"
-SNAPSHOT="nightly-20260301"
+# Als gmzadmin – KEIN sudo für docker:
+docker exec prometheus wget -qO- 'http://localhost:9090/api/v1/targets' \
+  | python3 -m json.tool | grep -E '"health"|"scrapeUrl"'
+```
 
-# Via WebApp: Tenants → acme-corp → Snapshots → Rollback
-# Oder via CLI:
-VM_ID=$(cat /opt/gmz/data/tenants/${TENANT}/vmid)
-qm rollback $VM_ID $SNAPSHOT
+Oder in Grafana: **Explore** → **Prometheus** → `up` → Alle Targets anzeigen
 
-# Rollback verifizieren
-ssh deploy@$(cat /opt/gmz/data/tenants/${TENANT}/ip) "uptime && docker ps"
+### Log-Suche in Loki/Grafana
 
-# DNS nach Rollback ggf. neu setzen
-ansible-playbook playbooks/verify-dns.yml --limit "tenant-${TENANT}"
+Grafana → **Explore** → Datasource: Loki
+
+Beispiel-Queries:
+```
+# Alle WebApp-Logs:
+{job="gmz-webapp"}
+
+# Fehler eines bestimmten Tenants:
+{job="tenant", tenant="kunde-gmbh"} |= "error"
+
+# Letzte 1h Traefik-Logs:
+{job="traefik"} | json | status >= 500
 ```
 
 ---
 
-## 11. Sicherheits-Konfiguration
+## 16. Wartung & Updates
 
-### 11.1 Trusted-Bearer-Token
-
-```bash
-# Token rotieren (ohne Downtime)
-NEW_BEARER=$(openssl rand -hex 48)
-
-# In .env aktualisieren
-sed -i "s/^WEBAPP_TRUSTED_BEARER=.*/WEBAPP_TRUSTED_BEARER=$NEW_BEARER/" /opt/gmz/.env
-
-# WebApp neu starten
-systemctl restart gmz-webapp
-
-# Ansible-Vault-Secret aktualisieren
-ansible-vault encrypt_string "$NEW_BEARER" --name "webapp_trusted_bearer" \
-  >> /opt/gmz/infrastructure/group_vars/all/vault.yml
-```
-
-### 11.2 API-Tokens sichern
+### Management-VM updaten
 
 ```bash
-# Alle Tokens in Ansible Vault speichern (nicht in .git!)
-ansible-vault create /opt/gmz/infrastructure/group_vars/all/vault.yml
-
-# Vault-Passwort in Datei (von git ausgeschlossen)
-echo "vault-passwort-hier" > /opt/gmz/.vault-password
-chmod 600 /opt/gmz/.vault-password
-echo ".vault-password" >> /opt/gmz/.gitignore
-
-# Playbooks mit Vault ausführen
-ansible-playbook playbooks/deploy-traefik.yml \
-  --vault-password-file /opt/gmz/.vault-password
+# Als gmzadmin:
+sudo apt update && sudo apt full-upgrade -y
+sudo apt autoremove -y
+sudo systemctl restart gmz-webapp
 ```
 
-### 11.3 RBAC-Rollen in der WebApp
-
-```javascript
-// roles/definitions.js
-const ROLES = {
-  SUPER_ADMIN: {
-    permissions: ['*'],
-    description: 'Vollzugriff auf alle Funktionen'
-  },
-  ADMIN: {
-    permissions: [
-      'tenants:create', 'tenants:read', 'tenants:update', 'tenants:delete',
-      'apps:deploy', 'apps:manage',
-      'users:manage',
-      'settings:read'
-    ]
-  },
-  OPERATOR: {
-    permissions: [
-      'tenants:read',
-      'apps:deploy', 'apps:read',
-      'monitoring:read'
-    ]
-  },
-  VIEWER: {
-    permissions: [
-      'tenants:read',
-      'apps:read',
-      'monitoring:read'
-    ]
-  }
-};
+**Nach Kernel-Updates:** Neustart empfohlen:
+```bash
+# Als gmzadmin:
+sudo reboot
+# (SSH-Verbindung kurz unterbrochen, dann neu verbinden)
 ```
 
-### 11.4 Secret-Scanning mit gitleaks
+### WebApp updaten
 
 ```bash
-# gitleaks installieren
-curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/main/scripts/install.sh \
-  | sh -s -- -b /usr/local/bin v8.18.2
-
-# Repository scannen
+# Als gmzadmin – KEIN sudo:
 cd /opt/gmz
-gitleaks detect --source . --verbose
+git pull origin main
+cd platform/webapp
+npm ci
+npm run build
 
-# Pre-commit Hook installieren
-cat > .git/hooks/pre-commit << 'EOF'
+# Als gmzadmin (sudo für systemd):
+sudo systemctl restart gmz-webapp
+sudo systemctl status gmz-webapp
+```
+
+**Update mit Zero-Downtime (empfohlen für Produktion):**
+1. Neuen Build vorbereiten, während alter Service läuft
+2. Kurzes Maintenance-Fenster (<30s) für `systemctl restart`
+
+### Monitoring Stack updaten
+
+```bash
+# Als gmzadmin – KEIN sudo für docker:
+cd /opt/gmz/infra/monitoring
+docker compose pull
+docker compose up -d
+docker compose ps
+```
+
+### Token rotieren
+
+Siehe [Abschnitt 14: Token-Rotation ohne Downtime](#token-rotation-ohne-downtime).
+
+### Proxmox-Snapshot erstellen und prüfen
+
+```bash
+# Als root auf dem Proxmox-Node:
+# Snapshot erstellen:
+qm snapshot 100 "manual-$(date +%Y%m%d-%H%M)" --vmstate 0
+
+# Snapshots auflisten:
+qm listsnapshot 100
+
+# Snapshot testen (VM klonen, testen, dann löschen):
+qm clone 100 999 --name "test-restore-$(date +%Y%m%d)" --snapname "manual-YYYYMMDD-HHmm"
+qm start 999
+# ... testen ...
+qm stop 999
+qm destroy 999
+```
+
+### Backup-Strategie
+
+**Tier 1: Proxmox Backup Server (PBS)**
+```bash
+# Als root auf Proxmox-Node (Backup-Job konfigurieren):
+# GUI: Datacenter → Backup → Add
+# Schedule: täglich, z.B. 03:00 Uhr
+# Retention: 7 täglich, 4 wöchentlich, 3 monatlich
+```
+
+**Tier 2: S3/MinIO Offsite-Backup**
+- PBS kann direkt in S3-kompatiblen Storage sichern
+- Konfiguration: PBS → Remotes → S3 konfigurieren
+
+**Kritische Daten:**
+- `/opt/gmz/platform/webapp/.env` → Manuell sichern (enthält Secrets!)
+- `/opt/gmz/data/` → Datenbank und App-Daten
+- Proxmox-VM-Backups aller Tenant-VMs
+
+---
+
+## 17. Sicherheits-Konfiguration
+
+### Bearer-Token-Sicherheit
+
+- Tokens mit `openssl rand -hex 32` generieren (256 Bit Entropie)
+- Verschiedene Tokens für verschiedene Rollen/Systeme
+- Tokens **niemals** in Logs ausgeben oder in Git committen
+- Rotation: mindestens alle 90 Tage oder bei Verdacht auf Kompromittierung
+
+### gitleaks Pre-commit Hook
+
+Verhindert versehentliches Committen von Secrets:
+
+```bash
+# Als gmzadmin – KEIN sudo:
+cd /opt/gmz
+
+# gitleaks installieren:
+curl -fsSL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64.tar.gz \
+  | tar xz -C /tmp/
+sudo mv /tmp/gitleaks /usr/local/bin/
+sudo chmod +x /usr/local/bin/gitleaks
+
+# Pre-commit Hook installieren:
+cat > .git/hooks/pre-commit << 'HOOK'
 #!/bin/bash
-gitleaks protect --staged --verbose
-EOF
+gitleaks protect --staged -v
+HOOK
 chmod +x .git/hooks/pre-commit
 ```
 
-### 11.5 Checkov IaC-Scanning
+### Checkov IaC-Scanning
 
 ```bash
-# Checkov installieren
-pip3 install --break-system-packages checkov
+# Als gmzadmin – KEIN sudo:
+pip3 install --user checkov
 
-# OpenTofu/Terraform-Code scannen
-checkov -d /opt/gmz/infrastructure/tofu \
-  --framework terraform \
-  --output cli \
-  --compact
+# Terraform/OpenTofu-Konfigurationen scannen:
+checkov -d infra/ --framework terraform
 
-# Docker-Compose-Files scannen
-checkov -d /opt/gmz/infrastructure \
-  --framework dockerfile \
-  --framework docker_compose
-
-# GitHub Actions scannen
-checkov -d /opt/gmz/.github \
-  --framework github_actions
+# Docker-Compose-Dateien scannen:
+checkov -d catalog/apps/ --framework dockerfile,docker_compose
 ```
 
-### 11.6 Security-Checkliste
+### Sicherheits-Checkliste (vor Go-Live)
 
-Vor dem Go-Live folgende Punkte abhaken:
-
-- [ ] SSH: Root-Login deaktiviert, nur Key-Auth
-- [ ] UFW: Alle nicht benötigten Ports gesperrt
-- [ ] Traefik: Security-Headers-Middleware aktiv
-- [ ] Traefik: Rate-Limiting für alle Public-Endpoints
-- [ ] Authentik: MFA für alle Admin-Accounts aktiviert
-- [ ] Authentik: Brute-Force-Schutz (max 5 Versuche)
-- [ ] API-Tokens: In Ansible Vault, nicht im Repo
-- [ ] .env: Nicht ins Git-Repository committed
-- [ ] Docker: Alle Container ohne `--privileged`
-- [ ] Docker: Rootless-Container wo möglich
-- [ ] Snapshots: Tägliche Snapshots verifiziert
-- [ ] Monitoring: Alerts für fehlgeschlagene Logins aktiv
+- [ ] SSH: Root-Login deaktiviert (`PermitRootLogin no`)
+- [ ] SSH: Passwort-Authentifizierung deaktiviert (`PasswordAuthentication no`)
+- [ ] UFW: Nur Ports 22, 80, 443 offen
+- [ ] `.env`: `chmod 600`, Besitzer `gmzadmin`
+- [ ] `.env`: Nicht in Git vorhanden (`.gitignore` prüfen)
+- [ ] API-Tokens: Stark und zufällig generiert (min. 32 Byte)
+- [ ] Proxmox API-Token: Minimale Berechtigungen
+- [ ] Docker: `gmzadmin` in `docker`-Gruppe (kein `sudo docker`)
+- [ ] Let's Encrypt: Gültiges Wildcard-Zertifikat aktiv
+- [ ] Monitoring: Alerts für kritische Systeme konfiguriert
+- [ ] Backup: Proxmox-Backup-Job aktiv und getestet
 - [ ] gitleaks: Pre-commit Hook installiert
-- [ ] Checkov: CI-Pipeline integriert
-- [ ] Fail2ban: Für SSH und Traefik installiert
-- [ ] Netzwerk: Tenant-VLANs isoliert (keine Tenant-zu-Tenant-Kommunikation)
+- [ ] unattended-upgrades: Aktiv für Sicherheitsupdates
 
 ---
 
-## 12. Backup-Strategie
+# Teil III: Benutzerhandbuch
 
-### 12.1 Automatisches Backup
+## 18. Erste Schritte
 
-```bash
-# Proxmox Backup Server (PBS) konfigurieren (empfohlen)
-# In Proxmox Web-UI: Datacenter → Backup → Add
+### Was ist das Mandanten-Portal?
 
-# Backup-Job-Konfiguration in /etc/pve/jobs.cfg:
-vzdump: nightly-backup
-  vmid 100-200
-  storage pbs
-  schedule 03:00
-  mode snapshot
-  compress zstd
-  mailnotification failure
-  mailto admin@example.com
-  retention-keep-daily 7
-  retention-keep-weekly 4
-  retention-keep-monthly 3
+Das GMZ Cloud Business Apps Portal ist das zentrale Verwaltungs-Interface für IT-Administratoren. Von hier aus können Sie:
+
+- **Tenants (Mandanten)** anlegen und verwalten – jeder Tenant ist eine isolierte virtuelle Maschine
+- **Geschäftsanwendungen** aus einem Katalog deployen (Nextcloud, Vaultwarden, etc.)
+- **Ressourcen** überwachen (CPU, RAM, Disk-Auslastung)
+- **Benutzer und Zugriffsrechte** verwalten
+
+### Login
+
+**URL:** `https://mgmt.example.com` (durch Ihre tatsächliche Domain ersetzen)
+
+**Anmeldung je nach konfiguriertem Auth-Modus:**
+
+- **trusted-bearer:** API-Token im Header `Authorization: Bearer IHR_TOKEN`
+- **jwt/OIDC:** Klick auf „Mit Authentik anmelden" → Authentik-Loginseite
+
+### Dashboard-Überblick
+
+Nach dem Login sehen Sie das Dashboard mit:
+
+| Bereich           | Beschreibung                                           |
+|-------------------|--------------------------------------------------------|
+| **Tenant-Karten** | Übersicht aller Mandanten mit Status-Anzeige           |
+| **Status-Badges** | Grün = aktiv, Gelb = aktualisiert, Rot = Fehler        |
+| **Schnellaktionen** | Neuer Tenant, App deployen, Logs anzeigen           |
+| **Ressourcen-Leiste** | Gesamt-CPU, RAM, Disk-Nutzung über alle Tenants    |
+| **Letzte Events** | Neueste Provisioning- und Deploy-Jobs                  |
+
+---
+
+## 19. Tenant-Übersicht
+
+### Status-Bedeutungen
+
+| Status         | Symbol | Bedeutung                                    | Aktion                            |
+|----------------|--------|----------------------------------------------|-----------------------------------|
+| `provisioning` | 🔄     | VM wird gerade erstellt                      | Warten (5–10 Min)                 |
+| `active`       | ✅     | Bereit, Apps können deployed werden          | Apps deployen                     |
+| `updating`     | 🔄     | Konfigurationsänderung läuft                 | Warten                            |
+| `error`        | ❌     | Fehler aufgetreten                           | Job-Log prüfen, Admin kontaktieren|
+| `suspended`    | ⏸️     | Manuell deaktiviert                          | „Aktivieren" klicken              |
+
+### Ressourcen-Anzeige
+
+In der Tenant-Detailansicht:
+
+- **CPU:** Aktuelle Last in % (Durchschnitt letzte 5 Min)
+- **RAM:** Belegter Arbeitsspeicher (Belegt / Gesamt)
+- **Disk:** Genutzter Speicherplatz (Belegt / Gesamt)
+- **Netzwerk:** Ein-/Ausgehender Traffic (letzte Stunde)
+
+> Wenn Ressourcen dauerhaft über 80% liegen: Tenant-Größe upgraden (Tenant → Bearbeiten → Größe ändern).
+
+### App-Liste und App-Status
+
+Tenant → **Apps** Tab:
+
+| Status     | Bedeutung                              |
+|------------|----------------------------------------|
+| `running`  | App läuft normal                       |
+| `stopped`  | App manuell gestoppt                   |
+| `error`    | App-Container in Fehler-Zustand        |
+| `deploying`| Installation/Update läuft             |
+| `updating` | Konfigurationsänderung oder Update     |
+
+### Event-Log lesen
+
+Tenant → **Events** Tab zeigt alle Aktionen chronologisch:
+
 ```
-
-### 12.2 Manuelles Backup
-
-```bash
-# Einzelne VM sichern
-vzdump 101 --storage pbs --mode snapshot --compress zstd
-
-# Alle Tenant-VMs
-for vmid in $(cat /opt/gmz/data/tenant-vmids.txt); do
-  echo "Backup VM $vmid..."
-  vzdump $vmid --storage pbs --mode snapshot --compress zstd
-done
-
-# WebApp-Datenbank backup
-sqlite3 /opt/gmz/data/webapp.db ".backup '/opt/gmz/backups/webapp-$(date +%Y%m%d).db'"
-
-# Konfigurationsdateien sichern
-tar czf /opt/gmz/backups/config-$(date +%Y%m%d).tar.gz \
-  /opt/gmz/.env \
-  /opt/gmz/infrastructure/ \
-  /opt/traefik/ \
-  /etc/ansible/
-```
-
-### 12.3 S3/MinIO Offsite-Backup
-
-```bash
-# MinIO-Client installieren
-curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc \
-  -o /usr/local/bin/mc
-chmod +x /usr/local/bin/mc
-
-# S3-Endpoint konfigurieren (IONOS Object Storage oder eigenes MinIO)
-mc alias set ionos-s3 https://s3-eu-central-1.ionoscloud.com \
-  "$S3_ACCESS_KEY" "$S3_SECRET_KEY"
-
-# Backup-Bucket anlegen
-mc mb ionos-s3/gmz-backups-$(hostname)
-
-# Tägliches Sync via Cron
-cat > /etc/cron.d/gmz-s3-backup << 'EOF'
-0 4 * * * deploy mc mirror /opt/gmz/backups/ ionos-s3/gmz-backups/$(hostname)/ --overwrite
-EOF
-
-# Retention Policy (30 Tage)
-mc ilm add ionos-s3/gmz-backups-$(hostname) \
-  --expiry-days 30
-```
-
-### 12.4 Restore-Test (Quartalsweise)
-
-```bash
-# Restore-Prozedur dokumentieren und testen:
-
-# 1. VM aus Backup wiederherstellen (auf Test-Node)
-qmrestore /var/lib/vz/dump/vzdump-qemu-101-*.vma.zst \
-  --storage local-lvm \
-  --unique true \
-  --vmid 201
-
-# 2. VM starten und Funktionalität prüfen
-qm start 201
-sleep 30
-ssh deploy@$(qm agent 201 network-get-interfaces | jq -r '.[].ip-addresses[0].["ip-address"]')
-
-# 3. App-Erreichbarkeit prüfen
-curl -k https://nextcloud.test.apps.example.com/status.php
-
-# 4. Daten-Integrität prüfen
-# (app-spezifische Prüfungen)
-
-# 5. Test-VM wieder löschen
-qm stop 201 && qm destroy 201
-
-# Restore-Test dokumentieren:
-echo "Restore-Test $(date): ERFOLGREICH" >> /opt/gmz/logs/restore-tests.log
+[2026-03-10 14:23] INFO  Provisioning gestartet (Size: M)
+[2026-03-10 14:24] INFO  Proxmox-VM erstellt (VMID: 115)
+[2026-03-10 14:26] INFO  Cloud-Init abgeschlossen
+[2026-03-10 14:28] INFO  Ansible-Playbook erfolgreich (provision-tenant.yml)
+[2026-03-10 14:28] INFO  Tenant aktiv
+[2026-03-10 14:30] INFO  App 'nextcloud' deploy gestartet
+[2026-03-10 14:33] INFO  App 'nextcloud' aktiv unter nextcloud.tenants.example.com
 ```
 
 ---
 
-## 13. Troubleshooting
+## 20. Apps nutzen
 
-### 13.1 Traefik: Kein TLS-Zertifikat
+### App aufrufen
 
-**Symptom:** Browser zeigt "Verbindung nicht sicher", `acme.json` ist leer.
+In der Tenant-Karte oder im Apps-Tab auf das 🔗 **Link-Icon** klicken → App öffnet sich in neuem Tab.
 
-**Ursache:** IONOS API-Key falsch, DNS-01-Challenge schlägt fehl.
+### Authentik-Login: Erstanmeldung
 
-**Lösung:**
+1. App-URL öffnen → Weiterleitung zu Authentik
+2. Benutzername: durch Admin mitgeteilt (meist E-Mail-Adresse)
+3. Passwort: Temporäres Passwort aus Willkommens-E-Mail
+4. Passwort beim ersten Login ändern
+5. MFA einrichten (empfohlen): **Konto** → **MFA** → TOTP-App (Authenticator) scannen
+
+### Nextcloud: Erste Anmeldung
+
+1. Nextcloud-URL aufrufen (z.B. `https://nextcloud.tenants.example.com`)
+2. Mit Authentik einloggen (SSO)
+3. Desktop-Client oder mobile App einrichten:
+   - Serveradresse eingeben
+   - Mit SSO anmelden
+4. Erste Dateien hochladen:
+   - Drag & Drop in das Browser-Fenster
+   - Oder: **+ Neu** → **Datei hochladen**
+
+### Vaultwarden: Browser-Extension einrichten
+
+1. Bitwarden-Extension installieren (Chrome/Firefox/Edge)
+2. In der Extension: **Server** → `https://vault.tenants.example.com`
+3. Account erstellen oder einloggen
+4. Extension für automatisches Ausfüllen konfigurieren
+
+### App-spezifische Hilfe-Links
+
+| App         | Offizielle Dokumentation                         |
+|-------------|--------------------------------------------------|
+| Nextcloud   | https://docs.nextcloud.com                       |
+| Vaultwarden | https://github.com/dani-garcia/vaultwarden/wiki  |
+| Gitea       | https://docs.gitea.com                           |
+| Authentik   | https://docs.goauthentik.io                      |
+| Paperless   | https://docs.paperless-ngx.com                   |
+
+---
+
+## 21. Support & Troubleshooting (Endbenutzer)
+
+### App nicht erreichbar
+
+1. **Warten und neu laden:** Kurzzeitige Unterbrechungen kommen vor (max. 1–2 Min)
+2. **Status prüfen:** Admin fragen, ob Maintenance-Fenster aktiv ist
+3. **Browser-Cache leeren:** Strg+F5 (Windows/Linux) oder Cmd+Shift+R (Mac)
+4. **Anderen Browser testen:** Schließt Browser-spezifische Probleme aus
+5. **Admin kontaktieren** (siehe unten)
+
+### Admin kontaktieren
+
+Folgende Informationen bereithalten:
+- Welche App ist betroffen?
+- Genaue Fehlermeldung (Screenshot)
+- Uhrzeit, wann der Fehler aufgetreten ist
+- Was Sie davor getan haben
+
+### Häufige Fehler und Selbsthilfe
+
+| Fehler                    | Mögliche Ursache             | Lösung                                   |
+|---------------------------|------------------------------|------------------------------------------|
+| „Verbindung abgelehnt"    | App gestoppt oder Fehler     | Admin informieren                        |
+| SSL-Fehler / rotes Schloss | TLS-Zertifikat abgelaufen   | Admin informieren                        |
+| Login funktioniert nicht  | Passwort falsch / gesperrt   | Passwort zurücksetzen via Authentik      |
+| Upload schlägt fehl       | Datei zu groß                | Admin fragen nach Upload-Limit-Erhöhung  |
+| „502 Bad Gateway"         | App-Container gestartet/gestoppt | Kurz warten, dann neu laden          |
+| Seite lädt extrem langsam | Tenant-Ressourcen ausgeschöpft | Admin: VM upgraden                    |
+
+---
+
+# Teil IV: Referenz
+
+## 22. Troubleshooting (technisch)
+
+### Traefik: Kein TLS-Zertifikat
+
+**Symptom:** Browser zeigt „Nicht sicher" oder SSL-Fehler.
+
+**Diagnose:**
 ```bash
-# 1. IONOS API-Key prüfen
-curl -X GET "https://api.hosting.ionos.com/dns/v1/zones" \
-  -H "X-API-Key: $IONOS_API_KEY"
-# → Sollte Liste der Zonen zurückgeben
-
-# 2. Traefik-Logs auf ACME-Fehler prüfen
-docker logs traefik 2>&1 | grep -i "acme\|error\|dns"
-
-# 3. acme.json zurücksetzen und neu versuchen
-docker exec traefik rm /acme/acme.json
-docker restart traefik
-
-# 4. DNS-Propagation abwarten (bis zu 5 Minuten)
-watch -n5 "dig TXT _acme-challenge.mgmt.example.com @1.1.1.1"
+# Als gmzadmin – KEIN sudo für docker:
+docker logs traefik 2>&1 | grep -i "acme\|cert\|error" | tail -20
+docker exec traefik cat /etc/traefik/acme.json | python3 -m json.tool | grep -c "certificate"
 ```
 
-### 13.2 Tenant-VM: Cloud-Init schlägt fehl
+**Ursachen und Lösungen:**
 
-**Symptom:** VM startet, bleibt aber bei Cloud-Init hängen.
+| Ursache                           | Lösung                                                          |
+|-----------------------------------|-----------------------------------------------------------------|
+| IONOS API-Key falsch               | `.env` prüfen: `IONOS_API_KEY=PREFIX.SECRET`                   |
+| DNS-Wildcard nicht propagiert     | `dig *.tenants.example.com` → A-Record vorhanden?              |
+| Let's Encrypt Rate-Limit erreicht | Bis zu 7 Tage warten (Staging nutzen für Tests)                |
+| Traefik startet nicht             | `docker compose logs traefik` vollständig prüfen               |
 
-**Ursache:** Falsches Template, fehlende Cloud-Init-Konfiguration.
-
-**Lösung:**
+**Let's Encrypt Staging für Tests:**
 ```bash
-# Proxmox-Konsole öffnen
-qm terminal 101
+# Als gmzadmin – KEIN sudo für docker:
+# In infra/traefik/traefik.yml:
+# certificatesResolvers.letsencrypt.acme.caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+docker compose restart traefik
+```
 
-# Cloud-Init-Status prüfen
-cloud-init status --wait
-cloud-init analyze show
+### Tenant-VM: Cloud-Init schlägt fehl
 
-# Cloud-Init-Logs
-journalctl -u cloud-init -n 50
+**Symptom:** Tenant bleibt in Status `provisioning`, VM antwortet nicht.
+
+**Diagnose auf Proxmox-Node:**
+```bash
+# Als root auf dem Proxmox-Node:
+qm status <VMID>
+# Cloud-Init-Log aus VM holen (via Serial-Konsole):
+qm terminal <VMID>
+# In der Konsole:
 cat /var/log/cloud-init-output.log
-
-# Template neu erstellen falls nötig (siehe Abschnitt 2.2)
 ```
 
-### 13.3 Ansible: SSH-Verbindung zu Tenant schlägt fehl
+**Häufige Ursachen:**
+- SSH-Key in Template nicht hinterlegt → `qm set 9000 --sshkeys ~/.ssh/authorized_keys`
+- Netzwerk nicht erreichbar (VLAN-Config) → Proxmox VLAN-Tag prüfen
+- Template VMID 9000 nicht vorhanden → Template neu erstellen (Abschnitt 3.3)
 
-**Symptom:** `UNREACHABLE! => {"msg": "Failed to connect to the host via ssh"}`
+### Ansible: SSH-Verbindung schlägt fehl
 
-**Ursache:** SSH-Key nicht auf VM, falsche IP, Firewall.
+**Symptom:** `ansible-playbook` schlägt mit „SSH connection failed" fehl.
 
-**Lösung:**
 ```bash
-# SSH-Key manuell kopieren
-ssh-copy-id -i /home/deploy/.ssh/id_ed25519.pub root@10.20.101.10
+# Als gmzadmin – KEIN sudo für ansible/ssh:
+# Verbindung manuell testen:
+ssh -i ~/.ssh/id_ed25519 debian@<tenant-vm-ip> -o ConnectTimeout=10
 
-# Verbindung testen
-ansible tenant-acme-corp -m ping -v
-
-# IP-Adresse aus Proxmox abrufen
-qm agent 101 network-get-interfaces | jq '.[].["ip-addresses"][].["ip-address"]'
-
-# Inventory aktualisieren
-cat /opt/gmz/infrastructure/inventory/hosts.yml
+# Ansible verbose:
+ansible-playbook automation/ansible/provision-tenant.yml \
+  -i automation/ansible/inventory/tenant.ini \
+  -vvv 2>&1 | head -50
 ```
 
-### 13.4 WebApp: Service startet nicht
-
-**Symptom:** `systemctl status gmz-webapp` zeigt `failed`.
-
-**Ursache:** Fehlende Umgebungsvariablen, Port bereits belegt.
-
-**Lösung:**
+**Inventory-Datei prüfen:**
 ```bash
-# Logs ansehen
+# Als gmzadmin:
+cat automation/ansible/inventory/tenant.ini.example
+# → ansible_user=debian  (Debian Cloud-Init Default!)
+```
+
+**Häufige Ursachen:**
+- `ansible_user=root` statt `debian` → korrigieren
+- SSH-Key nicht auf Tenant-VM hinterlegt → Template prüfen (Abschnitt 3.3)
+- Tenant-VM noch nicht gebootet → 30–60s warten
+
+### WebApp: Service startet nicht
+
+**Symptom:** `systemctl status gmz-webapp` zeigt `failed` oder `activating`.
+
+```bash
+# Als gmzadmin:
+sudo systemctl status gmz-webapp
 journalctl -u gmz-webapp -n 50 --no-pager
-
-# Port-Konflikt prüfen
-lsof -i :3000
-
-# .env-Syntax prüfen
-node -e "require('dotenv').config({path:'/opt/gmz/.env'}); console.log(process.env.WEBAPP_PORT)"
-
-# Manuell starten für Debug-Output
-sudo -u deploy bash -c "cd /opt/gmz/webapp && node dist/server.js"
 ```
 
-### 13.5 Proxmox: API-Verbindung schlägt fehl
+**Häufige Ursachen:**
 
-**Symptom:** OpenTofu-Plan schlägt fehl mit `401 Unauthorized`.
+| Fehler in Logs                      | Lösung                                                         |
+|-------------------------------------|----------------------------------------------------------------|
+| `.env: file not found`              | `.env` anlegen: `cp .env.example .env && chmod 600 .env`      |
+| `Port 3000 already in use`         | Anderen Prozess stoppen: `lsof -i :3000`                       |
+| `MODULE_NOT_FOUND`                  | `npm ci && npm run build` erneut ausführen                     |
+| `WEBAPP_AUTH_MODE is not set`      | `.env` prüfen, Pflichtfelder gesetzt?                          |
+| Permission denied                   | WorkingDirectory und .env gehören `gmzadmin`?                  |
 
-**Ursache:** API-Token abgelaufen oder falsche Permissions.
-
-**Lösung:**
 ```bash
-# Token-Gültigkeit prüfen
-curl -k -H "Authorization: PVEAPIToken=root@pam!terraform=<secret>" \
-  https://10.10.10.1:8006/api2/json/version
-
-# Neuen Token erstellen (Proxmox Web-UI)
-# Datacenter → Permissions → API Tokens → root@pam → Add
-# Token-ID: terraform2
-# Privilege Separation: NO
-
-# .env aktualisieren
-sed -i "s/^PROXMOX_TOKEN_SECRET=.*/PROXMOX_TOKEN_SECRET=neuer-secret/" /opt/gmz/.env
+# Als gmzadmin:
+# Rechte prüfen:
+ls -la /opt/gmz/platform/webapp/.env
+# → -rw------- 1 gmzadmin gmzadmin ...
+ls -la /opt/gmz/platform/webapp/
+# → Alles gmzadmin:gmzadmin
 ```
 
-### 13.6 Nextcloud: Falsche Domain / Redirect-Loop
+### Proxmox: API-Verbindung schlägt fehl
 
-**Symptom:** Nextcloud zeigt "Zugriff über nicht vertrauenswürdige Domain".
+**Symptom:** Provisioning schlägt fehl mit „Proxmox API error" oder Timeout.
 
-**Ursache:** `trusted_domains` in Nextcloud-Konfiguration nicht gesetzt.
-
-**Lösung:**
 ```bash
-# SSH auf Tenant-VM
-ssh deploy@10.20.101.10
-
-# Nextcloud-Container
-docker exec -u www-data nextcloud \
-  php occ config:system:set trusted_domains 0 \
-  --value="nextcloud.acme.apps.example.com"
-
-docker exec -u www-data nextcloud \
-  php occ config:system:set overwrite.cli.url \
-  --value="https://nextcloud.acme.apps.example.com"
-
-docker exec -u www-data nextcloud \
-  php occ config:system:set overwriteprotocol --value="https"
+# Als gmzadmin – KEIN sudo:
+# API-Verbindung testen:
+curl -k -s \
+  -H "Authorization: PVEAPIToken=root@pam!gmz-webapp=IHR_TOKEN" \
+  https://proxmox.example.com:8006/api2/json/version
+# → {"data":{"version":"8.x.x",...}}
 ```
 
-### 13.7 Grafana: Keine Metriken von Tenant-VM
+**Häufige Ursachen:**
+- API-Token-Format falsch: muss `user@realm!tokenname=secret` sein
+- Proxmox nicht über Netzwerk erreichbar (Firewall?)
+- Token-Berechtigungen fehlen → Proxmox GUI: API Tokens → Berechtigungen prüfen
 
-**Symptom:** Tenant-VM erscheint nicht in Grafana-Dashboards.
+### Nextcloud: Redirect-Loop / falsche Domain
 
-**Ursache:** Node-Exporter läuft nicht, Prometheus-Target fehlt.
+**Symptom:** Nextcloud-Seite lädt endlos um oder zeigt falsche URL.
 
-**Lösung:**
 ```bash
-# Node-Exporter auf Tenant prüfen
-ssh deploy@10.20.101.10 "systemctl status node_exporter"
-
-# Falls nicht installiert:
-ansible-playbook playbooks/install-node-exporter.yml --limit "tenant-acme-corp"
-
-# Prometheus-Target prüfen
-curl http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | select(.labels.job=="node") | {instance: .labels.instance, health: .health}'
-
-# Firewall auf Tenant (Port 9100 für Prometheus freigeben)
-ssh deploy@10.20.101.10 "ufw allow from 10.10.10.10 to any port 9100"
+# Auf der Tenant-VM als debian:
+ssh debian@<tenant-vm-ip>
+cd /opt/apps/nextcloud
+# config.php prüfen:
+docker exec -it nextcloud-app cat /var/www/html/config/config.php | grep -E "overwrite|trusted"
 ```
 
-### 13.8 Authentik: Login schlägt fehl
-
-**Symptom:** SSO-Login gibt `Error: invalid_grant`.
-
-**Ursache:** OIDC-Redirect-URI stimmt nicht überein.
-
-**Lösung:**
+**Fix:**
 ```bash
-# Authentik Provider-Konfiguration prüfen
-# Admin UI → Applications → Providers → GMZ WebApp
-
-# Redirect-URI muss exakt übereinstimmen:
-# https://mgmt.example.com/auth/callback
-
-# In WEBAPP_AUTHENTIK_CLIENT_ID und _SECRET prüfen
-grep WEBAPP_AUTHENTIK /opt/gmz/.env
-
-# Authentik-Logs
-docker logs authentik-server 2>&1 | grep -i "error\|oauth\|oidc" | tail 20
+# Auf der Tenant-VM als debian:
+docker exec -it nextcloud-app php /var/www/html/occ config:system:set overwrite.cli.url --value=https://nextcloud.tenants.example.com
+docker exec -it nextcloud-app php /var/www/html/occ config:system:set trusted_domains 0 --value=nextcloud.tenants.example.com
 ```
 
-### 13.9 Docker: Container startet immer wieder neu
+### Grafana: Keine Metriken von Tenant
 
-**Symptom:** `docker ps` zeigt Container im Status `Restarting`.
+**Symptom:** Grafana zeigt „No data" für Tenant-Dashboards.
 
-**Ursache:** Fehlende Umgebungsvariablen, Datenbank-Verbindungsfehler.
-
-**Lösung:**
 ```bash
-# Container-Logs analysieren
-docker logs <container-name> --tail 50
+# Als gmzadmin – KEIN sudo für docker:
+# Prometheus-Targets prüfen:
+curl -s http://localhost:9090/api/v1/targets | python3 -m json.tool | grep -A5 "tenant"
 
-# docker-compose.yml auf fehlende Variablen prüfen
-docker compose config | grep -E "^\s+[A-Z_]+:$"
-
-# Manuell starten für Debugging
-docker run --rm -it \
-  --env-file /opt/gmz/infrastructure/tenants/acme-corp/.env \
-  nextcloud:latest \
-  /entrypoint.sh apache2-foreground
+# node_exporter auf Tenant-VM erreichbar?
+curl -s http://<tenant-vm-ip>:9100/metrics | head -5
 ```
 
-### 13.10 OpenTofu: State-Konflikt
+**Häufige Ursachen:**
+- `node_exporter` auf Tenant-VM nicht installiert → Ansible-Playbook erneut ausführen
+- Firewall auf Tenant-VM blockiert Port 9100 → `ssh debian@<ip> sudo ufw status`
+- Prometheus-Scraping-Config fehlt → `infra/monitoring/prometheus/prometheus.yml` prüfen
 
-**Symptom:** `Error: Resource already exists` oder `State file locked`.
+### Authentik: Login schlägt fehl
 
-**Ursache:** Parallele Ausführung, abgebrochenes Deployment.
+**Symptom:** SSO-Login gibt Fehler, Redirect-Fehler.
 
-**Lösung:**
 ```bash
-# State-Lock aufheben (nur wenn sicher kein anderer Prozess läuft!)
-cd /opt/gmz/infrastructure/tofu/tenants/acme-corp
-tofu force-unlock <LOCK_ID>
-
-# State-Datei auf Konsistenz prüfen
-tofu state list
-tofu plan -refresh-only
-
-# Im Notfall: State-Import für bereits existierende Ressourcen
-tofu import proxmox_virtual_environment_vm.tenant_vm pve01/qemu/101
+# Als gmzadmin – KEIN sudo für docker:
+cd /opt/gmz/infra/authentik
+docker compose logs authentik-server --tail 30
+docker compose logs authentik-worker --tail 20
 ```
 
-### 13.11 DNS: App nicht erreichbar trotz korrekter Route
+**Häufige Ursachen:**
+- Redirect-URI in OIDC-Provider falsch → Authentik: Provider bearbeiten
+- `NEXTAUTH_URL` in `.env` stimmt nicht mit tatsächlicher URL überein
+- Authentik-Container nicht gestartet → `docker compose ps`
 
-**Symptom:** Browser zeigt `ERR_NAME_NOT_RESOLVED`.
+### Docker: Container startet immer neu
 
-**Ursache:** DNS-Eintrag noch nicht propagiert oder falsche IP.
+**Symptom:** `docker ps` zeigt `Restarting (1)` in kurzen Abständen.
 
-**Lösung:**
 ```bash
-# DNS-Auflösung prüfen
-dig nextcloud.acme.apps.example.com @1.1.1.1
-dig nextcloud.acme.apps.example.com @8.8.8.8
+# Als gmzadmin – KEIN sudo für docker:
+# Logs prüfen:
+docker logs <container-name> --tail 30
 
-# IONOS DNS-Einträge prüfen
-curl -s -X GET "https://api.hosting.ionos.com/dns/v1/zones" \
-  -H "X-API-Key: $IONOS_API_KEY" | jq '.[] | select(.name=="apps.example.com")'
-
-# DNS-Eintrag manuell erstellen (falls Automation fehlschlug)
-ansible-playbook playbooks/create-dns-record.yml \
-  --extra-vars "record=nextcloud.acme subdomain=acme tenant=acme-corp"
+# Exit-Code prüfen:
+docker inspect <container-name> | python3 -m json.tool | grep -A3 '"State"'
 ```
+
+**Häufige Ursachen:**
+- Fehlende Umgebungsvariable → `docker inspect` → Env-Section
+- Port-Konflikt → `ss -tlnp | grep <port>`
+- Volumes nicht vorhanden → `docker volume ls`
+- Konfigurations-Datei Fehler → Compose-YAML prüfen
 
 ---
 
-## 14. Umgebungsvariablen-Referenz
+## 23. Umgebungsvariablen-Referenz
 
-Vollständige Tabelle aller `WEBAPP_*` Umgebungsvariablen und weiterer Plattform-Variablen:
+Datei: `/opt/gmz/platform/webapp/.env` | Berechtigungen: `chmod 600` | Besitzer: `gmzadmin`
 
-### Server & Basis-Konfiguration
-
-| Variable | Pflicht | Standard | Beschreibung |
-|----------|---------|----------|-------------|
-| `WEBAPP_HOST` | Nein | `0.0.0.0` | Bind-Adresse des HTTP-Servers |
-| `WEBAPP_PORT` | Nein | `3000` | HTTP-Port der WebApp |
-| `WEBAPP_BASE_URL` | **Ja** | – | Öffentliche URL der WebApp (z. B. `https://mgmt.example.com`) |
-| `WEBAPP_SECRET` | **Ja** | – | 64-Zeichen Hex-String für JWT-Signing und Session-Verschlüsselung |
-| `WEBAPP_NODE_ENV` | Nein | `production` | `development`, `test`, `production` |
-| `WEBAPP_LOG_LEVEL` | Nein | `info` | `error`, `warn`, `info`, `debug`, `trace` |
-| `WEBAPP_LOG_FORMAT` | Nein | `json` | `json` oder `pretty` |
-
-### Authentifizierung & Sicherheit
+### Authentifizierung
 
 | Variable | Pflicht | Standard | Beschreibung |
-|----------|---------|----------|-------------|
-| `WEBAPP_TRUSTED_BEARER` | **Ja** | – | 96-Zeichen Hex-Token für interne API-Aufrufe (Ansible → WebApp) |
-| `WEBAPP_SESSION_TIMEOUT` | Nein | `3600` | Session-Timeout in Sekunden |
-| `WEBAPP_RATE_LIMIT_WINDOW` | Nein | `60000` | Rate-Limit-Fenster in Millisekunden |
-| `WEBAPP_RATE_LIMIT_MAX` | Nein | `100` | Max. Requests pro Fenster pro IP |
-| `WEBAPP_ADMIN_EMAIL` | **Ja** | – | E-Mail des initialen Admin-Accounts |
-| `WEBAPP_ADMIN_PASSWORD` | **Ja** | – | Passwort des initialen Admin-Accounts (wird gehasht gespeichert) |
-| `WEBAPP_CORS_ORIGINS` | Nein | `WEBAPP_BASE_URL` | Kommagetrennte Liste erlaubter CORS-Origins |
-| `WEBAPP_CSRF_ENABLED` | Nein | `true` | CSRF-Schutz aktivieren |
-| `WEBAPP_HELMET_ENABLED` | Nein | `true` | HTTP-Security-Headers (Helmet.js) |
+|----------|---------|----------|--------------|
+| `WEBAPP_AUTH_MODE` | ✅ | – | Auth-Modus: `trusted-bearer` (Produktion), `jwt` (OIDC), `none` (nur Dev) |
+| `WEBAPP_TRUSTED_TOKENS_JSON` | Wenn `trusted-bearer` | – | JSON-Objekt mit Tokens. Format: `{"name":{"role":"admin","token":"..."}}` |
+| `NEXTAUTH_URL` | Wenn `jwt` | – | Vollständige URL der WebApp, z.B. `https://mgmt.example.com` |
+| `NEXTAUTH_SECRET` | Wenn `jwt` | – | Zufälliger geheimer Schlüssel für NextAuth.js Sessions |
+| `AUTHENTIK_CLIENT_ID` | Wenn `jwt` | – | OAuth2 Client-ID aus Authentik |
+| `AUTHENTIK_CLIENT_SECRET` | Wenn `jwt` | – | OAuth2 Client-Secret aus Authentik |
+| `AUTHENTIK_ISSUER` | Wenn `jwt` | – | OIDC Issuer-URL, z.B. `https://auth.example.com/application/o/slug/` |
+
+### Sicherheit
+
+| Variable | Pflicht | Standard | Beschreibung |
+|----------|---------|----------|--------------|
+| `WEBAPP_NOTIFICATION_ENCRYPTION_KEY` | ✅ | – | 32-Byte Hex-Schlüssel zur Verschlüsselung sensibler Daten. Generieren: `openssl rand -hex 16` |
+| `NODE_ENV` | – | `development` | `production` für Produktivbetrieb (wichtig für Performance und Sicherheit!) |
 
 ### Datenbank
 
 | Variable | Pflicht | Standard | Beschreibung |
-|----------|---------|----------|-------------|
-| `WEBAPP_DB_TYPE` | Nein | `sqlite` | `sqlite` oder `postgres` |
-| `WEBAPP_DB_PATH` | Nein | `./data/webapp.db` | Pfad zur SQLite-Datenbankdatei |
-| `WEBAPP_DB_URL` | Nein* | – | PostgreSQL-Connection-String (`postgresql://user:pass@host:5432/db`). *Pflicht wenn `DB_TYPE=postgres` |
-| `WEBAPP_DB_POOL_MIN` | Nein | `2` | Minimale DB-Pool-Verbindungen |
-| `WEBAPP_DB_POOL_MAX` | Nein | `10` | Maximale DB-Pool-Verbindungen |
-| `WEBAPP_DB_SSL` | Nein | `false` | TLS für PostgreSQL-Verbindung |
+|----------|---------|----------|--------------|
+| `DATABASE_URL` | – | Dateibasiert | PostgreSQL Connection-String: `postgresql://user:pass@host:5432/db`. Ohne diese Variable wird ein lokaler dateibasierter Speicher verwendet. |
 
-### Proxmox-Integration
+### Proxmox / Provisioning
 
 | Variable | Pflicht | Standard | Beschreibung |
-|----------|---------|----------|-------------|
-| `WEBAPP_PROXMOX_URL` | **Ja** | – | Proxmox API-URL (z. B. `https://10.10.10.1:8006`) |
-| `WEBAPP_PROXMOX_TOKEN_ID` | **Ja** | – | API-Token-ID (z. B. `root@pam!terraform`) |
-| `WEBAPP_PROXMOX_TOKEN_SECRET` | **Ja** | – | API-Token-Secret |
-| `WEBAPP_PROXMOX_NODE` | **Ja** | – | Proxmox-Node-Name (z. B. `pve01`) |
-| `WEBAPP_PROXMOX_STORAGE` | Nein | `local-lvm` | Standard-Storage für VM-Disks |
-| `WEBAPP_PROXMOX_TEMPLATE_ID` | **Ja** | – | VMID des Debian-13-Templates |
-| `WEBAPP_PROXMOX_VERIFY_SSL` | Nein | `false` | SSL-Zertifikat des Proxmox-Servers verifizieren |
-| `WEBAPP_PROXMOX_TIMEOUT` | Nein | `30000` | API-Timeout in Millisekunden |
+|----------|---------|----------|--------------|
+| `PROVISION_PROXMOX_ENDPOINT` | ✅ | – | Proxmox-API-URL: `https://proxmox.example.com:8006/api2/json` |
+| `PROVISION_PROXMOX_API_TOKEN` | ✅ | – | Format: `user@realm!tokenname=secret` |
+| `PROVISION_PROXMOX_NODE` | ✅ | – | Name des Proxmox-Nodes, z.B. `pve` |
+| `PROVISION_PROXMOX_INSECURE` | – | `false` | `true` wenn selbstsigniertes Zertifikat auf Proxmox (nicht für Produktion) |
+| `PROVISION_TEMPLATE_VMID` | ✅ | – | VMID des Cloud-Init-Templates, z.B. `9000` |
+| `PROVISION_STORAGE` | – | `local-lvm` | Proxmox-Storage-Name für VM-Disks |
+| `PROVISION_BRIDGE` | – | `vmbr0` | Netzwerk-Bridge für Tenant-VMs |
+| `PROVISION_TENANT_VLAN` | – | `20` | Basis-VLAN-ID für Tenant-Netz |
+| `PROVISION_SSH_PUBLIC_KEY` | ✅ | – | SSH Public Key für Tenant-VM-Zugriff (Ansible) |
+| `PROVISION_EXECUTION_ENABLED` | – | `false` | `true` um echtes Provisioning zu aktivieren (in Dev/Test auf `false` lassen!) |
 
-### Netzwerk & DNS
-
-| Variable | Pflicht | Standard | Beschreibung |
-|----------|---------|----------|-------------|
-| `WEBAPP_BASE_DOMAIN` | **Ja** | – | Basis-Domain für Tenant-Apps (z. B. `apps.example.com`) |
-| `WEBAPP_MGMT_DOMAIN` | **Ja** | – | Management-Domain (z. B. `mgmt.example.com`) |
-| `WEBAPP_MANAGEMENT_VLAN` | Nein | `10` | VLAN-ID für Management-Netz |
-| `WEBAPP_TENANT_VLAN_START` | Nein | `101` | Erste VLAN-ID für Tenants |
-| `WEBAPP_TENANT_VLAN_END` | Nein | `200` | Letzte VLAN-ID für Tenants |
-| `WEBAPP_TENANT_NETWORK_BASE` | Nein | `10.20` | Netzwerk-Prefix für Tenant-IPs |
-| `WEBAPP_IONOS_API_KEY` | **Ja** | – | IONOS DNS API-Key (Public.Secret Format) |
-| `WEBAPP_DNS_TTL` | Nein | `300` | DNS-TTL in Sekunden |
-| `WEBAPP_FEATURE_AUTO_DNS` | Nein | `true` | DNS-Einträge automatisch erstellen |
-
-### Authentik SSO
+### Domain / Netzwerk
 
 | Variable | Pflicht | Standard | Beschreibung |
-|----------|---------|----------|-------------|
-| `WEBAPP_AUTHENTIK_URL` | Nein | – | Authentik-Instanz-URL (z. B. `https://auth.example.com`) |
-| `WEBAPP_AUTHENTIK_CLIENT_ID` | Nein | – | OIDC Client-ID |
-| `WEBAPP_AUTHENTIK_CLIENT_SECRET` | Nein | – | OIDC Client-Secret |
-| `WEBAPP_AUTHENTIK_SCOPE` | Nein | `openid email profile groups` | OAuth2-Scopes |
-| `WEBAPP_AUTHENTIK_ADMIN_GROUP` | Nein | `gmz-admins` | Authentik-Gruppe für WebApp-Admins |
-| `WEBAPP_SSO_ENABLED` | Nein | `false` | SSO aktivieren (erfordert Authentik-Konfiguration) |
+|----------|---------|----------|--------------|
+| `WEBAPP_BASE_DOMAIN` | ✅ | – | Haupt-Domain, z.B. `example.com` |
+| `WEBAPP_TENANT_SUBDOMAIN_TEMPLATE` | – | `*.tenants.{base}` | Template für Tenant-Subdomains |
+| `WEBAPP_MANAGEMENT_URL` | – | `NEXTAUTH_URL` | Öffentliche URL der WebApp (falls abweichend) |
 
-### SMTP & Benachrichtigungen
+### SMTP / Benachrichtigungen
 
 | Variable | Pflicht | Standard | Beschreibung |
-|----------|---------|----------|-------------|
-| `WEBAPP_SMTP_HOST` | Nein | – | SMTP-Server-Hostname |
-| `WEBAPP_SMTP_PORT` | Nein | `587` | SMTP-Port |
-| `WEBAPP_SMTP_USER` | Nein | – | SMTP-Benutzername |
-| `WEBAPP_SMTP_PASSWORD` | Nein | – | SMTP-Passwort |
-| `WEBAPP_SMTP_FROM` | Nein | – | Absender-Adresse (z. B. `GMZ Cloud <noreply@example.com>`) |
-| `WEBAPP_SMTP_TLS` | Nein | `true` | STARTTLS aktivieren |
-| `WEBAPP_SMTP_REJECT_UNAUTHORIZED` | Nein | `true` | TLS-Zertifikat verifizieren |
-| `WEBAPP_NOTIFY_TEAMS_WEBHOOK` | Nein | – | Teams-Webhook für Job-Benachrichtigungen |
-| `WEBAPP_NOTIFY_ON_PROVISION` | Nein | `true` | Benachrichtigung bei neuem Tenant |
-| `WEBAPP_NOTIFY_ON_ERROR` | Nein | `true` | Benachrichtigung bei Job-Fehler |
+|----------|---------|----------|--------------|
+| `SMTP_HOST` | – | – | SMTP-Server-Adresse |
+| `SMTP_PORT` | – | `587` | SMTP-Port (587 = StartTLS, 465 = SSL) |
+| `SMTP_USER` | – | – | SMTP-Benutzername |
+| `SMTP_PASSWORD` | – | – | SMTP-Passwort |
+| `SMTP_FROM` | – | – | Absender-E-Mail: `GMZ Cloud <noreply@example.com>` |
+| `SMTP_SECURE` | – | `false` | `true` für SSL/TLS auf Port 465 |
 
-### Feature-Flags & Limits
+### Entwicklung / Debug
 
 | Variable | Pflicht | Standard | Beschreibung |
-|----------|---------|----------|-------------|
-| `WEBAPP_MAX_TENANTS` | Nein | `50` | Maximale Anzahl Tenants |
-| `WEBAPP_FEATURE_AUTO_DNS` | Nein | `true` | Automatische DNS-Einträge |
-| `WEBAPP_FEATURE_AUTO_SNAPSHOT` | Nein | `true` | Automatische Snapshots vor Updates |
-| `WEBAPP_FEATURE_NIGHTLY_UPDATES` | Nein | `true` | Nightly-Update-Workflow aktivieren |
-| `WEBAPP_FEATURE_APP_CATALOG` | Nein | `true` | App-Katalog in UI anzeigen |
-| `WEBAPP_FEATURE_BILLING` | Nein | `false` | Billing-Modul (experimentell) |
-| `WEBAPP_MAINTENANCE_WINDOW_START` | Nein | `02:00` | Beginn Maintenance-Window (HH:MM) |
-| `WEBAPP_MAINTENANCE_WINDOW_END` | Nein | `04:00` | Ende Maintenance-Window (HH:MM) |
-| `WEBAPP_MAINTENANCE_TIMEZONE` | Nein | `Europe/Berlin` | Zeitzone für Maintenance-Window |
-
-### Infrastruktur-Variablen (nicht WEBAPP_*)
-
-| Variable | Pflicht | Standard | Beschreibung |
-|----------|---------|----------|-------------|
-| `PROXMOX_URL` | **Ja** | – | Proxmox API-Endpunkt |
-| `PROXMOX_TOKEN_ID` | **Ja** | – | API-Token-ID für OpenTofu |
-| `PROXMOX_TOKEN_SECRET` | **Ja** | – | API-Token-Secret für OpenTofu |
-| `PROXMOX_NODE` | **Ja** | – | Proxmox-Node-Name |
-| `IONOS_API_KEY` | **Ja** | – | IONOS DNS API-Key für Traefik ACME |
-| `BASE_DOMAIN` | **Ja** | – | Basis-Domain für alle Apps |
-| `AUTHENTIK_SECRET_KEY` | **Ja** | – | Authentik Django Secret Key |
-| `AUTHENTIK_DOMAIN` | **Ja** | – | Öffentliche Authentik-Domain |
-| `GRAFANA_ADMIN_PASSWORD` | **Ja** | – | Initialer Grafana-Admin-Passwort |
-| `GRAFANA_DOMAIN` | **Ja** | – | Öffentliche Grafana-Domain |
-| `ALERTMANAGER_TEAMS_WEBHOOK` | Nein | – | Teams-Webhook für Alertmanager |
-| `SMTP_HOST` | Nein | – | SMTP-Host für Alertmanager |
-| `SMTP_PORT` | Nein | `587` | SMTP-Port für Alertmanager |
-| `SMTP_USER` | Nein | – | SMTP-User für Alertmanager |
-| `SMTP_PASSWORD` | Nein | – | SMTP-Passwort für Alertmanager |
+|----------|---------|----------|--------------|
+| `NEXT_PUBLIC_ENABLE_DEV_ROLE_SWITCH` | – | `false` | `true` erlaubt Rollen-Umschalten im UI (NUR mit `auth_mode=none`!) |
+| `LOG_LEVEL` | – | `info` | Log-Level: `debug`, `info`, `warn`, `error` |
 
 ---
 
-## Anhang
+## 24. Schnell-Referenz
 
-### Nützliche Befehle (Quick Reference)
+### Service-Verwaltung
 
 ```bash
-# WebApp Status
-systemctl status gmz-webapp
+# Als gmzadmin (sudo für systemctl):
+# WebApp-Status prüfen:
+sudo systemctl status gmz-webapp
+
+# WebApp neu starten:
+sudo systemctl restart gmz-webapp
+
+# WebApp-Logs live:
 journalctl -u gmz-webapp -f
 
-# Alle Container-Status
-docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-
-# Tenant-VM-Liste
-qm list | grep -v "^  *100 "
-
-# Logs eines Ansible-Jobs
-tail -f /opt/gmz/logs/ansible/$(ls -t /opt/gmz/logs/ansible/ | head -1)
-
-# Proxmox-Cluster-Status
-pvecm status
-
-# Backup-Status
-pbs-client list --repository backup@10.10.10.5:gmz-backups
-
-# Traefik-Zertifikate
-docker exec traefik cat /acme/acme.json | python3 -m json.tool | grep -A2 '"main"'
-
-# Authentik-Status
-docker exec authentik-server ak check
+# WebApp-Logs letzte 100 Zeilen:
+journalctl -u gmz-webapp -n 100 --no-pager
 ```
 
-### Versionsverlauf
+### Docker-Befehle
 
-| Version | Datum | Änderungen |
-|---------|-------|-----------|
-| 1.0.0 | 2026-03-09 | Initiale Version |
+```bash
+# Als gmzadmin – KEIN sudo (docker-Gruppe!):
+# Alle laufenden Container:
+docker ps
+
+# Monitoring-Stack neu starten:
+cd /opt/gmz/infra/monitoring && docker compose restart
+
+# Traefik-Logs:
+docker logs traefik -f --tail 50
+
+# Container-Ressourcennutzung:
+docker stats --no-stream
+```
+
+### Ansible-Befehle
+
+```bash
+# Als gmzadmin – KEIN sudo:
+# Tenant provisionieren:
+ansible-playbook /opt/gmz/automation/ansible/provision-tenant.yml \
+  -i /opt/gmz/automation/ansible/inventory/tenant.ini
+
+# Traefik deployen:
+ansible-playbook /opt/gmz/automation/ansible/deploy-traefik.yml \
+  -i /opt/gmz/automation/ansible/inventory/management.yml
+
+# Ad-hoc Befehl auf allen Tenant-VMs:
+ansible all -i /opt/gmz/automation/ansible/inventory/tenant.ini \
+  -m command -a "uptime"
+
+# Ansible-Verbindung testen:
+ansible all -i /opt/gmz/automation/ansible/inventory/tenant.ini -m ping
+```
+
+### Nützliche System-Befehle
+
+```bash
+# Als gmzadmin:
+# Offene Ports anzeigen:
+ss -tlnp
+
+# UFW-Status:
+sudo ufw status verbose
+
+# Disk-Nutzung:
+df -h
+
+# RAM-Nutzung:
+free -h
+
+# CPU-Last:
+uptime
+htop
+
+# Systemd-Service-Übersicht:
+systemctl list-units --state=failed
+
+# Letzten Boot prüfen:
+last reboot | head -5
+
+# Alle Docker-Volumes:
+docker volume ls
+
+# Docker-Disk-Nutzung:
+docker system df
+```
+
+### SSH auf Tenant-VMs
+
+```bash
+# Als gmzadmin – KEIN sudo für SSH:
+# Standard-Login (Debian Cloud-Init User):
+ssh -i ~/.ssh/id_ed25519 debian@<tenant-vm-ip>
+
+# Mit SSH-Config (empfohlen, ~/.ssh/config einrichten):
+# Host tenant-01
+#   HostName 10.20.1.100
+#   User debian
+#   IdentityFile ~/.ssh/id_ed25519
+ssh tenant-01
+```
+
+### Logs schnell finden
+
+```bash
+# Als gmzadmin:
+# WebApp-Fehler der letzten Stunde:
+journalctl -u gmz-webapp --since "1 hour ago" | grep -i error
+
+# System-Logs nach Fehler durchsuchen:
+journalctl -p err --since "today" --no-pager
+
+# Docker-Container-Log (letzter Fehler):
+docker logs <container-name> 2>&1 | grep -i "error\|fatal\|panic" | tail -10
+
+# Ansible-Playbook-Log:
+cat /tmp/ansible-playbook-run-$(date +%Y%m%d)*.log
+```
+
+### Git-Workflow
+
+```bash
+# Als gmzadmin – KEIN sudo:
+cd /opt/gmz
+
+# Aktuellen Stand holen:
+git fetch origin
+git status
+
+# Update einspielen:
+git pull origin main
+
+# Lokale Änderungen (z.B. .env.example aktualisiert):
+git diff HEAD
+
+# Commit-History:
+git log --oneline -10
+```
 
 ---
 
-*Dieses Dokument wird automatisch bei größeren Plattform-Updates aktualisiert. Für Fragen und Verbesserungsvorschläge bitte ein Issue im Repository eröffnen.*
+*Ende des Handbuchs*
+
+---
+
+> **Versionsverlauf:**
+> | Version | Datum      | Änderungen                                         |
+> |---------|------------|----------------------------------------------------|
+> | 2.0.0   | März 2026  | Komplett neu: Debian 13 Install, sudo-Konsistenz, Authentik-SSO, vollständiges Benutzerhandbuch |
+> | 1.x     | 2025       | Ursprüngliche Version                              |
