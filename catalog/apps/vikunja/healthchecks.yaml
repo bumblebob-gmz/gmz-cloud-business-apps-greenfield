@@ -1,0 +1,7 @@
+checks:
+  - id: vikunja-https
+    type: http
+    target: https://vikunja.{tenant}.irongeeks.eu/api/v1/info
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 5

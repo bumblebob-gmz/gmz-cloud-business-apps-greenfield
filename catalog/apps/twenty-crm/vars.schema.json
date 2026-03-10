@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Twenty CRM tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["TWENTY_HOST", "TWENTY_VERSION", "TWENTY_SECRET_KEY", "TWENTY_DB_PASSWORD"],
+  "properties": {
+    "TWENTY_HOST": {
+      "type": "string",
+      "description": "Public hostname for Twenty CRM"
+    },
+    "TWENTY_VERSION": {
+      "type": "string",
+      "default": "latest",
+      "description": "Twenty Docker image tag"
+    },
+    "TWENTY_SECRET_KEY": {
+      "type": "string",
+      "minLength": 32,
+      "description": "APP_SECRET for Twenty — used for JWT signing and encryption"
+    },
+    "TWENTY_DB_NAME": {
+      "type": "string",
+      "default": "twenty",
+      "description": "PostgreSQL database name"
+    },
+    "TWENTY_DB_USER": {
+      "type": "string",
+      "default": "twenty",
+      "description": "PostgreSQL database user"
+    },
+    "TWENTY_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "PostgreSQL database password"
+    },
+    "TWENTY_REDIS_URL": {
+      "type": "string",
+      "default": "redis://twenty-redis:6379",
+      "description": "Redis connection URL"
+    },
+    "TWENTY_STORAGE_LOCAL_PATH": {
+      "type": "string",
+      "default": ".local-storage",
+      "description": "Path for local file storage"
+    }
+  }
+}

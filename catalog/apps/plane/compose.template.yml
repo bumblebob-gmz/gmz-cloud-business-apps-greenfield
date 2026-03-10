@@ -1,0 +1,73 @@
+services:
+  plane-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PLANE_DB_NAME}
+      POSTGRES_USER: ${PLANE_DB_USER}
+      POSTGRES_PASSWORD: ${PLANE_DB_PASSWORD}
+    volumes:
+      - plane_db:/var/lib/postgresql/data
+
+  plane-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - plane_redis:/data
+
+  plane-api:
+    image: makeplane/plane-backend:${PLANE_VERSION}
+    restart: unless-stopped
+    entrypoint: python manage.py runserver 0.0.0.0:8000
+    depends_on: [plane-db, plane-redis]
+    environment:
+      DATABASE_URL: postgresql://${PLANE_DB_USER}:${PLANE_DB_PASSWORD}@plane-db:5432/${PLANE_DB_NAME}
+      REDIS_URL: ${PLANE_REDIS_URL}
+      SECRET_KEY: ${PLANE_SECRET_KEY}
+      WEB_URL: https://${PLANE_HOST}
+      CORS_ALLOWED_ORIGINS: https://${PLANE_HOST}
+      DJANGO_SETTINGS_MODULE: plane.settings.production
+
+  plane-worker:
+    image: makeplane/plane-backend:${PLANE_VERSION}
+    restart: unless-stopped
+    entrypoint: celery -A plane worker -l info
+    depends_on: [plane-db, plane-redis]
+    environment:
+      DATABASE_URL: postgresql://${PLANE_DB_USER}:${PLANE_DB_PASSWORD}@plane-db:5432/${PLANE_DB_NAME}
+      REDIS_URL: ${PLANE_REDIS_URL}
+      SECRET_KEY: ${PLANE_SECRET_KEY}
+      WEB_URL: https://${PLANE_HOST}
+      CORS_ALLOWED_ORIGINS: https://${PLANE_HOST}
+      DJANGO_SETTINGS_MODULE: plane.settings.production
+
+  plane-beat:
+    image: makeplane/plane-backend:${PLANE_VERSION}
+    restart: unless-stopped
+    entrypoint: celery -A plane beat -l info
+    depends_on: [plane-db, plane-redis]
+    environment:
+      DATABASE_URL: postgresql://${PLANE_DB_USER}:${PLANE_DB_PASSWORD}@plane-db:5432/${PLANE_DB_NAME}
+      REDIS_URL: ${PLANE_REDIS_URL}
+      SECRET_KEY: ${PLANE_SECRET_KEY}
+      WEB_URL: https://${PLANE_HOST}
+      CORS_ALLOWED_ORIGINS: https://${PLANE_HOST}
+      DJANGO_SETTINGS_MODULE: plane.settings.production
+
+  plane-frontend:
+    image: makeplane/plane-frontend:${PLANE_VERSION}
+    restart: unless-stopped
+    depends_on: [plane-api]
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: https://${PLANE_HOST}
+      NEXT_PUBLIC_DEPLOY_URL: https://${PLANE_HOST}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.plane.rule: Host(`${PLANE_HOST}`)
+      traefik.http.routers.plane.entrypoints: websecure
+      traefik.http.routers.plane.tls: "true"
+      traefik.http.services.plane.loadbalancer.server.port: "3000"
+
+volumes:
+  plane_db:
+  plane_redis:

@@ -1,0 +1,7 @@
+checks:
+  - id: taiga-https
+    type: http
+    target: https://taiga.{tenant}.irongeeks.eu/api/v1/
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 5

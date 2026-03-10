@@ -1,0 +1,7 @@
+checks:
+  - id: espocrm-https
+    type: http
+    target: https://espocrm.{tenant}.irongeeks.eu/
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 5

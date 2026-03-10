@@ -1,0 +1,58 @@
+services:
+  twenty-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${TWENTY_DB_NAME}
+      POSTGRES_USER: ${TWENTY_DB_USER}
+      POSTGRES_PASSWORD: ${TWENTY_DB_PASSWORD}
+    volumes:
+      - twenty_db:/var/lib/postgresql/data
+
+  twenty-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - twenty_redis:/data
+
+  twenty-server:
+    image: twentycrm/twenty:${TWENTY_VERSION}
+    restart: unless-stopped
+    depends_on: [twenty-db, twenty-redis]
+    environment:
+      SERVER_URL: https://${TWENTY_HOST}
+      FRONT_BASE_URL: https://${TWENTY_HOST}
+      PG_DATABASE_URL: postgres://${TWENTY_DB_USER}:${TWENTY_DB_PASSWORD}@twenty-db:5432/${TWENTY_DB_NAME}
+      REDIS_URL: ${TWENTY_REDIS_URL}
+      APP_SECRET: ${TWENTY_SECRET_KEY}
+      STORAGE_TYPE: local
+      STORAGE_LOCAL_PATH: ${TWENTY_STORAGE_LOCAL_PATH}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.twenty.rule: Host(`${TWENTY_HOST}`)
+      traefik.http.routers.twenty.entrypoints: websecure
+      traefik.http.routers.twenty.tls: "true"
+      traefik.http.services.twenty.loadbalancer.server.port: "3000"
+    volumes:
+      - twenty_data:/.local-storage
+
+  twenty-worker:
+    image: twentycrm/twenty:${TWENTY_VERSION}
+    restart: unless-stopped
+    command: ["node", "dist/src/queue-worker/queue-worker.js"]
+    depends_on: [twenty-server]
+    environment:
+      SERVER_URL: https://${TWENTY_HOST}
+      FRONT_BASE_URL: https://${TWENTY_HOST}
+      PG_DATABASE_URL: postgres://${TWENTY_DB_USER}:${TWENTY_DB_PASSWORD}@twenty-db:5432/${TWENTY_DB_NAME}
+      REDIS_URL: ${TWENTY_REDIS_URL}
+      APP_SECRET: ${TWENTY_SECRET_KEY}
+      STORAGE_TYPE: local
+      STORAGE_LOCAL_PATH: ${TWENTY_STORAGE_LOCAL_PATH}
+    volumes:
+      - twenty_data:/.local-storage
+
+volumes:
+  twenty_db:
+  twenty_redis:
+  twenty_data:

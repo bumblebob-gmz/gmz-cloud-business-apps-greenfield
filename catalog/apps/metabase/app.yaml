@@ -1,0 +1,17 @@
+id: metabase
+name: Metabase
+version: v0.51
+status: approved
+category: analytics
+summary: Open-source business intelligence and data visualization platform for teams of all sizes.
+website: https://www.metabase.com/
+docsUrl: https://www.metabase.com/docs/latest/
+requires: []
+supportsBranding: false
+supportsSSO: false
+exposes:
+  - service: metabase
+    component: app
+    protocol: https
+    port: 3000
+    hostPattern: metabase.{tenant}.irongeeks.eu

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Metabase tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["MB_HOST", "MB_IMAGE_TAG", "MB_DB_PASSWORD", "MB_ENCRYPTION_SECRET_KEY"],
+  "properties": {
+    "MB_HOST": {
+      "type": "string",
+      "description": "Public hostname for Metabase"
+    },
+    "MB_IMAGE_TAG": {
+      "type": "string",
+      "default": "v0.51",
+      "description": "Metabase Docker image tag"
+    },
+    "MB_DB_NAME": {
+      "type": "string",
+      "default": "metabase",
+      "description": "PostgreSQL database name for Metabase metadata"
+    },
+    "MB_DB_USER": {
+      "type": "string",
+      "default": "metabase",
+      "description": "PostgreSQL database user"
+    },
+    "MB_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "PostgreSQL database password"
+    },
+    "MB_ENCRYPTION_SECRET_KEY": {
+      "type": "string",
+      "minLength": 16,
+      "description": "Secret key for encrypting sensitive data stored in the Metabase database"
+    },
+    "MB_SITE_NAME": {
+      "type": "string",
+      "default": "Metabase",
+      "description": "Site name displayed in the UI"
+    },
+    "MB_JAVA_TIMEZONE": {
+      "type": "string",
+      "default": "Europe/Berlin",
+      "description": "JVM timezone for Metabase"
+    }
+  }
+}

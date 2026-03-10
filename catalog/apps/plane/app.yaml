@@ -1,0 +1,17 @@
+id: plane
+name: Plane
+version: stable
+status: approved
+category: project-management
+summary: Open-source project management tool for software teams with issues, cycles, and modules.
+website: https://plane.so/
+docsUrl: https://docs.plane.so/
+requires: []
+supportsBranding: false
+supportsSSO: false
+exposes:
+  - service: plane
+    component: frontend
+    protocol: https
+    port: 3000
+    hostPattern: plane.{tenant}.irongeeks.eu

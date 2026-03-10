@@ -1,0 +1,17 @@
+id: orangehrm
+name: OrangeHRM
+version: latest
+status: approved
+category: hr
+summary: Open-source human resource management system with employee records, leave, and attendance tracking.
+website: https://www.orangehrm.com/
+docsUrl: https://www.orangehrm.com/orangehrm-documentation/
+requires: []
+supportsBranding: false
+supportsSSO: false
+exposes:
+  - service: orangehrm
+    component: app
+    protocol: https
+    port: 80
+    hostPattern: orangehrm.{tenant}.irongeeks.eu

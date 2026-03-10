@@ -1,0 +1,7 @@
+checks:
+  - id: plane-https
+    type: http
+    target: https://plane.{tenant}.irongeeks.eu/api/health/
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 5

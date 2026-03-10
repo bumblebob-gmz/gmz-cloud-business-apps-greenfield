@@ -1,0 +1,17 @@
+id: espocrm
+name: EspoCRM
+version: "8"
+status: approved
+category: crm
+summary: Open-source CRM platform with sales pipeline, contacts, leads, and real-time WebSocket support.
+website: https://www.espocrm.com/
+docsUrl: https://docs.espocrm.com/
+requires: []
+supportsBranding: false
+supportsSSO: true
+exposes:
+  - service: espocrm
+    component: app
+    protocol: https
+    port: 80
+    hostPattern: espocrm.{tenant}.irongeeks.eu

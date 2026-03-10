@@ -1,0 +1,31 @@
+services:
+  focalboard-db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${FB_DB_NAME}
+      POSTGRES_USER: ${FB_DB_USER}
+      POSTGRES_PASSWORD: ${FB_DB_PASSWORD}
+    volumes:
+      - focalboard_db:/var/lib/postgresql/data
+
+  focalboard:
+    image: mattermost/focalboard:${FB_IMAGE_TAG}
+    restart: unless-stopped
+    depends_on: [focalboard-db]
+    environment:
+      FOCALBOARD_DBTYPE: postgres
+      FOCALBOARD_DBCONFIG: postgres://${FB_DB_USER}:${FB_DB_PASSWORD}@focalboard-db:5432/${FB_DB_NAME}?sslmode=disable
+      FOCALBOARD_SERVERROOT: https://${FB_HOST}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.focalboard.rule: Host(`${FB_HOST}`)
+      traefik.http.routers.focalboard.entrypoints: websecure
+      traefik.http.routers.focalboard.tls: "true"
+      traefik.http.services.focalboard.loadbalancer.server.port: "8000"
+    volumes:
+      - focalboard_data:/data
+
+volumes:
+  focalboard_db:
+  focalboard_data:

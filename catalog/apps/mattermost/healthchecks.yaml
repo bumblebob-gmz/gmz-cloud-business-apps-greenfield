@@ -1,0 +1,8 @@
+checks:
+  - id: mattermost-https
+    type: http
+    target: https://mattermost.{tenant}.irongeeks.eu/api/v4/system/ping
+    expectedStatus: 200
+    contains: '"status":"OK"'
+    intervalSeconds: 30
+    timeoutSeconds: 5

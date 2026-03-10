@@ -1,0 +1,39 @@
+services:
+  leantime-db:
+    image: mysql:8.0
+    restart: unless-stopped
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_DATABASE: ${LT_DB_NAME}
+      MYSQL_USER: ${LT_DB_USER}
+      MYSQL_PASSWORD: ${LT_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${LT_DB_ROOT_PASSWORD}
+    volumes:
+      - leantime_db:/var/lib/mysql
+
+  leantime:
+    image: leantime/leantime:${LT_IMAGE_TAG}
+    restart: unless-stopped
+    depends_on: [leantime-db]
+    environment:
+      LEAN_APP_URL: https://${LT_HOST}
+      LEAN_DB_HOST: leantime-db
+      LEAN_DB_DATABASE: ${LT_DB_NAME}
+      LEAN_DB_USER: ${LT_DB_USER}
+      LEAN_DB_PASSWORD: ${LT_DB_PASSWORD}
+      LEAN_DB_PORT: "3306"
+      LEAN_SESSION_PASSWORD: ${LT_SESSION_PASSWORD}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.leantime.rule: Host(`${LT_HOST}`)
+      traefik.http.routers.leantime.entrypoints: websecure
+      traefik.http.routers.leantime.tls: "true"
+      traefik.http.services.leantime.loadbalancer.server.port: "80"
+    volumes:
+      - leantime_userfiles:/var/www/html/userfiles
+      - leantime_public_userfiles:/var/www/html/public/userfiles
+
+volumes:
+  leantime_db:
+  leantime_userfiles:
+  leantime_public_userfiles:

@@ -1,0 +1,33 @@
+services:
+  orangehrm-db:
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${OHRM_DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${OHRM_DB_NAME}
+      MYSQL_USER: ${OHRM_DB_USER}
+      MYSQL_PASSWORD: ${OHRM_DB_PASSWORD}
+    volumes:
+      - orangehrm_db:/var/lib/mysql
+
+  orangehrm:
+    image: orangehrm/orangehrm:${OHRM_IMAGE_TAG}
+    restart: unless-stopped
+    depends_on: [orangehrm-db]
+    environment:
+      ORANGEHRM_DATABASE_HOST: orangehrm-db
+      ORANGEHRM_DATABASE_NAME: ${OHRM_DB_NAME}
+      ORANGEHRM_DATABASE_USER: ${OHRM_DB_USER}
+      ORANGEHRM_DATABASE_PASSWORD: ${OHRM_DB_PASSWORD}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.orangehrm.rule: Host(`${OHRM_HOST}`)
+      traefik.http.routers.orangehrm.entrypoints: websecure
+      traefik.http.routers.orangehrm.tls: "true"
+      traefik.http.services.orangehrm.loadbalancer.server.port: "80"
+    volumes:
+      - orangehrm_data:/var/www/html
+
+volumes:
+  orangehrm_db:
+  orangehrm_data:

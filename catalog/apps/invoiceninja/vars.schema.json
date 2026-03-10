@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Invoice Ninja tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["IN_HOST", "IN_IMAGE_TAG", "IN_APP_KEY", "IN_DB_PASSWORD", "IN_DB_ROOT_PASSWORD"],
+  "properties": {
+    "IN_HOST": {
+      "type": "string",
+      "description": "Public hostname for Invoice Ninja"
+    },
+    "IN_IMAGE_TAG": {
+      "type": "string",
+      "default": "5",
+      "description": "Invoice Ninja Docker image tag"
+    },
+    "IN_APP_KEY": {
+      "type": "string",
+      "minLength": 32,
+      "description": "Laravel APP_KEY — generieren mit: echo \"base64:$(openssl rand -base64 32)\""
+    },
+    "IN_DB_NAME": {
+      "type": "string",
+      "default": "ninja",
+      "description": "MySQL database name"
+    },
+    "IN_DB_USER": {
+      "type": "string",
+      "default": "ninja",
+      "description": "MySQL database user"
+    },
+    "IN_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "MySQL database password"
+    },
+    "IN_DB_ROOT_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "MySQL root password"
+    }
+  }
+}

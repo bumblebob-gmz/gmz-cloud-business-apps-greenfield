@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Focalboard tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["FB_HOST", "FB_IMAGE_TAG", "FB_DB_PASSWORD"],
+  "properties": {
+    "FB_HOST": {
+      "type": "string",
+      "description": "Public hostname for Focalboard"
+    },
+    "FB_IMAGE_TAG": {
+      "type": "string",
+      "default": "7.11",
+      "description": "Focalboard Docker image tag"
+    },
+    "FB_DB_NAME": {
+      "type": "string",
+      "default": "focalboard",
+      "description": "PostgreSQL database name"
+    },
+    "FB_DB_USER": {
+      "type": "string",
+      "default": "focalboard",
+      "description": "PostgreSQL database user"
+    },
+    "FB_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "PostgreSQL database password"
+    }
+  }
+}

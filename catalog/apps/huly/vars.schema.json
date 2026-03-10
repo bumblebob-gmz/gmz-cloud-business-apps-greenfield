@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Huly tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["HULY_HOST", "HULY_VERSION", "HULY_SECRET", "HULY_MINIO_ROOT_PASSWORD"],
+  "properties": {
+    "HULY_HOST": {
+      "type": "string",
+      "description": "Public hostname for Huly"
+    },
+    "HULY_VERSION": {
+      "type": "string",
+      "default": "v0.6.295",
+      "description": "Huly (hcengineering) Docker image tag"
+    },
+    "HULY_SECRET": {
+      "type": "string",
+      "minLength": 32,
+      "description": "Server secret for JWT signing and inter-service auth"
+    },
+    "HULY_DB_URL": {
+      "type": "string",
+      "default": "mongodb://huly-mongo:27017",
+      "description": "MongoDB connection URL"
+    },
+    "HULY_MINIO_ROOT_USER": {
+      "type": "string",
+      "default": "minioadmin",
+      "description": "MinIO root user"
+    },
+    "HULY_MINIO_ROOT_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "MinIO root password"
+    },
+    "HULY_ELASTIC_URL": {
+      "type": "string",
+      "default": "http://huly-elastic:9200",
+      "description": "Elasticsearch URL"
+    }
+  }
+}

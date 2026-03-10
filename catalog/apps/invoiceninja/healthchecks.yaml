@@ -1,0 +1,7 @@
+checks:
+  - id: invoiceninja-https
+    type: http
+    target: https://invoiceninja.{tenant}.irongeeks.eu/api/v1/ping
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 5

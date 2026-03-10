@@ -1,0 +1,7 @@
+checks:
+  - id: leantime-https
+    type: http
+    target: https://leantime.{tenant}.irongeeks.eu/
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 5

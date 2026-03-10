@@ -1,0 +1,17 @@
+id: leantime
+name: Leantime
+version: "3.2"
+status: approved
+category: project-management
+summary: Strategic project management system for non-project managers with goal tracking and roadmaps.
+website: https://leantime.io/
+docsUrl: https://docs.leantime.io/
+requires: []
+supportsBranding: false
+supportsSSO: false
+exposes:
+  - service: leantime
+    component: app
+    protocol: https
+    port: 80
+    hostPattern: leantime.{tenant}.irongeeks.eu

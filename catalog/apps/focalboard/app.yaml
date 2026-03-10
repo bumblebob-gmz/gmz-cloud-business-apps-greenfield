@@ -1,0 +1,17 @@
+id: focalboard
+name: Focalboard
+version: "7.11"
+status: deprecated
+category: project-management
+summary: "DEPRECATED: Focalboard has been superseded by Mattermost Boards. Use the mattermost app instead. Standalone project management tool for self-hosted teams."
+website: https://www.focalboard.com/
+docsUrl: https://www.focalboard.com/docs/
+requires: []
+supportsBranding: false
+supportsSSO: false
+exposes:
+  - service: focalboard
+    component: app
+    protocol: https
+    port: 8000
+    hostPattern: focalboard.{tenant}.irongeeks.eu

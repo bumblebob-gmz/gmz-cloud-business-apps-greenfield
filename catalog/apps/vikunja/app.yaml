@@ -1,0 +1,17 @@
+id: vikunja
+name: Vikunja
+version: "0.24"
+status: approved
+category: project-management
+summary: Open-source to-do and project management app with tasks, teams, and namespaces.
+website: https://vikunja.io/
+docsUrl: https://vikunja.io/docs/
+requires: []
+supportsBranding: false
+supportsSSO: false
+exposes:
+  - service: vikunja
+    component: app
+    protocol: https
+    port: 3456
+    hostPattern: vikunja.{tenant}.irongeeks.eu

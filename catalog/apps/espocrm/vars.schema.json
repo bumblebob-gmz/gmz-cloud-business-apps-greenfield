@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EspoCRM tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ESPO_HOST", "ESPO_IMAGE_TAG", "ESPO_DB_PASSWORD", "ESPO_DB_ROOT_PASSWORD"],
+  "properties": {
+    "ESPO_HOST": {
+      "type": "string",
+      "description": "Public hostname for EspoCRM"
+    },
+    "ESPO_IMAGE_TAG": {
+      "type": "string",
+      "default": "8",
+      "description": "EspoCRM Docker image tag"
+    },
+    "ESPO_DB_NAME": {
+      "type": "string",
+      "default": "espocrm",
+      "description": "MySQL database name"
+    },
+    "ESPO_DB_USER": {
+      "type": "string",
+      "default": "espocrm",
+      "description": "MySQL database user"
+    },
+    "ESPO_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "MySQL database password"
+    },
+    "ESPO_DB_ROOT_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "MySQL root password"
+    }
+  }
+}

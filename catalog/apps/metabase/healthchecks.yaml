@@ -1,0 +1,7 @@
+checks:
+  - id: metabase-https
+    type: http
+    target: https://metabase.{tenant}.irongeeks.eu/api/health
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 5

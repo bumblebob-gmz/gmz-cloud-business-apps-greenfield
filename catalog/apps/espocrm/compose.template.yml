@@ -1,0 +1,64 @@
+services:
+  espocrm-db:
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${ESPO_DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${ESPO_DB_NAME}
+      MYSQL_USER: ${ESPO_DB_USER}
+      MYSQL_PASSWORD: ${ESPO_DB_PASSWORD}
+    volumes:
+      - espocrm_db:/var/lib/mysql
+
+  espocrm:
+    image: espocrm/espocrm:${ESPO_IMAGE_TAG}
+    restart: unless-stopped
+    depends_on: [espocrm-db]
+    environment:
+      ESPOCRM_DATABASE_HOST: espocrm-db
+      ESPOCRM_DATABASE_NAME: ${ESPO_DB_NAME}
+      ESPOCRM_DATABASE_USER: ${ESPO_DB_USER}
+      ESPOCRM_DATABASE_PASSWORD: ${ESPO_DB_PASSWORD}
+      ESPOCRM_SITE_URL: https://${ESPO_HOST}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.espocrm.rule: Host(`${ESPO_HOST}`)
+      traefik.http.routers.espocrm.entrypoints: websecure
+      traefik.http.routers.espocrm.tls: "true"
+      traefik.http.services.espocrm.loadbalancer.server.port: "80"
+    volumes:
+      - espocrm_data:/var/www/html
+
+  espocrm-daemon:
+    image: espocrm/espocrm:${ESPO_IMAGE_TAG}
+    restart: unless-stopped
+    entrypoint: docker-daemon.sh
+    depends_on: [espocrm]
+    environment:
+      ESPOCRM_DATABASE_HOST: espocrm-db
+      ESPOCRM_DATABASE_NAME: ${ESPO_DB_NAME}
+      ESPOCRM_DATABASE_USER: ${ESPO_DB_USER}
+      ESPOCRM_DATABASE_PASSWORD: ${ESPO_DB_PASSWORD}
+      ESPOCRM_SITE_URL: https://${ESPO_HOST}
+    volumes:
+      - espocrm_data:/var/www/html
+
+  espocrm-websocket:
+    image: espocrm/espocrm:${ESPO_IMAGE_TAG}
+    restart: unless-stopped
+    entrypoint: docker-websocket.sh
+    depends_on: [espocrm]
+    environment:
+      ESPOCRM_DATABASE_HOST: espocrm-db
+      ESPOCRM_DATABASE_NAME: ${ESPO_DB_NAME}
+      ESPOCRM_DATABASE_USER: ${ESPO_DB_USER}
+      ESPOCRM_DATABASE_PASSWORD: ${ESPO_DB_PASSWORD}
+      ESPOCRM_SITE_URL: https://${ESPO_HOST}
+      ESPOCRM_CONFIG_USE_WEB_SOCKET: "true"
+      ESPOCRM_CONFIG_WEB_SOCKET_URL: wss://${ESPO_HOST}
+    volumes:
+      - espocrm_data:/var/www/html
+
+volumes:
+  espocrm_db:
+  espocrm_data:

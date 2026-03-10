@@ -1,0 +1,7 @@
+checks:
+  - id: orangehrm-https
+    type: http
+    target: https://orangehrm.{tenant}.irongeeks.eu/
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 5

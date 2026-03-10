@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Taiga tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["TAIGA_HOST", "TAIGA_VERSION", "TAIGA_SECRET_KEY", "TAIGA_DB_PASSWORD", "TAIGA_RABBITMQ_PASSWORD"],
+  "properties": {
+    "TAIGA_HOST": {
+      "type": "string",
+      "description": "Public hostname for Taiga"
+    },
+    "TAIGA_VERSION": {
+      "type": "string",
+      "default": "6.8",
+      "description": "Taiga Docker image tag"
+    },
+    "TAIGA_SECRET_KEY": {
+      "type": "string",
+      "minLength": 50,
+      "description": "Django secret key"
+    },
+    "TAIGA_DB_NAME": {
+      "type": "string",
+      "default": "taiga",
+      "description": "PostgreSQL database name"
+    },
+    "TAIGA_DB_USER": {
+      "type": "string",
+      "default": "taiga",
+      "description": "PostgreSQL database user"
+    },
+    "TAIGA_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "PostgreSQL database password"
+    },
+    "TAIGA_RABBITMQ_USER": {
+      "type": "string",
+      "default": "taiga",
+      "description": "RabbitMQ user"
+    },
+    "TAIGA_RABBITMQ_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "RabbitMQ password"
+    },
+    "TAIGA_RABBITMQ_VHOST": {
+      "type": "string",
+      "default": "taiga",
+      "description": "RabbitMQ virtual host"
+    },
+    "TRUSTED_PROXIES": {
+      "type": "string",
+      "default": "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16",
+      "description": "Trusted proxy CIDR ranges"
+    }
+  }
+}

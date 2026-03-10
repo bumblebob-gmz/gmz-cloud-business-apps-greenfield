@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Leantime tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["LT_HOST", "LT_IMAGE_TAG", "LT_SESSION_PASSWORD", "LT_DB_PASSWORD", "LT_DB_ROOT_PASSWORD"],
+  "properties": {
+    "LT_HOST": {
+      "type": "string",
+      "description": "Public hostname for Leantime"
+    },
+    "LT_IMAGE_TAG": {
+      "type": "string",
+      "default": "3.2",
+      "description": "Leantime Docker image tag"
+    },
+    "LT_APP_URL": {
+      "type": "string",
+      "description": "Application URL (computed from LT_HOST, e.g. https://leantime.example.com)"
+    },
+    "LT_SESSION_PASSWORD": {
+      "type": "string",
+      "minLength": 32,
+      "description": "Session encryption password"
+    },
+    "LT_DB_NAME": {
+      "type": "string",
+      "default": "leantime",
+      "description": "MySQL database name"
+    },
+    "LT_DB_USER": {
+      "type": "string",
+      "default": "leantime",
+      "description": "MySQL database user"
+    },
+    "LT_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "MySQL database password"
+    },
+    "LT_DB_ROOT_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "MySQL root password"
+    }
+  }
+}

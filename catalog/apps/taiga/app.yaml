@@ -1,0 +1,17 @@
+id: taiga
+name: Taiga
+version: "6.8"
+status: approved
+category: project-management
+summary: Agile project management platform for cross-functional teams with Scrum and Kanban support.
+website: https://www.taiga.io/
+docsUrl: https://community.taiga.io/
+requires: []
+supportsBranding: false
+supportsSSO: false
+exposes:
+  - service: taiga
+    component: frontend
+    protocol: https
+    port: 80
+    hostPattern: taiga.{tenant}.irongeeks.eu

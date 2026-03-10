@@ -1,0 +1,7 @@
+checks:
+  - id: twenty-crm-https
+    type: http
+    target: https://twenty.{tenant}.irongeeks.eu/api/healthz
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 5

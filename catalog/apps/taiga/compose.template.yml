@@ -1,0 +1,102 @@
+services:
+  taiga-db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${TAIGA_DB_NAME}
+      POSTGRES_USER: ${TAIGA_DB_USER}
+      POSTGRES_PASSWORD: ${TAIGA_DB_PASSWORD}
+    volumes:
+      - taiga_db:/var/lib/postgresql/data
+
+  taiga-redis:
+    image: redis:6-alpine
+    restart: unless-stopped
+    volumes:
+      - taiga_redis:/data
+
+  taiga-rabbitmq:
+    image: taigaio/taiga-async-rabbitmq:${TAIGA_VERSION}
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${TAIGA_RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${TAIGA_RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_VHOST: ${TAIGA_RABBITMQ_VHOST}
+    volumes:
+      - taiga_rabbitmq:/var/lib/rabbitmq
+
+  taiga-back:
+    image: taigaio/taiga-back:${TAIGA_VERSION}
+    restart: unless-stopped
+    depends_on: [taiga-db, taiga-redis, taiga-rabbitmq]
+    environment:
+      POSTGRES_DB: ${TAIGA_DB_NAME}
+      POSTGRES_USER: ${TAIGA_DB_USER}
+      POSTGRES_PASSWORD: ${TAIGA_DB_PASSWORD}
+      POSTGRES_HOST: taiga-db
+      TAIGA_SECRET_KEY: ${TAIGA_SECRET_KEY}
+      TAIGA_SITES_SCHEME: https
+      TAIGA_SITES_DOMAIN: ${TAIGA_HOST}
+      RABBITMQ_USER: ${TAIGA_RABBITMQ_USER}
+      RABBITMQ_PASS: ${TAIGA_RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${TAIGA_RABBITMQ_VHOST}
+      REDIS_URL: redis://taiga-redis:6379
+    volumes:
+      - taiga_static_data:/taiga-back/static
+      - taiga_media_data:/taiga-back/media
+
+  taiga-async:
+    image: taigaio/taiga-async:${TAIGA_VERSION}
+    restart: unless-stopped
+    depends_on: [taiga-db, taiga-redis, taiga-rabbitmq]
+    environment:
+      POSTGRES_DB: ${TAIGA_DB_NAME}
+      POSTGRES_USER: ${TAIGA_DB_USER}
+      POSTGRES_PASSWORD: ${TAIGA_DB_PASSWORD}
+      POSTGRES_HOST: taiga-db
+      TAIGA_SECRET_KEY: ${TAIGA_SECRET_KEY}
+      TAIGA_SITES_SCHEME: https
+      TAIGA_SITES_DOMAIN: ${TAIGA_HOST}
+      RABBITMQ_USER: ${TAIGA_RABBITMQ_USER}
+      RABBITMQ_PASS: ${TAIGA_RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${TAIGA_RABBITMQ_VHOST}
+      REDIS_URL: redis://taiga-redis:6379
+    volumes:
+      - taiga_static_data:/taiga-back/static
+      - taiga_media_data:/taiga-back/media
+
+  taiga-events:
+    image: taigaio/taiga-events:${TAIGA_VERSION}
+    restart: unless-stopped
+    depends_on: [taiga-rabbitmq]
+    environment:
+      RABBITMQ_URL: amqp://${TAIGA_RABBITMQ_USER}:${TAIGA_RABBITMQ_PASSWORD}@taiga-rabbitmq:5672/${TAIGA_RABBITMQ_VHOST}
+      SECRET_KEY: ${TAIGA_SECRET_KEY}
+
+  taiga-protected:
+    image: taigaio/taiga-protected:${TAIGA_VERSION}
+    restart: unless-stopped
+    environment:
+      MAX_AGE: "360"
+      SECRET_KEY: ${TAIGA_SECRET_KEY}
+
+  taiga-front:
+    image: taigaio/taiga-front:${TAIGA_VERSION}
+    restart: unless-stopped
+    depends_on: [taiga-back, taiga-events]
+    environment:
+      TAIGA_URL: https://${TAIGA_HOST}
+      TAIGA_WEBSOCKETS_URL: wss://${TAIGA_HOST}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.taiga.rule: Host(`${TAIGA_HOST}`)
+      traefik.http.routers.taiga.entrypoints: websecure
+      traefik.http.routers.taiga.tls: "true"
+      traefik.http.services.taiga.loadbalancer.server.port: "80"
+
+volumes:
+  taiga_db:
+  taiga_redis:
+  taiga_rabbitmq:
+  taiga_static_data:
+  taiga_media_data:

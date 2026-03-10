@@ -1,0 +1,17 @@
+id: huly
+name: Huly
+version: v0.6.295
+status: approved
+category: collaboration
+summary: All-in-one collaboration platform by hcengineering combining project management, HR, and team chat.
+website: https://huly.io/
+docsUrl: https://huly.io/docs
+requires: []
+supportsBranding: false
+supportsSSO: false
+exposes:
+  - service: huly
+    component: frontend
+    protocol: https
+    port: 8083
+    hostPattern: huly.{tenant}.irongeeks.eu

@@ -1,0 +1,17 @@
+id: twenty-crm
+name: Twenty CRM
+version: latest
+status: approved
+category: crm
+summary: Modern open-source CRM platform built for teams who want full control over their customer data.
+website: https://twenty.com/
+docsUrl: https://twenty.com/developers
+requires: []
+supportsBranding: false
+supportsSSO: false
+exposes:
+  - service: twenty-crm
+    component: server
+    protocol: https
+    port: 3000
+    hostPattern: twenty.{tenant}.irongeeks.eu

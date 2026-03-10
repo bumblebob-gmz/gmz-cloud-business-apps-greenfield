@@ -1,0 +1,17 @@
+id: mattermost
+name: Mattermost
+version: "9.11"
+status: approved
+category: communication
+summary: Open-source team messaging platform with channels, direct messages, and integrations.
+website: https://mattermost.com/
+docsUrl: https://docs.mattermost.com/
+requires: []
+supportsBranding: true
+supportsSSO: true
+exposes:
+  - service: mattermost
+    component: app
+    protocol: https
+    port: 8065
+    hostPattern: mattermost.{tenant}.irongeeks.eu

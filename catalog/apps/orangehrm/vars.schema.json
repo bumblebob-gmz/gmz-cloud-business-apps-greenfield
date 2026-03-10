@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OrangeHRM tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["OHRM_HOST", "OHRM_IMAGE_TAG", "OHRM_DB_PASSWORD", "OHRM_DB_ROOT_PASSWORD"],
+  "properties": {
+    "OHRM_HOST": {
+      "type": "string",
+      "description": "Public hostname for OrangeHRM"
+    },
+    "OHRM_IMAGE_TAG": {
+      "type": "string",
+      "default": "latest",
+      "description": "OrangeHRM Docker image tag"
+    },
+    "OHRM_DB_NAME": {
+      "type": "string",
+      "default": "orangehrm",
+      "description": "MySQL database name"
+    },
+    "OHRM_DB_USER": {
+      "type": "string",
+      "default": "orangehrm",
+      "description": "MySQL database user"
+    },
+    "OHRM_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "MySQL database password"
+    },
+    "OHRM_DB_ROOT_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "MySQL root password"
+    }
+  }
+}

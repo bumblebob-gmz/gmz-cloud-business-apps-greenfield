@@ -1,0 +1,17 @@
+id: invoiceninja
+name: Invoice Ninja
+version: "5"
+status: approved
+category: finance
+summary: Open-source invoicing, billing, and payment platform for freelancers and small businesses.
+website: https://invoiceninja.com/
+docsUrl: https://invoiceninja.github.io/
+requires: []
+supportsBranding: true
+supportsSSO: false
+exposes:
+  - service: invoiceninja
+    component: app
+    protocol: https
+    port: 80
+    hostPattern: invoiceninja.{tenant}.irongeeks.eu

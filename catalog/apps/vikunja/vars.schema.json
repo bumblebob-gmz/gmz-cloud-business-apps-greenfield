@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Vikunja tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["VIKUNJA_HOST", "VIKUNJA_IMAGE_TAG", "VIKUNJA_DB_PASSWORD", "VIKUNJA_SERVICE_JWT_SECRET"],
+  "properties": {
+    "VIKUNJA_HOST": {
+      "type": "string",
+      "description": "Public hostname for Vikunja"
+    },
+    "VIKUNJA_IMAGE_TAG": {
+      "type": "string",
+      "default": "0.24",
+      "description": "Vikunja Docker image tag"
+    },
+    "VIKUNJA_DB_NAME": {
+      "type": "string",
+      "default": "vikunja",
+      "description": "PostgreSQL database name"
+    },
+    "VIKUNJA_DB_USER": {
+      "type": "string",
+      "default": "vikunja",
+      "description": "PostgreSQL database user"
+    },
+    "VIKUNJA_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "PostgreSQL database password"
+    },
+    "VIKUNJA_SERVICE_JWT_SECRET": {
+      "type": "string",
+      "minLength": 32,
+      "description": "JWT secret for session tokens"
+    },
+    "VIKUNJA_SERVICE_TIMEZONE": {
+      "type": "string",
+      "default": "Europe/Berlin",
+      "description": "Service timezone"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Mattermost tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["MM_HOST", "MM_IMAGE_TAG", "MM_DB_PASSWORD"],
+  "properties": {
+    "MM_HOST": {
+      "type": "string",
+      "description": "Public hostname for Mattermost"
+    },
+    "MM_IMAGE_TAG": {
+      "type": "string",
+      "default": "9.11",
+      "description": "Mattermost Docker image tag"
+    },
+    "MM_DB_NAME": {
+      "type": "string",
+      "default": "mattermost",
+      "description": "PostgreSQL database name"
+    },
+    "MM_DB_USER": {
+      "type": "string",
+      "default": "mattermost",
+      "description": "PostgreSQL database user"
+    },
+    "MM_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "PostgreSQL database password"
+    },
+    "MM_SITE_NAME": {
+      "type": "string",
+      "default": "Mattermost",
+      "description": "Site name displayed in the UI"
+    },
+    "TRUSTED_PROXIES": {
+      "type": "string",
+      "default": "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16",
+      "description": "Trusted proxy CIDR ranges"
+    }
+  }
+}

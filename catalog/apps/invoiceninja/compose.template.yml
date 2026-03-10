@@ -1,0 +1,39 @@
+services:
+  invoiceninja-db:
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${IN_DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${IN_DB_NAME}
+      MYSQL_USER: ${IN_DB_USER}
+      MYSQL_PASSWORD: ${IN_DB_PASSWORD}
+    volumes:
+      - invoiceninja_db:/var/lib/mysql
+
+  invoiceninja:
+    image: invoiceninja/invoiceninja:${IN_IMAGE_TAG}
+    restart: unless-stopped
+    depends_on: [invoiceninja-db]
+    environment:
+      APP_URL: https://${IN_HOST}
+      APP_KEY: ${IN_APP_KEY}
+      DB_HOST: invoiceninja-db
+      DB_DATABASE: ${IN_DB_NAME}
+      DB_USERNAME: ${IN_DB_USER}
+      DB_PASSWORD: ${IN_DB_PASSWORD}
+      REQUIRE_HTTPS: "true"
+      PHANTOMJS_PDF_GENERATION: "false"
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.invoiceninja.rule: Host(`${IN_HOST}`)
+      traefik.http.routers.invoiceninja.entrypoints: websecure
+      traefik.http.routers.invoiceninja.tls: "true"
+      traefik.http.services.invoiceninja.loadbalancer.server.port: "80"
+    volumes:
+      - invoiceninja_public:/var/www/app/public
+      - invoiceninja_storage:/var/www/app/storage
+
+volumes:
+  invoiceninja_db:
+  invoiceninja_public:
+  invoiceninja_storage:

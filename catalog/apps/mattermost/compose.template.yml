@@ -1,0 +1,39 @@
+services:
+  mattermost-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${MM_DB_NAME}
+      POSTGRES_USER: ${MM_DB_USER}
+      POSTGRES_PASSWORD: ${MM_DB_PASSWORD}
+    volumes:
+      - mattermost_db:/var/lib/postgresql/data
+
+  mattermost:
+    image: mattermost/mattermost-team-edition:${MM_IMAGE_TAG}
+    restart: unless-stopped
+    depends_on: [mattermost-db]
+    environment:
+      MM_SQLSETTINGS_DRIVERNAME: postgres
+      MM_SQLSETTINGS_DATASOURCE: postgres://${MM_DB_USER}:${MM_DB_PASSWORD}@mattermost-db:5432/${MM_DB_NAME}?sslmode=disable
+      MM_SERVICESETTINGS_SITEURL: https://${MM_HOST}
+      MM_TEAMSETTINGS_SITENAME: ${MM_SITE_NAME}
+      MM_SERVICESETTINGS_TRUSTEDPROXYIPHEADER: X-Forwarded-For
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.mattermost.rule: Host(`${MM_HOST}`)
+      traefik.http.routers.mattermost.entrypoints: websecure
+      traefik.http.routers.mattermost.tls: "true"
+      traefik.http.services.mattermost.loadbalancer.server.port: "8065"
+    volumes:
+      - mattermost_data:/mattermost/data
+      - mattermost_logs:/mattermost/logs
+      - mattermost_plugins:/mattermost/plugins
+      - mattermost_client_plugins:/mattermost/client/plugins
+
+volumes:
+  mattermost_db:
+  mattermost_data:
+  mattermost_logs:
+  mattermost_plugins:
+  mattermost_client_plugins:

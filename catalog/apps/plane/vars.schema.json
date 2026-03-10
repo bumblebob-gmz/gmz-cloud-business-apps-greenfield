@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Plane tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["PLANE_HOST", "PLANE_VERSION", "PLANE_SECRET_KEY", "PLANE_DB_PASSWORD"],
+  "properties": {
+    "PLANE_HOST": {
+      "type": "string",
+      "description": "Public hostname for Plane"
+    },
+    "PLANE_VERSION": {
+      "type": "string",
+      "default": "stable",
+      "description": "Plane Docker image tag"
+    },
+    "PLANE_SECRET_KEY": {
+      "type": "string",
+      "minLength": 50,
+      "description": "Django secret key"
+    },
+    "PLANE_DB_NAME": {
+      "type": "string",
+      "default": "plane",
+      "description": "PostgreSQL database name"
+    },
+    "PLANE_DB_USER": {
+      "type": "string",
+      "default": "plane",
+      "description": "PostgreSQL database user"
+    },
+    "PLANE_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "PostgreSQL database password"
+    },
+    "PLANE_REDIS_URL": {
+      "type": "string",
+      "default": "redis://plane-redis:6379/",
+      "description": "Redis connection URL"
+    },
+    "PLANE_CORS_ALLOWED_ORIGINS": {
+      "type": "string",
+      "default": "https://${PLANE_HOST}",
+      "description": "Comma-separated list of allowed CORS origins"
+    }
+  }
+}
