@@ -46,7 +46,7 @@ Internet
 ### Control-Plane WebApp
 - 🏢 **Tenant-Management** — Anlegen, Verwalten, Status-Übersicht aller Kunden-VMs
 - 🚀 **Provisionierung** — Vollautomatisch Wizard → OpenTofu → Ansible → `active`
-- 📦 **App-Katalog** — 25 vorkonfigurierte Apps (Authentik, Nextcloud, Mattermost, Metabase, u.v.m.)
+- 📦 **App-Katalog** — 35 vorkonfigurierte Apps (Authentik, Nextcloud, Mattermost, Metabase, u.v.m.)
 - 🔐 **RBAC** — Rollenmodell `admin` / `technician` / `readonly` auf allen API-Routen
 - 📋 **Audit-Log** — Vollständiges Ereignisprotokoll aller Aktionen
 - 🔔 **Alerts** — Teams + E-Mail Benachrichtigungen mit Severity-Routing
@@ -70,7 +70,7 @@ Internet
 | RBAC + Auth (trusted-bearer, JWT/OIDC) | ✅ Vollständig |
 | Audit-Logging | ✅ Vollständig |
 | Tenant-Provisionierung (OpenTofu + Ansible) | ✅ Vollständig |
-| App-Katalog (25 Apps) | ✅ Vollständig |
+| App-Katalog (35 Apps) | ✅ Vollständig |
 | Traefik + IONOS DNS ACME | ✅ Vollständig |
 | Monitoring Stack | ✅ Vollständig |
 | Nightly Updates + Rollback | ✅ Vollständig |
@@ -132,7 +132,7 @@ gmz-cloud-business-apps/
 │       ├── deploy-traefik.yml
 │       └── provision-tenant.yml
 ├── catalog/
-│   └── apps/                # App-Katalog (25 Apps)
+│   └── apps/                # App-Katalog (35 Apps)
 │       ├── authentik/
 │       ├── nextcloud/
 │       ├── documenso/
@@ -158,7 +158,7 @@ gmz-cloud-business-apps/
 
 ## App-Katalog
 
-**25 Apps** in 9 Kategorien.
+**35 Apps** in 14 Kategorien.
 
 ### Collaboration & Produktivität
 
@@ -177,6 +177,7 @@ gmz-cloud-business-apps/
 | Vikunja | Aufgabenverwaltung | ✅ Approved |
 | Taiga | Agiles Projektmanagement | ✅ Approved |
 | Leantime | Projektmanagement für Teams | ✅ Approved |
+| Planka | Kanban-Board (Trello-Ersatz) | ✅ Approved |
 
 ### CRM & Finanzen
 
@@ -185,12 +186,14 @@ gmz-cloud-business-apps/
 | Twenty CRM | Open-Source CRM | ✅ Approved |
 | EspoCRM | CRM-System | ✅ Approved |
 | Invoice Ninja | Rechnungsstellung | ✅ Approved |
+| Akaunting | Buchhaltungssoftware | ✅ Approved |
 
 ### HR & Organisation
 
 | App | Kategorie | Status |
 |---|---|---|
 | OrangeHRM | HR-Management | ✅ Approved |
+| OpenCATS | Applicant Tracking System | ✅ Approved |
 
 ### Dokumente & Wissen
 
@@ -200,6 +203,8 @@ gmz-cloud-business-apps/
 | BookStack | Wiki / Dokumentation | ✅ Approved |
 | Wiki.js | Wiki-Engine | ✅ Approved |
 | Documenso | Dokumentensignatur | ✅ Approved |
+| Outline | Team-Wissensdatenbank | ✅ Approved |
+| Docmost | Confluence-ähnliches Wiki | ✅ Approved |
 
 ### Sicherheit & Tools
 
@@ -208,6 +213,7 @@ gmz-cloud-business-apps/
 | Vaultwarden | Passwort-Manager | ✅ Approved |
 | Snipe-IT | Asset-Management | ✅ Approved |
 | IT-Tools | Dev-Toolbox | ✅ Approved |
+| Stirling PDF | PDF-Werkzeugset | ✅ Approved |
 
 ### Kommunikation & Notizen
 
@@ -215,11 +221,30 @@ gmz-cloud-business-apps/
 |---|---|---|
 | Joplin Server | Notizen / Sync | ✅ Approved |
 
+### Helpdesk
+
+| App | Kategorie | Status |
+|---|---|---|
+| Peppermint | Helpdesk & Ticketsystem | ✅ Approved |
+
+### Umfragen
+
+| App | Kategorie | Status |
+|---|---|---|
+| LimeSurvey | Umfrage-Software | ✅ Approved |
+
+### Produktivität
+
+| App | Kategorie | Status |
+|---|---|---|
+| AppFlowy | Notion/Linear-Ersatz | ✅ Approved |
+
 ### Analytics & Monitoring
 
 | App | Kategorie | Status |
 |---|---|---|
 | Metabase | Business Intelligence | ✅ Approved |
+| Umami | DSGVO-konforme Web-Analyse | ✅ Approved |
 
 ### Übersetzung & KI
 

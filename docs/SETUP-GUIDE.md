@@ -50,7 +50,7 @@ GMZ Cloud Business Apps ist eine selbst gehostete Multi-Tenant-Plattform zur Ver
 
 **Kernfunktionen:**
 - Multi-Tenant-Verwaltung mit isolierten VMs pro Mandant
-- App-Katalog mit 25 vorkonfigurierten Geschäftsanwendungen (Nextcloud, Mattermost, Metabase, Twenty CRM, …)
+- App-Katalog mit 35 vorkonfigurierten Geschäftsanwendungen (Nextcloud, Mattermost, Metabase, Twenty CRM, …)
 - Automatische TLS-Zertifikate via Let's Encrypt (DNS-01, Wildcard)
 - Integriertes Monitoring (Prometheus, Grafana, Loki)
 - SSO-Integration via Authentik (OIDC)
@@ -859,7 +859,7 @@ journalctl -u gmz-webapp -f | grep -i "tenant\|provision"
 
 Verfügbare Apps befinden sich unter `catalog/apps/`. Jede App hat eine `app.yaml` mit Metadaten und eine `compose.template.yml` für das Docker-Compose-Template.
 
-**25 Apps in 9 Kategorien:**
+**35 Apps in 14 Kategorien:**
 
 #### Collaboration & Produktivität
 
@@ -878,6 +878,7 @@ Verfügbare Apps befinden sich unter `catalog/apps/`. Jede App hat eine `app.yam
 | `vikunja`    | Vikunja   | Aufgaben, Listen, Kanban, Gantt               | S      |
 | `taiga`      | Taiga     | Agiles PM: Scrum, Kanban, Epics               | M      |
 | `leantime`   | Leantime  | PM für Teams ohne PM-Erfahrung                | S      |
+| `planka`     | Planka    | Kanban-Board à la Trello                      | XS     |
 
 #### CRM & Finanzen
 
@@ -886,12 +887,14 @@ Verfügbare Apps befinden sich unter `catalog/apps/`. Jede App hat eine `app.yam
 | `twenty-crm`    | Twenty CRM      | Modernes Open-Source CRM           | M      |
 | `espocrm`       | EspoCRM         | CRM mit Workflows & Portalen       | S      |
 | `invoiceninja`  | Invoice Ninja   | Rechnungen, Angebote, Zeiterfassung| S      |
+| `akaunting`     | Akaunting       | Buchhaltung, Rechnungen, Berichte  | S      |
 
 #### HR & Organisation
 
 | App-Slug     | Name       | Beschreibung                            | Min-VM |
 |--------------|------------|-----------------------------------------|--------|
 | `orangehrm`  | OrangeHRM  | HR-Management, Urlaub, Performance      | M      |
+| `opencats`   | OpenCATS   | Applicant Tracking System (ATS)         | S      |
 
 #### Dokumente & Wissen
 
@@ -901,14 +904,17 @@ Verfügbare Apps befinden sich unter `catalog/apps/`. Jede App hat eine `app.yam
 | `bookstack`    | BookStack     | Wiki, Bücher, Kapitel, Seiten        | S      |
 | `wiki-js`      | Wiki.js       | Modernes Wiki mit vielen Editoren    | S      |
 | `documenso`    | Documenso     | Dokument-Signatur (DocuSign-Ersatz)  | S      |
+| `outline`      | Outline       | Team-Wissensdatenbank mit SSO        | M      |
+| `docmost`      | Docmost       | Confluence-ähnliches Wiki            | S      |
 
 #### Sicherheit & IT-Tools
 
-| App-Slug     | Name        | Beschreibung                          | Min-VM |
-|--------------|-------------|---------------------------------------|--------|
-| `vaultwarden`| Vaultwarden | Passwort-Manager (Bitwarden-kompatibel)| XS    |
-| `snipe-it`   | Snipe-IT    | Asset-Management, Lizenzen, Zubehör   | S      |
-| `it-tools`   | IT-Tools    | Dev-Toolbox (100+ Web-Werkzeuge)      | XS     |
+| App-Slug       | Name          | Beschreibung                          | Min-VM |
+|----------------|---------------|---------------------------------------|--------|
+| `vaultwarden`  | Vaultwarden   | Passwort-Manager (Bitwarden-kompatibel)| XS   |
+| `snipe-it`     | Snipe-IT      | Asset-Management, Lizenzen, Zubehör   | S      |
+| `it-tools`     | IT-Tools      | Dev-Toolbox (100+ Web-Werkzeuge)      | XS     |
+| `stirling-pdf` | Stirling PDF  | PDF-Werkzeugset (40+ Operationen)     | XS     |
 
 #### Notizen & Sync
 
@@ -916,11 +922,30 @@ Verfügbare Apps befinden sich unter `catalog/apps/`. Jede App hat eine `app.yam
 |----------|---------------|---------------------------------------|--------|
 | `joplin` | Joplin Server | Notizen-Sync für Joplin-Clients       | XS     |
 
+#### Helpdesk
+
+| App-Slug      | Name        | Beschreibung                              | Min-VM |
+|---------------|-------------|-------------------------------------------|--------|
+| `peppermint`  | Peppermint  | Helpdesk & Ticketsystem (Freshdesk-Ersatz)| S      |
+
+#### Umfragen
+
+| App-Slug      | Name        | Beschreibung                              | Min-VM |
+|---------------|-------------|-------------------------------------------|--------|
+| `limesurvey`  | LimeSurvey  | Umfrage-Software, 30+ Fragetypen          | S      |
+
+#### Produktivität
+
+| App-Slug    | Name      | Beschreibung                                  | Min-VM |
+|-------------|-----------|-----------------------------------------------|--------|
+| `appflowy`  | AppFlowy  | Notion/Linear-Ersatz, Docs, Kanban, KI        | M      |
+
 #### Analytics
 
 | App-Slug   | Name      | Beschreibung                              | Min-VM |
 |------------|-----------|-------------------------------------------|--------|
 | `metabase` | Metabase  | Business Intelligence, Dashboards, SQL    | M      |
+| `umami`    | Umami     | DSGVO-konforme Web-Analyse, kein Cookie   | XS     |
 
 #### Übersetzung & KI
 
