@@ -33,7 +33,7 @@ entryPoints:
 certificatesResolvers:
   letsencrypt:
     acme:
-      email: "${ACME_EMAIL}"
+      email: "{{ acme_email }}"
       storage: {{ traefik_acme_dir }}/acme.json
       dnsChallenge:
         provider: ionos

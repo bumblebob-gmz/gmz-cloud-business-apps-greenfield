@@ -51,6 +51,7 @@ services:
     depends_on:
       - authentik-postgresql
       - authentik-redis
+      - authentik-socket-proxy
     environment:
       AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
       AUTHENTIK_POSTGRESQL__HOST: authentik-postgresql
@@ -60,11 +61,27 @@ services:
       AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_DB_PASSWORD}
       AUTHENTIK_REDIS__HOST: authentik-redis
       AUTHENTIK_REDIS__PORT: "6379"
+      DOCKER_HOST: tcp://authentik-socket-proxy:2375
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - authentik_media:/media
       - authentik_certs:/certs
       - authentik_templates:/templates
+    networks:
+      - authentik_net
+      - proxy_net
+
+  authentik-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.1.2
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      NETWORKS: 0
+      VOLUMES: 0
+      POST: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - proxy_net
 
 volumes:
   authentik_postgres_data:
@@ -72,3 +89,9 @@ volumes:
   authentik_media:
   authentik_certs:
   authentik_templates:
+
+networks:
+  authentik_net:
+  proxy_net:
+    driver: bridge
+    internal: true

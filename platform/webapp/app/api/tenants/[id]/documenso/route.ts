@@ -16,14 +16,10 @@ export async function GET(
     return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
   }
 
-  // Derive the Documenso URL from the tenant's app config or naming convention
-  const apps: Record<string, unknown>[] = Array.isArray((tenant as Record<string, unknown>).apps)
-    ? ((tenant as Record<string, unknown>).apps as Record<string, unknown>[])
-    : [];
-
-  const documensoApp = apps.find((a) => a.name === 'documenso');
-  const domain = documensoApp?.domain ?? `sign.${tenant.name.toLowerCase().replace(/\s+/g, '-')}.irongeeks.eu`;
-  const status = documensoApp ? 'provisioned' : 'not_installed';
+  // Derive the Documenso URL from the tenant's app list
+  const hasDocumenso = Array.isArray(tenant.apps) && tenant.apps.includes('documenso');
+  const domain = `sign.${tenant.name.toLowerCase().replace(/\s+/g, '-')}.irongeeks.eu`;
+  const status = hasDocumenso ? 'provisioned' : 'not_installed';
 
   await appendAuditEvent(
     buildAuditEvent({
@@ -45,7 +41,7 @@ export async function GET(
       status,
       url: status === 'provisioned' ? `https://${domain}` : null,
       domain: status === 'provisioned' ? domain : null,
-      version: documensoApp?.version ?? null
+      version: null
     }
   });
 }

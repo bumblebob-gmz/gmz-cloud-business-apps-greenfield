@@ -12,6 +12,7 @@ jobs:
   test:
     name: "Run Tests"
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     outputs:
       js_passed: ${{ steps.js_tests.outputs.passed }}
       py_passed: ${{ steps.py_tests.outputs.passed }}
@@ -77,6 +78,7 @@ jobs:
   gate-evidence:
     name: "Publish Gate Evidence Bundle"
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: test
     if: always()
 

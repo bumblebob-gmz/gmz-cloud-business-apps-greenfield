@@ -3,7 +3,10 @@ services:
     image: stirlingtools/stirling-pdf:${SPDF_IMAGE_TAG}
     restart: unless-stopped
     environment:
-      DOCKER_ENABLE_SECURITY: "false"
+      DOCKER_ENABLE_SECURITY: "true"
+      SECURITY_ENABLE_LOGIN: "true"
+      SECURITY_INITIALLOGIN_USERNAME: admin
+      SECURITY_INITIALLOGIN_PASSWORD: ${SPDF_ADMIN_PASSWORD}
       ALLOW_GOOGLE_VISIBILITY: ${SPDF_ALLOW_GOOGLE_VISIBILITY}
       APP_LOCALE: ${SPDF_DEFAULT_LOCALE}
     labels:

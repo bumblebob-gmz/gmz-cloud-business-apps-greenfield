@@ -23,6 +23,20 @@
     port: '22'
     proto: tcp
 
+- name: Allow HTTP (Port 80)
+  community.general.ufw:
+    rule: allow
+    port: '80'
+    proto: tcp
+    comment: 'HTTP Traefik'
+
+- name: Allow HTTPS (Port 443)
+  community.general.ufw:
+    rule: allow
+    port: '443'
+    proto: tcp
+    comment: 'HTTPS Traefik'
+
 - name: Enable UFW
   community.general.ufw:
     state: enabled

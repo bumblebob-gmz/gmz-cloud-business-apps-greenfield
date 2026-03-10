@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.52.0
     container_name: prometheus
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -17,11 +15,11 @@ services:
     restart: always
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.1.0
     container_name: grafana
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme_please}
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
@@ -36,7 +34,7 @@ services:
       - loki
 
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:3.1.0
     container_name: loki
     command: -config.file=/etc/loki/local-config.yaml
     networks:
@@ -44,11 +42,12 @@ services:
     restart: always
 
   promtail:
-    image: grafana/promtail:latest
+    image: grafana/promtail:3.1.0
     container_name: promtail
     volumes:
       - /var/log:/var/log:ro
       - ./promtail/config.yml:/etc/promtail/config.yml:ro
+      - promtail_positions:/var/promtail
     command: -config.file=/etc/promtail/config.yml
     networks:
       - monitoring_net
@@ -59,8 +58,8 @@ services:
 networks:
   monitoring_net:
     driver: bridge
-    internal: true
 
 volumes:
   prometheus_data:
   grafana_data:
+  promtail_positions:

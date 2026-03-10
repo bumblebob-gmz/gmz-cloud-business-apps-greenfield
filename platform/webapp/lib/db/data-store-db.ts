@@ -8,8 +8,8 @@ import { getDbClient } from './client.ts';
 import type { CreateDeploymentInput, CreateJobInput, CreateTenantInput, Deployment, Job, Report, Tenant, TenantStatus, UpdateDeploymentPatch } from '../types.ts';
 
 // Prisma enum values map to TypeScript string literals
-function nowClock() {
-  return new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+function nowIso(): string {
+  return new Date().toISOString();
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ export async function dbCreateTenant(input: CreateTenantInput): Promise<{ tenant
 
   const tenantId = `tn-${randomUUID().slice(0, 8)}`;
   const jobId = `job-${randomUUID().slice(0, 8)}`;
-  const clock = nowClock();
+  const clock = nowIso();
 
   const [tenantRow, jobRow] = await db.$transaction([
     db.tenant.create({
@@ -85,7 +85,7 @@ export async function dbCreateTenant(input: CreateTenantInput): Promise<{ tenant
         status: 'Provisioning',
         size: input.size,
         vlan: input.vlan,
-        ipAddress: `10.${input.vlan}.10.100`,
+        ipAddress: input.ipAddress ?? `10.${input.vlan}.10.100`,
         authMode: authModeToDb(input.authMode) as string | undefined,
         entraTenantId: input.authConfig?.entraTenantId,
         ldapUrl: input.authConfig?.ldapUrl,
@@ -145,7 +145,7 @@ export async function dbGetJobById(id: string): Promise<Job | null> {
 
 export async function dbCreateJob(input: CreateJobInput): Promise<Job> {
   const db = getDbClient();
-  const clock = nowClock();
+  const clock = nowIso();
 
   const row = await db.job.create({
     data: {
@@ -180,7 +180,7 @@ export async function dbUpdateJob(
     data: {
       status: patch.status,
       details: Object.keys(patchDetails).length > 0 ? patchDetails : undefined,
-      updatedAt: patch.updatedAt ?? nowClock()
+      updatedAt: patch.updatedAt ?? nowIso()
     }
   });
 
@@ -217,7 +217,7 @@ export async function dbCreateDeployment(input: CreateDeploymentInput): Promise<
       version: input.version,
       env: input.env as string,
       status: (input.status ?? 'Healthy') as string,
-      updatedAt: nowClock()
+      updatedAt: nowIso()
     }
   });
   return dbDeploymentToDeployment(row as unknown as Record<string, unknown>);
@@ -231,7 +231,7 @@ export async function dbUpdateDeployment(id: string, patch: UpdateDeploymentPatc
     where: { id },
     data: {
       status: patch.status as string | undefined,
-      updatedAt: patch.updatedAt ?? nowClock()
+      updatedAt: patch.updatedAt ?? nowIso()
     }
   });
   return dbDeploymentToDeployment(row as unknown as Record<string, unknown>);

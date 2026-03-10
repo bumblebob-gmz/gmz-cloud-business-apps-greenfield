@@ -60,6 +60,8 @@ model Tenant {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
+  @@unique([vlan])
+  @@unique([ipAddress])
   @@map("tenants")
 }
 

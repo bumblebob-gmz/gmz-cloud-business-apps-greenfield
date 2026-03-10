@@ -689,6 +689,12 @@ docker exec traefik cat /etc/traefik/acme.json | python3 -m json.tool | grep -A2
 
 Prometheus, Grafana und Loki werden als Docker-Compose-Stack auf der Management-VM betrieben.
 
+> **Wichtig:** Vor dem Start des Monitoring-Stacks `.env` aus `.env.example` erstellen und `GRAFANA_ADMIN_PASSWORD` setzen:
+> ```bash
+> cp infra/monitoring/.env.example infra/monitoring/.env
+> nano infra/monitoring/.env
+> ```
+
 ```bash
 # Als gmzadmin – KEIN sudo für docker (gmzadmin ist in docker-Gruppe!):
 cd /opt/gmz/infra/monitoring

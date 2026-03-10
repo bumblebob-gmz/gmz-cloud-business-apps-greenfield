@@ -18,13 +18,15 @@
     update_cache: true
 
 - name: Add Docker GPG key
-  ansible.builtin.apt_key:
+  ansible.builtin.get_url:
     url: https://download.docker.com/linux/debian/gpg
-    state: present
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+    force: false
 
 - name: Add Docker repository
   ansible.builtin.apt_repository:
-    repo: "deb [arch=amd64] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
+    repo: "deb [arch={{ ansible_architecture | replace('x86_64', 'amd64') }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
     state: present
 
 - name: Install Docker CE
@@ -98,6 +100,15 @@
     group: root
     mode: "0640"
   notify: restart traefik
+
+- name: Deploy Traefik .env file with secrets
+  ansible.builtin.template:
+    src: traefik.env.j2
+    dest: "{{ traefik_config_dir }}/.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
 
 - name: Start Traefik via Docker Compose
   community.docker.docker_compose_v2:

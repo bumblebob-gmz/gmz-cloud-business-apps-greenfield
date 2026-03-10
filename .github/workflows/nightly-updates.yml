@@ -34,6 +34,7 @@ jobs:
   snapshot:
     name: Pre-update Snapshot
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     outputs:
       snapshot_file: ${{ steps.snap.outputs.snapshot_file }}
       tenant_host: ${{ steps.resolve.outputs.tenant_host }}
@@ -97,6 +98,7 @@ jobs:
   update:
     name: Nightly Ansible Update
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     needs: snapshot
     # Skip the actual update in dry-run mode; health-check still runs
     if: ${{ github.event.inputs.dry_run != 'true' }}
@@ -119,9 +121,15 @@ jobs:
       - name: Install Ansible community.docker collection
         run: ansible-galaxy collection install community.docker
 
+      - name: Populate SSH known_hosts for tenant
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ env.TENANT_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          chmod 600 ~/.ssh/known_hosts
+
       - name: Run nightly-updates playbook
-        env:
-          ANSIBLE_HOST_KEY_CHECKING: "False"
+        # ANSIBLE_HOST_KEY_CHECKING ist absichtlich nicht deaktiviert.
+        # SSH Known Hosts werden dynamisch per ssh-keyscan ermittelt.
         run: |
           TENANT_HOST="${{ needs.snapshot.outputs.tenant_host }}"
           SSH_USER="${{ needs.snapshot.outputs.ssh_user }}"
@@ -142,6 +150,7 @@ jobs:
   healthcheck:
     name: Post-update Health Check
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     needs: [snapshot, update]
     # Run even when update is skipped (dry-run path); always runs after update.
     if: ${{ always() && needs.snapshot.result == 'success' }}
@@ -184,6 +193,7 @@ jobs:
   rollback:
     name: Automated Rollback
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     needs: [snapshot, update, healthcheck]
     # Only runs when health check explicitly failed
     if: ${{ needs.healthcheck.outputs.healthy == 'false' }}
@@ -226,7 +236,9 @@ jobs:
         id: rollback
         env:
           ROLLBACK_COMPOSE_DIR: /opt/gmz/apps
-          PROVISION_ROLLBACK_HOOK_CMD: ${{ secrets.PROVISION_ROLLBACK_HOOK_CMD }}
+          PROVISION_ROLLBACK_HOST: ${{ secrets.PROVISION_ROLLBACK_HOST }}
+          PROVISION_ROLLBACK_USER: ${{ secrets.PROVISION_ROLLBACK_USER }}
+          PROVISION_ROLLBACK_SNAPSHOT: ${{ secrets.PROVISION_ROLLBACK_SNAPSHOT }}
         run: |
           HOST="${{ needs.snapshot.outputs.tenant_host }}"
           USER="${{ needs.snapshot.outputs.ssh_user }}"
@@ -235,10 +247,13 @@ jobs:
           # Primary rollback: restore from snapshot
           ops/scripts/tenant-rollback.sh "${HOST}" "${USER}" "${SNAP}"
 
-          # Optional: invoke PROVISION_ROLLBACK_HOOK_CMD if configured
-          if [[ -n "${PROVISION_ROLLBACK_HOOK_CMD}" ]]; then
-            echo "[rollback] Invoking PROVISION_ROLLBACK_HOOK_CMD ..." >&2
-            eval "${PROVISION_ROLLBACK_HOOK_CMD}"
+          # Optional: invoke tenant rollback hook script if configured
+          if [[ -n "${PROVISION_ROLLBACK_HOST}" ]]; then
+            echo "[rollback] Executing tenant rollback script ..." >&2
+            bash ops/scripts/tenant-rollback-hook.sh \
+              "${PROVISION_ROLLBACK_HOST}" \
+              "${PROVISION_ROLLBACK_USER:-debian}" \
+              "${PROVISION_ROLLBACK_SNAPSHOT:-}"
           fi
 
       - name: Post-rollback health verification
@@ -264,6 +279,7 @@ jobs:
   report:
     name: Pipeline Summary
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     needs: [snapshot, update, healthcheck, rollback]
     if: ${{ always() }}
 

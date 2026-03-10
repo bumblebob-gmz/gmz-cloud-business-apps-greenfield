@@ -1,6 +1,6 @@
 ---
 - name: Create monitoring directories
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     mode: '0755'
@@ -12,7 +12,7 @@
     - /opt/monitoring/promtail
 
 - name: Template monitoring files
-  copy:
+  ansible.builtin.copy:
     src: "{{ playbook_dir }}/../../infra/monitoring/{{ item }}"
     dest: "/opt/monitoring/{{ item }}"
   loop:
@@ -23,6 +23,6 @@
     - promtail/config.yml
 
 - name: Start monitoring stack
-  docker_compose:
+  community.docker.docker_compose_v2:
     project_src: /opt/monitoring
     state: present

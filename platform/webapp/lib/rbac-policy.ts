@@ -41,6 +41,7 @@ export const RBAC_POLICY = {
   'POST /api/alerts/preview-routing': 'admin',
   'POST /api/auth/alerts/dispatch': 'admin',
   'GET /api/monitoring/status': 'admin',
+  'GET /api/jobs/:id': 'readonly',
   'GET /api/tenants/:id/documenso': 'readonly',
 } as const satisfies Record<string, UserRole>;
 

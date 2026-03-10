@@ -7,7 +7,8 @@
     "SPDF_HOST",
     "SPDF_IMAGE_TAG",
     "SPDF_ALLOW_GOOGLE_VISIBILITY",
-    "SPDF_DEFAULT_LOCALE"
+    "SPDF_DEFAULT_LOCALE",
+    "SPDF_ADMIN_PASSWORD"
   ],
   "properties": {
     "SPDF_HOST": {
@@ -29,6 +30,11 @@
       "type": "string",
       "default": "de-DE",
       "description": "Application locale"
+    },
+    "SPDF_ADMIN_PASSWORD": {
+      "type": "string",
+      "minLength": 12,
+      "description": "Admin-Passwort für Stirling-PDF Login"
     }
   }
 }

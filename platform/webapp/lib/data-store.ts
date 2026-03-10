@@ -117,8 +117,8 @@ async function writeStore(data: DataShape) {
   await writeFile(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
 }
 
-function nowClock() {
-  return new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+function nowIso(): string {
+  return new Date().toISOString();
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ async function fileCreateDeployment(input: CreateDeploymentInput): Promise<Deplo
     version: input.version,
     env: input.env,
     status: input.status ?? 'Healthy',
-    updatedAt: nowClock()
+    updatedAt: nowIso()
   };
   data.deployments.unshift(deployment);
   await writeStore(data);
@@ -178,7 +178,7 @@ async function fileUpdateDeployment(id: string, patch: UpdateDeploymentPatch): P
   const next: Deployment = {
     ...current,
     status: patch.status ?? current.status,
-    updatedAt: patch.updatedAt ?? nowClock()
+    updatedAt: patch.updatedAt ?? nowIso()
   };
   data.deployments[index] = next;
   await writeStore(data);
@@ -199,8 +199,8 @@ async function fileCreateJob(input: CreateJobInput): Promise<Job> {
     status: input.status ?? 'Queued',
     correlationId: input.correlationId,
     details: input.details,
-    startedAt: nowClock(),
-    updatedAt: nowClock()
+    startedAt: nowIso(),
+    updatedAt: nowIso()
   };
 
   data.jobs.unshift(job);
@@ -221,7 +221,7 @@ async function fileUpdateJob(
     ...current,
     ...patch,
     details: patch.details ? { ...current.details, ...patch.details } : current.details,
-    updatedAt: patch.updatedAt ?? nowClock()
+    updatedAt: patch.updatedAt ?? nowIso()
   };
 
   data.jobs[index] = next;
@@ -267,8 +267,8 @@ async function fileCreateTenant(input: CreateTenantInput): Promise<{ tenant: Ten
     tenant: tenant.name,
     task: 'Provision Tenant Environment',
     status: 'Queued',
-    startedAt: nowClock(),
-    updatedAt: nowClock()
+    startedAt: nowIso(),
+    updatedAt: nowIso()
   };
 
   data.tenants.unshift(tenant);

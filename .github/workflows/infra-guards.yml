@@ -16,6 +16,7 @@ jobs:
   prod-tfvars-security-guard:
     name: "TLS default regression guard (prod)"
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,6 +27,7 @@ jobs:
   lab-tls-override-audit:
     name: "Lab TLS override audit"
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 /**
  * In-process sliding-window rate limiter.
  *
@@ -66,26 +68,33 @@ export function checkRateLimit(
   return { allowed: true };
 }
 
+function hashRateLimitKey(token: string): string {
+  return createHash('sha256').update(token).digest('hex').slice(0, 16);
+}
+
+const IPV4_RE = /^\d{1,3}(\.\d{1,3}){3}$/;
+const IPV6_RE = /^[0-9a-fA-F:]+$/;
+
 /**
  * Extract a stable per-client key from an HTTP request.
- * Preference order: Bearer token > X-Forwarded-For > "anonymous".
+ * Preference order: Bearer token (hashed) > X-Forwarded-For (validated) > "anonymous".
  *
- * We hash nothing here – the token itself IS the key (it's already opaque
- * within the process; we never log it).
+ * Bearer tokens are hashed to avoid storing raw secrets in the rate-limit map.
+ * X-Forwarded-For values are validated to prevent header injection attacks.
  */
 export function getClientKey(request: Request): string {
   const authHeader = request.headers.get('authorization')?.trim();
   if (authHeader) {
     const match = authHeader.match(/^Bearer\s+(.+)$/i);
     const token = match?.[1]?.trim();
-    if (token) return `bearer:${token}`;
+    if (token) return `bearer:${hashRateLimitKey(token)}`;
   }
 
   const xff = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  if (xff) return `ip:${xff}`;
+  if (xff && (IPV4_RE.test(xff) || IPV6_RE.test(xff))) return `ip:${xff}`;
 
   const realIp = request.headers.get('x-real-ip')?.trim();
-  if (realIp) return `ip:${realIp}`;
+  if (realIp && (IPV4_RE.test(realIp) || IPV6_RE.test(realIp))) return `ip:${realIp}`;
 
   return 'anonymous';
 }

@@ -1,3 +1,5 @@
+import { timingSafeEqual } from 'node:crypto';
+
 export type UserRole = 'readonly' | 'technician' | 'admin';
 export type AuthMode = 'dev-header' | 'trusted-bearer' | 'jwt' | 'vault';
 
@@ -187,6 +189,13 @@ export function getTrustedTokenHealthSummary(
   };
 }
 
+function timingSafeTokenCompare(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, 'utf8');
+  const bufB = Buffer.from(b, 'utf8');
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
 function getBearerToken(request: Request): string | null {
   const authHeader = request.headers.get('authorization')?.trim();
   if (!authHeader) return null;
@@ -200,7 +209,7 @@ function getAuthContextFromTrustedBearer(request: Request, env: NodeJS.ProcessEn
   if (!token) return null;
 
   const trustedTokens = parseTrustedTokensJson(env.WEBAPP_TRUSTED_TOKENS_JSON);
-  const match = trustedTokens.find((entry) => entry.token === token);
+  const match = trustedTokens.find((entry) => timingSafeTokenCompare(entry.token, token));
   if (!match || isTrustedTokenExpired(match)) return null;
 
   return { userId: match.userId, role: match.role };

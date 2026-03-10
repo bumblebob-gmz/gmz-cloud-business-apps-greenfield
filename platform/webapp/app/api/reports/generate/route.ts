@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
 import { requireProtectedOperation } from '@/lib/auth-context';
+
+function sanitizeFilename(input: string | undefined | null): string {
+  if (!input) return 'unknown';
+  return input.replace(/[^a-zA-Z0-9\-_]/g, '_').slice(0, 64);
+}
 import { appendAuditEvent, buildAuditEvent, getCorrelationIdFromRequest, listAuditEvents, toAuditEventsCsv } from '@/lib/audit';
 import {
   generateTenantReport,
@@ -75,7 +80,7 @@ export async function POST(request: Request) {
             (j) => j.tenant === options.tenantId || j.tenant.toLowerCase() === (options.tenantId ?? '').toLowerCase()
           );
           csvContent = provisioningHistoryToCsv(tenantJobs);
-          filename = `tenant-${options.tenantId}-${Date.now()}.csv`;
+          filename = `tenant-${sanitizeFilename(options.tenantId)}-${Date.now()}.csv`;
           break;
         }
         default: {
@@ -109,7 +114,7 @@ export async function POST(request: Request) {
         }
         case 'tenant': {
           buffer = await generateTenantReport(options.tenantId ?? '', options, tenants);
-          filename = `tenant-${options.tenantId}-${Date.now()}.pdf`;
+          filename = `tenant-${sanitizeFilename(options.tenantId)}-${Date.now()}.pdf`;
           break;
         }
         case 'summary':
@@ -138,7 +143,7 @@ export async function POST(request: Request) {
       return new NextResponse(csvContent, {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
-          'Content-Disposition': `attachment; filename="${filename}"`,
+          'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
           'Cache-Control': 'no-store'
         }
       });
@@ -147,7 +152,7 @@ export async function POST(request: Request) {
     return new NextResponse(buffer!, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
         'Cache-Control': 'no-store'
       }
     });
