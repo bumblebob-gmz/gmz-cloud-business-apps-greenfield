@@ -46,7 +46,7 @@ Internet
 ### Control-Plane WebApp
 - 🏢 **Tenant-Management** — Anlegen, Verwalten, Status-Übersicht aller Kunden-VMs
 - 🚀 **Provisionierung** — Vollautomatisch Wizard → OpenTofu → Ansible → `active`
-- 📦 **App-Katalog** — 14 vorkonfigurierte Apps (Authentik, Nextcloud, Documenso, u.v.m.)
+- 📦 **App-Katalog** — 25 vorkonfigurierte Apps (Authentik, Nextcloud, Mattermost, Metabase, u.v.m.)
 - 🔐 **RBAC** — Rollenmodell `admin` / `technician` / `readonly` auf allen API-Routen
 - 📋 **Audit-Log** — Vollständiges Ereignisprotokoll aller Aktionen
 - 🔔 **Alerts** — Teams + E-Mail Benachrichtigungen mit Severity-Routing
@@ -70,7 +70,7 @@ Internet
 | RBAC + Auth (trusted-bearer, JWT/OIDC) | ✅ Vollständig |
 | Audit-Logging | ✅ Vollständig |
 | Tenant-Provisionierung (OpenTofu + Ansible) | ✅ Vollständig |
-| App-Katalog (14 Apps) | ✅ Vollständig |
+| App-Katalog (25 Apps) | ✅ Vollständig |
 | Traefik + IONOS DNS ACME | ✅ Vollständig |
 | Monitoring Stack | ✅ Vollständig |
 | Nightly Updates + Rollback | ✅ Vollständig |
@@ -132,7 +132,7 @@ gmz-cloud-business-apps/
 │       ├── deploy-traefik.yml
 │       └── provision-tenant.yml
 ├── catalog/
-│   └── apps/                # App-Katalog (14 Apps)
+│   └── apps/                # App-Katalog (25 Apps)
 │       ├── authentik/
 │       ├── nextcloud/
 │       ├── documenso/
@@ -158,18 +158,73 @@ gmz-cloud-business-apps/
 
 ## App-Katalog
 
+**25 Apps** in 9 Kategorien.
+
+### Collaboration & Produktivität
+
 | App | Kategorie | Status |
 |---|---|---|
 | Authentik | Identity & Access | ✅ Certified Reference |
-| Nextcloud | Collaboration | ✅ Certified Reference |
+| Nextcloud | Datei-Cloud / Collaboration | ✅ Certified Reference |
+| Mattermost | Team-Kommunikation | ✅ Approved |
+| Huly | All-in-One Collaboration | ✅ Approved |
+
+### Projektmanagement
+
+| App | Kategorie | Status |
+|---|---|---|
+| Plane | Projektmanagement (Linear-Style) | ✅ Approved |
+| Vikunja | Aufgabenverwaltung | ✅ Approved |
+| Taiga | Agiles Projektmanagement | ✅ Approved |
+| Leantime | Projektmanagement für Teams | ✅ Approved |
+
+### CRM & Finanzen
+
+| App | Kategorie | Status |
+|---|---|---|
+| Twenty CRM | Open-Source CRM | ✅ Approved |
+| EspoCRM | CRM-System | ✅ Approved |
+| Invoice Ninja | Rechnungsstellung | ✅ Approved |
+
+### HR & Organisation
+
+| App | Kategorie | Status |
+|---|---|---|
+| OrangeHRM | HR-Management | ✅ Approved |
+
+### Dokumente & Wissen
+
+| App | Kategorie | Status |
+|---|---|---|
 | Paperless-ngx | Dokumentenmanagement | ✅ Approved |
 | BookStack | Wiki / Dokumentation | ✅ Approved |
-| Vaultwarden | Passwort-Manager | ✅ Approved |
-| Documenso | Dokumentensignatur | ✅ Approved |
-| Joplin Server | Notizen / Sync | ✅ Approved |
-| IT-Tools | Dev-Toolbox | ✅ Approved |
 | Wiki.js | Wiki-Engine | ✅ Approved |
+| Documenso | Dokumentensignatur | ✅ Approved |
+
+### Sicherheit & Tools
+
+| App | Kategorie | Status |
+|---|---|---|
+| Vaultwarden | Passwort-Manager | ✅ Approved |
 | Snipe-IT | Asset-Management | ✅ Approved |
+| IT-Tools | Dev-Toolbox | ✅ Approved |
+
+### Kommunikation & Notizen
+
+| App | Kategorie | Status |
+|---|---|---|
+| Joplin Server | Notizen / Sync | ✅ Approved |
+
+### Analytics & Monitoring
+
+| App | Kategorie | Status |
+|---|---|---|
+| Metabase | Business Intelligence | ✅ Approved |
+
+### Übersetzung & KI
+
+| App | Kategorie | Status |
+|---|---|---|
 | SearXNG | Metasuchmaschine | ✅ Approved |
 | LibreTranslate | Übersetzung | ✅ Approved |
 | Open WebUI | KI-Chat-Frontend | ✅ Approved |

@@ -50,7 +50,7 @@ GMZ Cloud Business Apps ist eine selbst gehostete Multi-Tenant-Plattform zur Ver
 
 **Kernfunktionen:**
 - Multi-Tenant-Verwaltung mit isolierten VMs pro Mandant
-- App-Katalog mit vorkonfigurierten Geschäftsanwendungen (Nextcloud, Vaultwarden, Gitea, …)
+- App-Katalog mit 25 vorkonfigurierten Geschäftsanwendungen (Nextcloud, Mattermost, Metabase, Twenty CRM, …)
 - Automatische TLS-Zertifikate via Let's Encrypt (DNS-01, Wildcard)
 - Integriertes Monitoring (Prometheus, Grafana, Loki)
 - SSO-Integration via Authentik (OIDC)
@@ -848,7 +848,7 @@ journalctl -u gmz-webapp -f | grep -i "tenant\|provision"
 ### 9.1 App aus dem Katalog deployen
 
 1. WebApp: **Tenants** → Tenant auswählen → **Apps** → **App deployen**
-2. App aus dem Katalog wählen (z.B. `nextcloud`, `vaultwarden`, `gitea`, `authentik`)
+2. App aus dem Katalog wählen (z.B. `nextcloud`, `vaultwarden`, `mattermost`, `metabase`, `plane`, `twenty-crm`)
 3. App-spezifische Variablen konfigurieren:
    - Domains werden automatisch vorgeschlagen: `nextcloud.tenants.example.com`
    - Admin-Passwort setzen
@@ -857,15 +857,79 @@ journalctl -u gmz-webapp -f | grep -i "tenant\|provision"
 
 ### 9.2 Katalog-Apps
 
-Verfügbare Apps befinden sich unter `catalog/apps/`. Jede App hat eine `app.yml` mit Metadaten und eine `compose.yml` mit der Docker-Konfiguration.
+Verfügbare Apps befinden sich unter `catalog/apps/`. Jede App hat eine `app.yaml` mit Metadaten und eine `compose.template.yml` für das Docker-Compose-Template.
 
-| App         | Beschreibung                    | Mindest-VM-Größe |
-|-------------|--------------------------------|-----------------|
-| nextcloud   | Datei-Cloud, Kalender, Kontakte | M               |
-| vaultwarden | Passwort-Manager (Bitwarden)    | XS              |
-| gitea       | Git-Server                      | S               |
-| authentik   | SSO / Identity Provider         | M               |
-| paperless   | Dokumenten-Management           | S               |
+**25 Apps in 9 Kategorien:**
+
+#### Collaboration & Produktivität
+
+| App-Slug      | Name            | Beschreibung                              | Min-VM |
+|---------------|-----------------|-------------------------------------------|--------|
+| `authentik`   | Authentik        | SSO / Identity Provider (OIDC)           | M      |
+| `nextcloud`   | Nextcloud        | Datei-Cloud, Kalender, Kontakte           | M      |
+| `mattermost`  | Mattermost       | Team-Chat, Channels, Bots                 | M      |
+| `huly`        | Huly             | All-in-One: Projekt, Chat, Docs           | L      |
+
+#### Projektmanagement
+
+| App-Slug     | Name      | Beschreibung                                  | Min-VM |
+|--------------|-----------|-----------------------------------------------|--------|
+| `plane`      | Plane     | Issues, Cycles, Modules (Linear-Style)        | M      |
+| `vikunja`    | Vikunja   | Aufgaben, Listen, Kanban, Gantt               | S      |
+| `taiga`      | Taiga     | Agiles PM: Scrum, Kanban, Epics               | M      |
+| `leantime`   | Leantime  | PM für Teams ohne PM-Erfahrung                | S      |
+
+#### CRM & Finanzen
+
+| App-Slug        | Name           | Beschreibung                       | Min-VM |
+|-----------------|----------------|------------------------------------|--------|
+| `twenty-crm`    | Twenty CRM      | Modernes Open-Source CRM           | M      |
+| `espocrm`       | EspoCRM         | CRM mit Workflows & Portalen       | S      |
+| `invoiceninja`  | Invoice Ninja   | Rechnungen, Angebote, Zeiterfassung| S      |
+
+#### HR & Organisation
+
+| App-Slug     | Name       | Beschreibung                            | Min-VM |
+|--------------|------------|-----------------------------------------|--------|
+| `orangehrm`  | OrangeHRM  | HR-Management, Urlaub, Performance      | M      |
+
+#### Dokumente & Wissen
+
+| App-Slug       | Name          | Beschreibung                         | Min-VM |
+|----------------|---------------|--------------------------------------|--------|
+| `paperless-ngx`| Paperless-ngx | Dokumenten-Scan, OCR, Archiv         | S      |
+| `bookstack`    | BookStack     | Wiki, Bücher, Kapitel, Seiten        | S      |
+| `wiki-js`      | Wiki.js       | Modernes Wiki mit vielen Editoren    | S      |
+| `documenso`    | Documenso     | Dokument-Signatur (DocuSign-Ersatz)  | S      |
+
+#### Sicherheit & IT-Tools
+
+| App-Slug     | Name        | Beschreibung                          | Min-VM |
+|--------------|-------------|---------------------------------------|--------|
+| `vaultwarden`| Vaultwarden | Passwort-Manager (Bitwarden-kompatibel)| XS    |
+| `snipe-it`   | Snipe-IT    | Asset-Management, Lizenzen, Zubehör   | S      |
+| `it-tools`   | IT-Tools    | Dev-Toolbox (100+ Web-Werkzeuge)      | XS     |
+
+#### Notizen & Sync
+
+| App-Slug | Name          | Beschreibung                          | Min-VM |
+|----------|---------------|---------------------------------------|--------|
+| `joplin` | Joplin Server | Notizen-Sync für Joplin-Clients       | XS     |
+
+#### Analytics
+
+| App-Slug   | Name      | Beschreibung                              | Min-VM |
+|------------|-----------|-------------------------------------------|--------|
+| `metabase` | Metabase  | Business Intelligence, Dashboards, SQL    | M      |
+
+#### Übersetzung & KI
+
+| App-Slug        | Name           | Beschreibung                          | Min-VM |
+|-----------------|----------------|---------------------------------------|--------|
+| `searxng`       | SearXNG        | Datenschutz-freundliche Metasuche     | XS     |
+| `libretranslate`| LibreTranslate | Selbst gehostete Übersetzungs-API     | S      |
+| `openwebui`     | Open WebUI     | KI-Chat-Frontend für Ollama & OpenAI  | S      |
+| `ollama`        | Ollama         | LLM-Runtime für lokale KI-Modelle    | XL     |
 
 ### 9.3 Deploy-Job verfolgen
 
@@ -1524,13 +1588,30 @@ In der Tenant-Karte oder im Apps-Tab auf das 🔗 **Link-Icon** klicken → App 
 
 ### App-spezifische Hilfe-Links
 
-| App         | Offizielle Dokumentation                         |
-|-------------|--------------------------------------------------|
-| Nextcloud   | https://docs.nextcloud.com                       |
-| Vaultwarden | https://github.com/dani-garcia/vaultwarden/wiki  |
-| Gitea       | https://docs.gitea.com                           |
-| Authentik   | https://docs.goauthentik.io                      |
-| Paperless   | https://docs.paperless-ngx.com                   |
+| App             | Offizielle Dokumentation                               |
+|-----------------|--------------------------------------------------------|
+| Nextcloud       | https://docs.nextcloud.com                             |
+| Vaultwarden     | https://github.com/dani-garcia/vaultwarden/wiki        |
+| Authentik       | https://docs.goauthentik.io                            |
+| Mattermost      | https://docs.mattermost.com                            |
+| Huly            | https://docs.huly.io                                   |
+| Plane           | https://docs.plane.so                                  |
+| Vikunja         | https://vikunja.io/docs/                               |
+| Taiga           | https://docs.taiga.io                                  |
+| Leantime        | https://docs.leantime.io                               |
+| Twenty CRM      | https://twenty.com/developers                          |
+| EspoCRM         | https://docs.espocrm.com                               |
+| Invoice Ninja   | https://invoiceninja.github.io/en/docs/                |
+| OrangeHRM       | https://opensource.orangehrm.com/                      |
+| Paperless-ngx   | https://docs.paperless-ngx.com                         |
+| BookStack       | https://www.bookstackapp.com/docs/                     |
+| Wiki.js         | https://docs.requarks.io                               |
+| Documenso       | https://docs.documenso.com                             |
+| Snipe-IT        | https://snipe-it.readme.io/docs                        |
+| Metabase        | https://www.metabase.com/docs/                         |
+| Joplin Server   | https://joplinapp.org/help/                            |
+| Ollama          | https://github.com/ollama/ollama/tree/main/docs        |
+| Open WebUI      | https://docs.openwebui.com                             |
 
 ---
 
