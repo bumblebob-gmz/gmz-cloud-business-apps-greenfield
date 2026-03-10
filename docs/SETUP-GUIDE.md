@@ -410,7 +410,8 @@ Dieser Schritt ist nur nötig, wenn `gmzadmin` nicht bereits während der Debian
 ```bash
 # Als root:
 useradd -m -s /bin/bash gmzadmin
-usermod -aG sudo gmzadmin
+# sudo: für sudo-Befehle | adm: für journalctl ohne sudo (Logs lesen)
+usermod -aG sudo,adm gmzadmin
 passwd gmzadmin
 
 # SSH-Key hinterlegen (eigenen Public Key eintragen!)
@@ -739,10 +740,9 @@ npm run build
 ### 7.2 Daten-Verzeichnis erstellen
 
 ```bash
-# Als gmzadmin:
-# sudo für /opt/gmz/data anlegen (falls außerhalb von /opt/gmz):
-sudo mkdir -p /opt/gmz/data
-sudo chown gmzadmin:gmzadmin /opt/gmz/data
+# Als gmzadmin – KEIN sudo:
+# /opt/gmz gehört gmzadmin (gesetzt in Schritt 4.10) → mkdir braucht kein sudo!
+mkdir -p /opt/gmz/data
 chmod 750 /opt/gmz/data
 ```
 
@@ -790,7 +790,7 @@ Erwartete Ausgabe:
 
 **WebApp-Logs live verfolgen:**
 ```bash
-# Als gmzadmin:
+# Als gmzadmin (kein sudo nötig wenn gmzadmin in adm-Gruppe – siehe Schritt 4.2):
 journalctl -u gmz-webapp -f
 ```
 
@@ -837,7 +837,7 @@ In der WebApp: **Tenants** → Tenant auswählen → **Jobs** Tab
 
 Oder per CLI:
 ```bash
-# Als gmzadmin:
+# Als gmzadmin (kein sudo wenn in adm-Gruppe – siehe Schritt 4.2):
 journalctl -u gmz-webapp -f | grep -i "tenant\|provision"
 ```
 
@@ -1041,7 +1041,7 @@ Manuelle Anpassung möglich in: **Tenant** → **Netzwerk** → **Bearbeiten**
 
 **Via CLI (Management-VM):**
 ```bash
-# Als gmzadmin:
+# Als gmzadmin (kein sudo wenn in adm-Gruppe – siehe Schritt 4.2):
 journalctl -u gmz-webapp -f | grep "tenant-name"
 ```
 
@@ -1077,10 +1077,12 @@ Die Änderung wird als neuer Deploy-Job ausgeführt (Rolling Restart).
 ```bash
 # Als gmzadmin auf der Management-VM (SSH zur Tenant-VM):
 ssh debian@<tenant-vm-ip>
-# Auf der Tenant-VM (als debian, kein sudo für docker nötig nach Ansible-Setup):
+# Auf der Tenant-VM als debian:
+# HINWEIS: Die Ansible-Rolle docker-runtime fügt 'debian' nicht zur docker-Gruppe hinzu.
+# Docker-Befehle auf Tenant-VMs daher mit sudo ausführen!
 cd /opt/apps/nextcloud
-docker compose restart
-docker compose ps
+sudo docker compose restart
+sudo docker compose ps
 ```
 
 ### App-Logs abrufen
@@ -1091,8 +1093,9 @@ docker compose ps
 ```bash
 # Als gmzadmin (SSH zur Tenant-VM, dann dort):
 ssh debian@<tenant-vm-ip>
+# Auf der Tenant-VM: docker benötigt sudo (debian ist nicht in docker-Gruppe):
 cd /opt/apps/<app-name>
-docker compose logs -f --tail 100
+sudo docker compose logs -f --tail 100
 ```
 
 ### App löschen / Daten sichern
@@ -1101,9 +1104,9 @@ docker compose logs -f --tail 100
 
 **Backup (auf Tenant-VM):**
 ```bash
-# Auf der Tenant-VM als debian:
+# Auf der Tenant-VM als debian (docker mit sudo!):
 cd /opt/apps/<app-name>
-docker compose stop
+sudo docker compose stop
 tar -czf /tmp/<app-name>-backup-$(date +%Y%m%d).tar.gz data/
 # Backup auf Management-VM kopieren:
 scp /tmp/<app-name>-backup-*.tar.gz gmzadmin@<mgmt-ip>:/opt/gmz/backups/
@@ -1645,7 +1648,7 @@ cat automation/ansible/inventory/tenant.ini.example
 **Symptom:** `systemctl status gmz-webapp` zeigt `failed` oder `activating`.
 
 ```bash
-# Als gmzadmin:
+# Als gmzadmin (sudo für systemctl, journalctl kein sudo wenn in adm-Gruppe):
 sudo systemctl status gmz-webapp
 journalctl -u gmz-webapp -n 50 --no-pager
 ```
@@ -1692,18 +1695,18 @@ curl -k -s \
 **Symptom:** Nextcloud-Seite lädt endlos um oder zeigt falsche URL.
 
 ```bash
-# Auf der Tenant-VM als debian:
+# Als gmzadmin → SSH zur Tenant-VM:
 ssh debian@<tenant-vm-ip>
+# Auf der Tenant-VM als debian (sudo für docker!):
 cd /opt/apps/nextcloud
-# config.php prüfen:
-docker exec -it nextcloud-app cat /var/www/html/config/config.php | grep -E "overwrite|trusted"
+sudo docker exec nextcloud-app cat /var/www/html/config/config.php | grep -E "overwrite|trusted"
 ```
 
 **Fix:**
 ```bash
-# Auf der Tenant-VM als debian:
-docker exec -it nextcloud-app php /var/www/html/occ config:system:set overwrite.cli.url --value=https://nextcloud.tenants.example.com
-docker exec -it nextcloud-app php /var/www/html/occ config:system:set trusted_domains 0 --value=nextcloud.tenants.example.com
+# Auf der Tenant-VM als debian (sudo für docker!):
+sudo docker exec nextcloud-app php /var/www/html/occ config:system:set overwrite.cli.url --value=https://nextcloud.tenants.example.com
+sudo docker exec nextcloud-app php /var/www/html/occ config:system:set trusted_domains 0 --value=nextcloud.tenants.example.com
 ```
 
 ### Grafana: Keine Metriken von Tenant
@@ -1721,7 +1724,7 @@ curl -s http://<tenant-vm-ip>:9100/metrics | head -5
 
 **Häufige Ursachen:**
 - `node_exporter` auf Tenant-VM nicht installiert → Ansible-Playbook erneut ausführen
-- Firewall auf Tenant-VM blockiert Port 9100 → `ssh debian@<ip> sudo ufw status`
+- Firewall auf Tenant-VM blockiert Port 9100 → `ssh debian@<ip>` dann `sudo ufw status`
 - Prometheus-Scraping-Config fehlt → `infra/monitoring/prometheus/prometheus.yml` prüfen
 
 ### Authentik: Login schlägt fehl
@@ -1745,12 +1748,13 @@ docker compose logs authentik-worker --tail 20
 **Symptom:** `docker ps` zeigt `Restarting (1)` in kurzen Abständen.
 
 ```bash
-# Als gmzadmin – KEIN sudo für docker:
-# Logs prüfen:
+# Auf der Management-VM als gmzadmin – KEIN sudo für docker:
 docker logs <container-name> --tail 30
-
-# Exit-Code prüfen:
 docker inspect <container-name> | python3 -m json.tool | grep -A3 '"State"'
+
+# Auf einer Tenant-VM als debian – sudo erforderlich:
+sudo docker logs <container-name> --tail 30
+sudo docker inspect <container-name> | python3 -m json.tool | grep -A3 '"State"'
 ```
 
 **Häufige Ursachen:**
