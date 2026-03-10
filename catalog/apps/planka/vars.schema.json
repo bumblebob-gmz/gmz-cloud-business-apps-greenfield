@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Planka tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "PLANKA_HOST",
+    "PLANKA_IMAGE_TAG",
+    "PLANKA_SECRET_KEY",
+    "PLANKA_DB_NAME",
+    "PLANKA_DB_USER",
+    "PLANKA_DB_PASSWORD",
+    "PLANKA_DEFAULT_ADMIN_EMAIL",
+    "PLANKA_DEFAULT_ADMIN_PASSWORD",
+    "PLANKA_DEFAULT_ADMIN_NAME",
+    "PLANKA_DEFAULT_ADMIN_USERNAME"
+  ],
+  "properties": {
+    "PLANKA_HOST": {
+      "type": "string",
+      "pattern": "^planka\\.[a-z0-9-]+\\.irongeeks\\.eu$",
+      "description": "Public hostname generated from hostPattern planka.{tenant}.irongeeks.eu"
+    },
+    "PLANKA_IMAGE_TAG": {
+      "type": "string",
+      "default": "latest",
+      "description": "Planka image tag"
+    },
+    "PLANKA_SECRET_KEY": {
+      "type": "string",
+      "minLength": 32,
+      "description": "Generieren mit: openssl rand -hex 64"
+    },
+    "PLANKA_DB_NAME": {
+      "type": "string",
+      "default": "planka",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "PLANKA_DB_USER": {
+      "type": "string",
+      "default": "planka",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "PLANKA_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "DB password from tenant secret store"
+    },
+    "PLANKA_DEFAULT_ADMIN_EMAIL": {
+      "type": "string",
+      "default": "admin@example.com"
+    },
+    "PLANKA_DEFAULT_ADMIN_PASSWORD": {
+      "type": "string",
+      "minLength": 12,
+      "description": "Default admin password from tenant secret store"
+    },
+    "PLANKA_DEFAULT_ADMIN_NAME": {
+      "type": "string",
+      "default": "Admin"
+    },
+    "PLANKA_DEFAULT_ADMIN_USERNAME": {
+      "type": "string",
+      "default": "admin",
+      "pattern": "^[a-zA-Z0-9._-]{3,32}$"
+    }
+  }
+}

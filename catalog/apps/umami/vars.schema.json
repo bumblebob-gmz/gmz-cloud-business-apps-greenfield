@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Umami tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "UMAMI_HOST",
+    "UMAMI_IMAGE_TAG",
+    "UMAMI_DB_NAME",
+    "UMAMI_DB_USER",
+    "UMAMI_DB_PASSWORD",
+    "UMAMI_HASH_SALT"
+  ],
+  "properties": {
+    "UMAMI_HOST": {
+      "type": "string",
+      "pattern": "^analytics\\.[a-z0-9-]+\\.irongeeks\\.eu$",
+      "description": "Public hostname generated from hostPattern analytics.{tenant}.irongeeks.eu"
+    },
+    "UMAMI_IMAGE_TAG": {
+      "type": "string",
+      "default": "postgresql-latest",
+      "description": "Umami image tag"
+    },
+    "UMAMI_DB_NAME": {
+      "type": "string",
+      "default": "umami",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "UMAMI_DB_USER": {
+      "type": "string",
+      "default": "umami",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "UMAMI_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "DB password from tenant secret store"
+    },
+    "UMAMI_HASH_SALT": {
+      "type": "string",
+      "minLength": 32,
+      "description": "Zufälliger Salt für Datenhashing – openssl rand -hex 16"
+    }
+  }
+}

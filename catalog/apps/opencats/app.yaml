@@ -1,0 +1,12 @@
+id: opencats
+name: OpenCATS
+status: approved
+category: hr
+summary: Open-Source Applicant Tracking System (ATS). Bewerbermanagement, Stellenausschreibungen, Kandidaten-Pipeline und Interview-Planung.
+website: https://www.opencats.org
+exposes:
+  - service: opencats
+    component: app
+    protocol: https
+    port: 80
+    hostPattern: opencats.{tenant}.irongeeks.eu

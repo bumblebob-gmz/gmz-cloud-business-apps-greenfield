@@ -1,0 +1,12 @@
+id: peppermint
+name: Peppermint
+status: approved
+category: helpdesk
+summary: Modernes schlankes Helpdesk- und Ticketsystem. Open-Source-Alternative zu Freshdesk.
+website: https://peppermint.sh
+exposes:
+  - service: peppermint
+    component: app
+    protocol: https
+    port: 3000
+    hostPattern: peppermint.{tenant}.irongeeks.eu

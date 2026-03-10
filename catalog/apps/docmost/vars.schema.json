@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Docmost tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "DM_HOST",
+    "DM_IMAGE_TAG",
+    "DM_APP_SECRET",
+    "DM_DB_NAME",
+    "DM_DB_USER",
+    "DM_DB_PASSWORD",
+    "DM_REDIS_URL"
+  ],
+  "properties": {
+    "DM_HOST": {
+      "type": "string",
+      "pattern": "^docmost\\.[a-z0-9-]+\\.irongeeks\\.eu$",
+      "description": "Public hostname generated from hostPattern docmost.{tenant}.irongeeks.eu"
+    },
+    "DM_IMAGE_TAG": {
+      "type": "string",
+      "default": "latest",
+      "description": "Docmost image tag"
+    },
+    "DM_APP_SECRET": {
+      "type": "string",
+      "minLength": 32,
+      "description": "Application secret – generieren mit: openssl rand -hex 32"
+    },
+    "DM_DB_NAME": {
+      "type": "string",
+      "default": "docmost",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "DM_DB_USER": {
+      "type": "string",
+      "default": "docmost",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "DM_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "DB password from tenant secret store"
+    },
+    "DM_REDIS_URL": {
+      "type": "string",
+      "default": "redis://docmost-redis:6379"
+    }
+  }
+}

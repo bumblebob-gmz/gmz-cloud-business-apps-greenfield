@@ -1,0 +1,12 @@
+id: outline
+name: Outline
+status: approved
+category: knowledge-base
+summary: Moderne Team-Wissensdatenbank. Notion-ähnliche Oberfläche mit Echtzeit-Kollaboration, Markdown-Editor und SSO-Unterstützung.
+website: https://www.getoutline.com
+exposes:
+  - service: outline
+    component: app
+    protocol: https
+    port: 3000
+    hostPattern: outline.{tenant}.irongeeks.eu

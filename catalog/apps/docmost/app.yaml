@@ -1,0 +1,12 @@
+id: docmost
+name: Docmost
+status: approved
+category: knowledge-base
+summary: Modernes Confluence-ähnliches Wiki mit Echtzeit-Kollaboration, Seitenhistorie und strukturierten Arbeitsbereichen.
+website: https://docmost.com
+exposes:
+  - service: docmost
+    component: app
+    protocol: https
+    port: 3000
+    hostPattern: docmost.{tenant}.irongeeks.eu

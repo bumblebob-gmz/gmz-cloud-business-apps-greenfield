@@ -1,0 +1,12 @@
+id: appflowy
+name: AppFlowy
+status: approved
+category: productivity
+summary: Open-Source Notion/Linear-Ersatz. Docs, Datenbanken, Kanban-Boards und KI-Unterstützung. Clients für Web, Desktop und Mobile.
+website: https://appflowy.io
+exposes:
+  - service: appflowy-cloud
+    component: app
+    protocol: https
+    port: 8000
+    hostPattern: appflowy.{tenant}.irongeeks.eu

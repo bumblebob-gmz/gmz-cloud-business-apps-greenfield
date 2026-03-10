@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Peppermint tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "PP_HOST",
+    "PP_IMAGE_TAG",
+    "PP_DB_NAME",
+    "PP_DB_USER",
+    "PP_DB_PASSWORD"
+  ],
+  "properties": {
+    "PP_HOST": {
+      "type": "string",
+      "pattern": "^peppermint\\.[a-z0-9-]+\\.irongeeks\\.eu$",
+      "description": "Public hostname generated from hostPattern peppermint.{tenant}.irongeeks.eu"
+    },
+    "PP_IMAGE_TAG": {
+      "type": "string",
+      "default": "latest",
+      "description": "Peppermint image tag"
+    },
+    "PP_DB_NAME": {
+      "type": "string",
+      "default": "peppermint",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "PP_DB_USER": {
+      "type": "string",
+      "default": "peppermint",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "PP_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "DB password from tenant secret store"
+    }
+  }
+}

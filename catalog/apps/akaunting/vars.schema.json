@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Akaunting tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "AK_HOST",
+    "AK_IMAGE_TAG",
+    "AK_DB_NAME",
+    "AK_DB_USER",
+    "AK_DB_PASSWORD",
+    "AK_DB_ROOT_PASSWORD",
+    "AK_COMPANY_NAME",
+    "AK_COMPANY_EMAIL",
+    "AK_ADMIN_EMAIL",
+    "AK_ADMIN_PASSWORD"
+  ],
+  "properties": {
+    "AK_HOST": {
+      "type": "string",
+      "pattern": "^akaunting\\.[a-z0-9-]+\\.irongeeks\\.eu$",
+      "description": "Public hostname generated from hostPattern akaunting.{tenant}.irongeeks.eu"
+    },
+    "AK_IMAGE_TAG": {
+      "type": "string",
+      "default": "latest",
+      "description": "Akaunting image tag"
+    },
+    "AK_DB_NAME": {
+      "type": "string",
+      "default": "akaunting",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "AK_DB_USER": {
+      "type": "string",
+      "default": "akaunting",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "AK_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "DB password from tenant secret store"
+    },
+    "AK_DB_ROOT_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "MySQL root password from tenant secret store"
+    },
+    "AK_COMPANY_NAME": {
+      "type": "string",
+      "default": "My Company"
+    },
+    "AK_COMPANY_EMAIL": {
+      "type": "string",
+      "default": "admin@example.com"
+    },
+    "AK_ADMIN_EMAIL": {
+      "type": "string",
+      "default": "admin@example.com"
+    },
+    "AK_ADMIN_PASSWORD": {
+      "type": "string",
+      "minLength": 12,
+      "description": "Admin password from tenant secret store"
+    }
+  }
+}

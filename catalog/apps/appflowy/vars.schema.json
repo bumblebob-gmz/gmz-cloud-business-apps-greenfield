@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AppFlowy tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "AF_HOST",
+    "AF_VERSION",
+    "AF_SECRET",
+    "AF_DB_NAME",
+    "AF_DB_USER",
+    "AF_DB_PASSWORD",
+    "AF_MINIO_ROOT_USER",
+    "AF_MINIO_ROOT_PASSWORD",
+    "AF_REDIS_URL"
+  ],
+  "properties": {
+    "AF_HOST": {
+      "type": "string",
+      "pattern": "^appflowy\\.[a-z0-9-]+\\.irongeeks\\.eu$",
+      "description": "Public hostname generated from hostPattern appflowy.{tenant}.irongeeks.eu"
+    },
+    "AF_VERSION": {
+      "type": "string",
+      "default": "latest",
+      "description": "AppFlowy Cloud image version"
+    },
+    "AF_SECRET": {
+      "type": "string",
+      "minLength": 32,
+      "description": "APPFLOWY_SECRET_KEY – generieren mit: openssl rand -hex 32"
+    },
+    "AF_DB_NAME": {
+      "type": "string",
+      "default": "appflowy",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "AF_DB_USER": {
+      "type": "string",
+      "default": "appflowy",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "AF_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "DB password from tenant secret store"
+    },
+    "AF_MINIO_ROOT_USER": {
+      "type": "string",
+      "default": "minioadmin"
+    },
+    "AF_MINIO_ROOT_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "MinIO root password from tenant secret store"
+    },
+    "AF_REDIS_URL": {
+      "type": "string",
+      "default": "redis://appflowy-redis:6379"
+    }
+  }
+}

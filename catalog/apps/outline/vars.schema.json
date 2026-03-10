@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Outline tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "OUTLINE_HOST",
+    "OUTLINE_IMAGE_TAG",
+    "OUTLINE_SECRET_KEY",
+    "OUTLINE_UTILS_SECRET",
+    "OUTLINE_DB_NAME",
+    "OUTLINE_DB_USER",
+    "OUTLINE_DB_PASSWORD",
+    "OUTLINE_REDIS_URL",
+    "OUTLINE_AWS_ACCESS_KEY",
+    "OUTLINE_AWS_SECRET_KEY",
+    "OUTLINE_AWS_BUCKET",
+    "OUTLINE_AWS_ENDPOINT"
+  ],
+  "properties": {
+    "OUTLINE_HOST": {
+      "type": "string",
+      "pattern": "^outline\\.[a-z0-9-]+\\.irongeeks\\.eu$",
+      "description": "Public hostname generated from hostPattern outline.{tenant}.irongeeks.eu"
+    },
+    "OUTLINE_IMAGE_TAG": {
+      "type": "string",
+      "default": "latest",
+      "description": "Outline image tag"
+    },
+    "OUTLINE_SECRET_KEY": {
+      "type": "string",
+      "minLength": 32,
+      "description": "Generieren mit: openssl rand -hex 32"
+    },
+    "OUTLINE_UTILS_SECRET": {
+      "type": "string",
+      "minLength": 32,
+      "description": "Utility secret from tenant secret store"
+    },
+    "OUTLINE_DB_NAME": {
+      "type": "string",
+      "default": "outline",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "OUTLINE_DB_USER": {
+      "type": "string",
+      "default": "outline",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "OUTLINE_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "DB password from tenant secret store"
+    },
+    "OUTLINE_REDIS_URL": {
+      "type": "string",
+      "default": "redis://outline-redis:6379"
+    },
+    "OUTLINE_AWS_ACCESS_KEY": {
+      "type": "string",
+      "default": "minioadmin",
+      "description": "MinIO oder S3 Access Key"
+    },
+    "OUTLINE_AWS_SECRET_KEY": {
+      "type": "string",
+      "minLength": 20,
+      "description": "MinIO oder S3 Secret Key"
+    },
+    "OUTLINE_AWS_BUCKET": {
+      "type": "string",
+      "default": "outline"
+    },
+    "OUTLINE_AWS_ENDPOINT": {
+      "type": "string",
+      "default": "http://outline-minio:9000"
+    }
+  }
+}

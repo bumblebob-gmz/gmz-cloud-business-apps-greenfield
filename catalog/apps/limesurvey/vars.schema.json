@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LimeSurvey tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "LS_HOST",
+    "LS_IMAGE_TAG",
+    "LS_DB_NAME",
+    "LS_DB_USER",
+    "LS_DB_PASSWORD",
+    "LS_ADMIN_USER",
+    "LS_ADMIN_PASSWORD",
+    "LS_ADMIN_EMAIL",
+    "LS_ADMIN_NAME",
+    "LS_DB_TYPE"
+  ],
+  "properties": {
+    "LS_HOST": {
+      "type": "string",
+      "pattern": "^limesurvey\\.[a-z0-9-]+\\.irongeeks\\.eu$",
+      "description": "Public hostname generated from hostPattern limesurvey.{tenant}.irongeeks.eu"
+    },
+    "LS_IMAGE_TAG": {
+      "type": "string",
+      "default": "6-apache",
+      "description": "LimeSurvey image tag"
+    },
+    "LS_DB_NAME": {
+      "type": "string",
+      "default": "limesurvey",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "LS_DB_USER": {
+      "type": "string",
+      "default": "limesurvey",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "LS_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "DB password from tenant secret store"
+    },
+    "LS_ADMIN_USER": {
+      "type": "string",
+      "default": "admin",
+      "pattern": "^[a-zA-Z0-9._-]{3,32}$"
+    },
+    "LS_ADMIN_PASSWORD": {
+      "type": "string",
+      "minLength": 12,
+      "description": "Admin password from tenant secret store"
+    },
+    "LS_ADMIN_EMAIL": {
+      "type": "string",
+      "default": "admin@example.com"
+    },
+    "LS_ADMIN_NAME": {
+      "type": "string",
+      "default": "Administrator"
+    },
+    "LS_DB_TYPE": {
+      "type": "string",
+      "default": "pgsql",
+      "enum": ["pgsql", "mysql"]
+    }
+  }
+}

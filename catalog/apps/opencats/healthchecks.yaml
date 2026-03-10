@@ -1,0 +1,7 @@
+checks:
+  - id: opencats-https
+    type: http
+    target: https://opencats.{tenant}.irongeeks.eu/
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 5

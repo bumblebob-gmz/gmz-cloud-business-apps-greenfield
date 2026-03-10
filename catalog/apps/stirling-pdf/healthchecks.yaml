@@ -1,0 +1,7 @@
+checks:
+  - id: stirling-pdf-status
+    type: http
+    target: https://pdf.{tenant}.irongeeks.eu/api/v1/info/status
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 5

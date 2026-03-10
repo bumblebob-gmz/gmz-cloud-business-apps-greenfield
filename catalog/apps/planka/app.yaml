@@ -1,0 +1,12 @@
+id: planka
+name: Planka
+status: approved
+category: project-management
+summary: Elegantes Kanban-Board à la Trello. Karten, Listen, Labels, Fälligkeiten, Kommentare und Attachments.
+website: https://planka.app
+exposes:
+  - service: planka
+    component: app
+    protocol: https
+    port: 1337
+    hostPattern: planka.{tenant}.irongeeks.eu

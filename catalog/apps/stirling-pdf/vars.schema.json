@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Stirling PDF tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "SPDF_HOST",
+    "SPDF_IMAGE_TAG",
+    "SPDF_ALLOW_GOOGLE_VISIBILITY",
+    "SPDF_DEFAULT_LOCALE"
+  ],
+  "properties": {
+    "SPDF_HOST": {
+      "type": "string",
+      "pattern": "^pdf\\.[a-z0-9-]+\\.irongeeks\\.eu$",
+      "description": "Public hostname generated from hostPattern pdf.{tenant}.irongeeks.eu"
+    },
+    "SPDF_IMAGE_TAG": {
+      "type": "string",
+      "default": "latest",
+      "description": "Stirling PDF image tag"
+    },
+    "SPDF_ALLOW_GOOGLE_VISIBILITY": {
+      "type": "string",
+      "default": "false",
+      "enum": ["true", "false"]
+    },
+    "SPDF_DEFAULT_LOCALE": {
+      "type": "string",
+      "default": "de-DE",
+      "description": "Application locale"
+    }
+  }
+}

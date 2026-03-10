@@ -1,0 +1,12 @@
+id: limesurvey
+name: LimeSurvey
+status: approved
+category: surveys
+summary: Professionelle Open-Source-Umfrage-Software. Erstellen, verteilen und auswerten von Umfragen mit über 30 Fragetypen.
+website: https://www.limesurvey.org
+exposes:
+  - service: limesurvey
+    component: app
+    protocol: https
+    port: 8080
+    hostPattern: limesurvey.{tenant}.irongeeks.eu

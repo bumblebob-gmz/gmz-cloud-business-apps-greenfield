@@ -1,0 +1,7 @@
+checks:
+  - id: peppermint-login
+    type: http
+    target: https://peppermint.{tenant}.irongeeks.eu/auth/login
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 5

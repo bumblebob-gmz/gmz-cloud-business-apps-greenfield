@@ -1,0 +1,36 @@
+services:
+  peppermint-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PP_DB_NAME}
+      POSTGRES_USER: ${PP_DB_USER}
+      POSTGRES_PASSWORD: ${PP_DB_PASSWORD}
+    volumes:
+      - peppermint_db:/var/lib/postgresql/data
+
+  peppermint:
+    image: peppermint/peppermint:${PP_IMAGE_TAG}
+    restart: unless-stopped
+    depends_on:
+      - peppermint-db
+    environment:
+      DB_USERNAME: ${PP_DB_USER}
+      DB_PASSWORD: ${PP_DB_PASSWORD}
+      DB_HOST: peppermint-db
+      DB_PORT: "5432"
+      DB_NAME: ${PP_DB_NAME}
+      SECRET: a_super_secret_key_here
+      BASE_URL: https://${PP_HOST}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.peppermint.rule: Host(`${PP_HOST}`)
+      traefik.http.routers.peppermint.entrypoints: websecure
+      traefik.http.routers.peppermint.tls: "true"
+      traefik.http.services.peppermint.loadbalancer.server.port: "3000"
+    volumes:
+      - peppermint_uploads:/app/uploads
+
+volumes:
+  peppermint_db:
+  peppermint_uploads:

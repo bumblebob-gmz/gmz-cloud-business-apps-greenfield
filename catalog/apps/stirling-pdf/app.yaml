@@ -1,0 +1,12 @@
+id: stirling-pdf
+name: Stirling PDF
+status: approved
+category: office-tools
+summary: "Umfassendes PDF-Werkzeugset im Browser: zusammenführen, aufteilen, konvertieren, komprimieren, OCR, Wasserzeichen und 40+ weitere Operationen."
+website: https://stirlingtools.com
+exposes:
+  - service: stirling-pdf
+    component: app
+    protocol: https
+    port: 8080
+    hostPattern: pdf.{tenant}.irongeeks.eu

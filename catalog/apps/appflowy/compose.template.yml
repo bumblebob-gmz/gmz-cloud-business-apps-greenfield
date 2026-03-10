@@ -1,0 +1,56 @@
+services:
+  appflowy-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${AF_DB_NAME}
+      POSTGRES_USER: ${AF_DB_USER}
+      POSTGRES_PASSWORD: ${AF_DB_PASSWORD}
+    volumes:
+      - appflowy_db:/var/lib/postgresql/data
+
+  appflowy-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - appflowy_redis:/data
+
+  appflowy-minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${AF_MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${AF_MINIO_ROOT_PASSWORD}
+    volumes:
+      - appflowy_minio:/data
+
+  appflowy-cloud:
+    image: appflowyinc/appflowy-cloud:${AF_VERSION}
+    restart: unless-stopped
+    depends_on:
+      - appflowy-db
+      - appflowy-redis
+      - appflowy-minio
+    environment:
+      APPFLOWY_DATABASE_URL: postgres://${AF_DB_USER}:${AF_DB_PASSWORD}@appflowy-db:5432/${AF_DB_NAME}
+      APPFLOWY_REDIS_URI: ${AF_REDIS_URL}
+      APPFLOWY_SECRET_KEY: ${AF_SECRET}
+      APPFLOWY_MINIO_URL: http://appflowy-minio:9000
+      APPFLOWY_MINIO_ACCESS_KEY: ${AF_MINIO_ROOT_USER}
+      APPFLOWY_MINIO_SECRET_KEY: ${AF_MINIO_ROOT_PASSWORD}
+      APPFLOWY_MINIO_BUCKET: appflowy
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.appflowy.rule: Host(`${AF_HOST}`)
+      traefik.http.routers.appflowy.entrypoints: websecure
+      traefik.http.routers.appflowy.tls: "true"
+      traefik.http.services.appflowy.loadbalancer.server.port: "8000"
+    volumes:
+      - appflowy_data:/app/data
+
+volumes:
+  appflowy_db:
+  appflowy_redis:
+  appflowy_minio:
+  appflowy_data:

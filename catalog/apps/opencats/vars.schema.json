@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OpenCATS tenant variables",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "OCATS_HOST",
+    "OCATS_IMAGE_TAG",
+    "OCATS_DB_NAME",
+    "OCATS_DB_USER",
+    "OCATS_DB_PASSWORD",
+    "OCATS_DB_ROOT_PASSWORD"
+  ],
+  "properties": {
+    "OCATS_HOST": {
+      "type": "string",
+      "pattern": "^opencats\\.[a-z0-9-]+\\.irongeeks\\.eu$",
+      "description": "Public hostname generated from hostPattern opencats.{tenant}.irongeeks.eu"
+    },
+    "OCATS_IMAGE_TAG": {
+      "type": "string",
+      "default": "latest",
+      "description": "OpenCATS image tag"
+    },
+    "OCATS_DB_NAME": {
+      "type": "string",
+      "default": "opencats",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "OCATS_DB_USER": {
+      "type": "string",
+      "default": "opencats",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "OCATS_DB_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "DB password from tenant secret store"
+    },
+    "OCATS_DB_ROOT_PASSWORD": {
+      "type": "string",
+      "minLength": 20,
+      "description": "MySQL root password from tenant secret store"
+    }
+  }
+}

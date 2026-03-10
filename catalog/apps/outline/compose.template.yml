@@ -1,0 +1,63 @@
+services:
+  outline-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${OUTLINE_DB_NAME}
+      POSTGRES_USER: ${OUTLINE_DB_USER}
+      POSTGRES_PASSWORD: ${OUTLINE_DB_PASSWORD}
+    volumes:
+      - outline_db:/var/lib/postgresql/data
+
+  outline-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - outline_redis:/data
+
+  outline-minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${OUTLINE_AWS_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${OUTLINE_AWS_SECRET_KEY}
+    volumes:
+      - outline_minio:/data
+
+  outline:
+    image: outlinewiki/outline:${OUTLINE_IMAGE_TAG}
+    restart: unless-stopped
+    depends_on:
+      - outline-db
+      - outline-redis
+      - outline-minio
+    environment:
+      DATABASE_URL: postgres://${OUTLINE_DB_USER}:${OUTLINE_DB_PASSWORD}@outline-db:5432/${OUTLINE_DB_NAME}
+      REDIS_URL: ${OUTLINE_REDIS_URL}
+      SECRET_KEY: ${OUTLINE_SECRET_KEY}
+      UTILS_SECRET: ${OUTLINE_UTILS_SECRET}
+      URL: https://${OUTLINE_HOST}
+      PORT: "3000"
+      AWS_ACCESS_KEY_ID: ${OUTLINE_AWS_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${OUTLINE_AWS_SECRET_KEY}
+      AWS_REGION: us-east-1
+      AWS_S3_UPLOAD_BUCKET_URL: ${OUTLINE_AWS_ENDPOINT}
+      AWS_S3_UPLOAD_BUCKET_NAME: ${OUTLINE_AWS_BUCKET}
+      AWS_S3_FORCE_PATH_STYLE: "true"
+      AWS_S3_ACL: private
+      FILE_STORAGE: s3
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.outline.rule: Host(`${OUTLINE_HOST}`)
+      traefik.http.routers.outline.entrypoints: websecure
+      traefik.http.routers.outline.tls: "true"
+      traefik.http.services.outline.loadbalancer.server.port: "3000"
+    volumes:
+      - outline_data:/var/lib/outline/data
+
+volumes:
+  outline_db:
+  outline_redis:
+  outline_minio:
+  outline_data:

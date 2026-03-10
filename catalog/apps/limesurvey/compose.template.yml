@@ -1,0 +1,41 @@
+services:
+  limesurvey-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${LS_DB_NAME}
+      POSTGRES_USER: ${LS_DB_USER}
+      POSTGRES_PASSWORD: ${LS_DB_PASSWORD}
+    volumes:
+      - limesurvey_db:/var/lib/postgresql/data
+
+  limesurvey:
+    image: martialblog/limesurvey:${LS_IMAGE_TAG}
+    restart: unless-stopped
+    depends_on:
+      - limesurvey-db
+    environment:
+      DB_TYPE: ${LS_DB_TYPE}
+      DB_HOST: limesurvey-db
+      DB_PORT: "5432"
+      DB_NAME: ${LS_DB_NAME}
+      DB_USERNAME: ${LS_DB_USER}
+      DB_PASSWORD: ${LS_DB_PASSWORD}
+      ADMIN_USER: ${LS_ADMIN_USER}
+      ADMIN_PASSWORD: ${LS_ADMIN_PASSWORD}
+      ADMIN_EMAIL: ${LS_ADMIN_EMAIL}
+      ADMIN_NAME: ${LS_ADMIN_NAME}
+      PUBLIC_URL: https://${LS_HOST}
+      LISTEN_PORT: "8080"
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.limesurvey.rule: Host(`${LS_HOST}`)
+      traefik.http.routers.limesurvey.entrypoints: websecure
+      traefik.http.routers.limesurvey.tls: "true"
+      traefik.http.services.limesurvey.loadbalancer.server.port: "8080"
+    volumes:
+      - limesurvey_upload:/var/www/html/upload
+
+volumes:
+  limesurvey_db:
+  limesurvey_upload:

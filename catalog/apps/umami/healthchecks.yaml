@@ -1,0 +1,7 @@
+checks:
+  - id: umami-heartbeat
+    type: http
+    target: https://analytics.{tenant}.irongeeks.eu/api/heartbeat
+    expectedStatus: 200
+    intervalSeconds: 30
+    timeoutSeconds: 5

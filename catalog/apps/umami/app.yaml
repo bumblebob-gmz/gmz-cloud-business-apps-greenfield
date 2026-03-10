@@ -1,0 +1,12 @@
+id: umami
+name: Umami
+status: approved
+category: analytics
+summary: DSGVO-konforme Web-Analyse ohne Cookies. Google Analytics-Ersatz — einfaches Dashboard, keine persönlichen Daten, kein Cookie-Banner nötig.
+website: https://umami.is
+exposes:
+  - service: umami
+    component: app
+    protocol: https
+    port: 3000
+    hostPattern: analytics.{tenant}.irongeeks.eu

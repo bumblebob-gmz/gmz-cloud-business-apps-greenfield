@@ -1,0 +1,36 @@
+services:
+  opencats-db:
+    image: mysql:8
+    restart: unless-stopped
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${OCATS_DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${OCATS_DB_NAME}
+      MYSQL_USER: ${OCATS_DB_USER}
+      MYSQL_PASSWORD: ${OCATS_DB_PASSWORD}
+    volumes:
+      - opencats_db:/var/lib/mysql
+
+  opencats:
+    image: opencats/opencats:${OCATS_IMAGE_TAG}
+    restart: unless-stopped
+    depends_on:
+      - opencats-db
+    environment:
+      CATS_DB_HOSTNAME: opencats-db
+      CATS_DB_NAME: ${OCATS_DB_NAME}
+      CATS_DB_USER: ${OCATS_DB_USER}
+      CATS_DB_PASS: ${OCATS_DB_PASSWORD}
+      CATS_DB_PORT: "3306"
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.opencats.rule: Host(`${OCATS_HOST}`)
+      traefik.http.routers.opencats.entrypoints: websecure
+      traefik.http.routers.opencats.tls: "true"
+      traefik.http.services.opencats.loadbalancer.server.port: "80"
+    volumes:
+      - opencats_attachments:/var/www/html/attachments
+
+volumes:
+  opencats_db:
+  opencats_attachments:

@@ -1,0 +1,12 @@
+id: akaunting
+name: Akaunting
+status: approved
+category: finance
+summary: Vollständige Open-Source-Buchhaltungssoftware. Unterstützt doppelte Buchführung, Rechnungen, Ausgaben, Berichte und mehrere Unternehmen.
+website: https://akaunting.com
+exposes:
+  - service: akaunting
+    component: app
+    protocol: https
+    port: 80
+    hostPattern: akaunting.{tenant}.irongeeks.eu

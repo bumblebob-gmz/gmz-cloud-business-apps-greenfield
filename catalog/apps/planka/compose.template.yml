@@ -1,0 +1,40 @@
+services:
+  planka-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PLANKA_DB_NAME}
+      POSTGRES_USER: ${PLANKA_DB_USER}
+      POSTGRES_PASSWORD: ${PLANKA_DB_PASSWORD}
+    volumes:
+      - planka_db:/var/lib/postgresql/data
+
+  planka:
+    image: ghcr.io/plankanban/planka:${PLANKA_IMAGE_TAG}
+    restart: unless-stopped
+    depends_on:
+      - planka-db
+    environment:
+      DATABASE_URL: postgresql://${PLANKA_DB_USER}:${PLANKA_DB_PASSWORD}@planka-db:5432/${PLANKA_DB_NAME}
+      BASE_URL: https://${PLANKA_HOST}
+      SECRET_KEY: ${PLANKA_SECRET_KEY}
+      DEFAULT_ADMIN_EMAIL: ${PLANKA_DEFAULT_ADMIN_EMAIL}
+      DEFAULT_ADMIN_PASSWORD: ${PLANKA_DEFAULT_ADMIN_PASSWORD}
+      DEFAULT_ADMIN_NAME: ${PLANKA_DEFAULT_ADMIN_NAME}
+      DEFAULT_ADMIN_USERNAME: ${PLANKA_DEFAULT_ADMIN_USERNAME}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.planka.rule: Host(`${PLANKA_HOST}`)
+      traefik.http.routers.planka.entrypoints: websecure
+      traefik.http.routers.planka.tls: "true"
+      traefik.http.services.planka.loadbalancer.server.port: "1337"
+    volumes:
+      - planka_user_avatars:/app/public/user-avatars
+      - planka_project_bg:/app/public/project-background-images
+      - planka_attachments:/app/private/attachments
+
+volumes:
+  planka_db:
+  planka_user_avatars:
+  planka_project_bg:
+  planka_attachments:

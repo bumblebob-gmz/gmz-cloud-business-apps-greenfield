@@ -1,0 +1,41 @@
+services:
+  docmost-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DM_DB_NAME}
+      POSTGRES_USER: ${DM_DB_USER}
+      POSTGRES_PASSWORD: ${DM_DB_PASSWORD}
+    volumes:
+      - docmost_db:/var/lib/postgresql/data
+
+  docmost-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - docmost_redis:/data
+
+  docmost:
+    image: docmost/docmost:${DM_IMAGE_TAG}
+    restart: unless-stopped
+    depends_on:
+      - docmost-db
+      - docmost-redis
+    environment:
+      APP_URL: https://${DM_HOST}
+      APP_SECRET: ${DM_APP_SECRET}
+      DATABASE_URL: postgresql://${DM_DB_USER}:${DM_DB_PASSWORD}@docmost-db:5432/${DM_DB_NAME}
+      REDIS_URL: ${DM_REDIS_URL}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.docmost.rule: Host(`${DM_HOST}`)
+      traefik.http.routers.docmost.entrypoints: websecure
+      traefik.http.routers.docmost.tls: "true"
+      traefik.http.services.docmost.loadbalancer.server.port: "3000"
+    volumes:
+      - docmost_storage:/app/data/storage
+
+volumes:
+  docmost_db:
+  docmost_redis:
+  docmost_storage:
