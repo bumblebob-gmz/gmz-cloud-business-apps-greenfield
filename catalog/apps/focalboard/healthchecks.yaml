@@ -1,7 +1,0 @@
-checks:
-  - id: focalboard-https
-    type: http
-    target: https://focalboard.{tenant}.irongeeks.eu/hello
-    expectedStatus: 200
-    intervalSeconds: 30
-    timeoutSeconds: 5
