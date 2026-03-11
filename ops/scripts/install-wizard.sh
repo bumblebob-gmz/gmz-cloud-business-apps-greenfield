@@ -109,19 +109,19 @@ Weiter mit OK — Abbrechen mit ESC." \
 }
 
 # ---------------------------------------------------------------------------
-# Schritt 3.1: Node.js 20 LTS installieren
+# Schritt 3.1: Node.js 22 LTS installieren
 # ---------------------------------------------------------------------------
 step_nodejs() {
-  whiptail --title "Schritt 3.1 — Node.js 20 LTS" \
-    --yesno "Node.js 20 LTS wird jetzt installiert.\n\nInstallationsmethode: NodeSource-Repository (offizielle Quelle)\n\nFortsetzen?" \
-    10 65 || return 1
+  whiptail --title "Schritt 3.1 — Node.js 22 LTS" \
+    --yesno "Node.js 22 LTS wird jetzt installiert.\n\nNode.js 22 ist Mindestvoraussetzung (--experimental-strip-types).\nNode.js 20 reicht nicht aus.\n\nInstallationsmethode: NodeSource-Repository (offizielle Quelle)\n\nFortsetzen?" \
+    12 68 || return 1
 
   {
     echo "10"; echo "XXX"; echo "10"; echo "Pakete aktualisieren..."; echo "XXX"
     apt-get update -qq
 
     echo "30"; echo "XXX"; echo "30"; echo "NodeSource-Repository einrichten..."; echo "XXX"
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >> "$LOGFILE" 2>&1
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >> "$LOGFILE" 2>&1
 
     echo "60"; echo "XXX"; echo "60"; echo "Node.js installieren..."; echo "XXX"
     apt-get install -y -qq nodejs
@@ -352,7 +352,10 @@ step_configure_env() {
       --msgbox "Admin-Token wurde generiert:\n\n  Name:  $token_name\n  Token: $token_value\n\n⚠️  WICHTIG: Diesen Token jetzt sicher aufbewahren!\nEr wird nur einmal angezeigt.\n\nVerwendung im HTTP-Header:\n  Authorization: Bearer $token_value" \
       16 72
 
-    api_token_json="{\"$token_name\":{\"role\":\"admin\",\"token\":\"$token_value\"}}"
+    # Array-Format: [{"tokenId":"...","userId":"...","role":"...","token":"...","expiresAt":"..."}]
+    local expires_year
+    expires_year=$(date -d "+2 years" '+%Y' 2>/dev/null || echo "2027")
+    api_token_json="[{\"tokenId\":\"tok-$(echo "$token_name" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')\",\"userId\":\"$token_name\",\"role\":\"admin\",\"token\":\"$token_value\",\"expiresAt\":\"${expires_year}-01-01T00:00:00Z\"}]"
   fi
 
   # Proxmox-Konfiguration
@@ -392,7 +395,8 @@ step_configure_env() {
 
   # Encryption Key generieren
   local encryption_key
-  encryption_key=$(openssl rand -hex 16 2>/dev/null || echo "bitte_durch_32hex_zeichen_ersetzen_!!")
+  # AES-256-GCM erfordert 32 Bytes = 64 Hex-Zeichen (rand -hex 32)
+  encryption_key=$(openssl rand -hex 32 2>/dev/null || printf '%064d' 0)
 
   # .env-Datei schreiben
   local env_file="$install_dir/platform/webapp/.env"
@@ -409,10 +413,10 @@ step_configure_env() {
 # ─── Authentifizierung ───────────────────────────────────────────────────────
 # Optionen: trusted-bearer (Produktion) | jwt (OIDC/Authentik) | none (nur Dev)
 WEBAPP_AUTH_MODE=${auth_mode}
-$([ -n "$api_token_json" ] && echo "WEBAPP_TRUSTED_TOKENS_JSON='${api_token_json}'" || echo "# WEBAPP_TRUSTED_TOKENS_JSON='{\"admin\":{\"role\":\"admin\",\"token\":\"IHR_TOKEN\"}}'")
+$([ -n "$api_token_json" ] && echo "WEBAPP_TRUSTED_TOKENS_JSON='${api_token_json}'" || echo '# WEBAPP_TRUSTED_TOKENS_JSON='"'"'[{"tokenId":"tok-admin","userId":"platform-admin","role":"admin","token":"IHR_TOKEN","expiresAt":"2027-01-01T00:00:00Z"}]'"'"'')
 
 # ─── Sicherheit ──────────────────────────────────────────────────────────────
-# 32 Byte Hex-Schlüssel zur Verschlüsselung. Neu generieren: openssl rand -hex 16
+# AES-256-GCM Schlüssel: exakt 32 Bytes = 64 Hex-Zeichen. Neu generieren: openssl rand -hex 32
 WEBAPP_NOTIFICATION_ENCRYPTION_KEY=${encryption_key}
 
 # ─── Datenbank ───────────────────────────────────────────────────────────────
@@ -441,11 +445,8 @@ WEBAPP_BASE_DOMAIN=${base_domain}
 WEBAPP_TENANT_SUBDOMAIN_TEMPLATE=*.tenants.${base_domain}
 
 # ─── JWT/OIDC (nur wenn WEBAPP_AUTH_MODE=jwt) ────────────────────────────────
-# NEXTAUTH_URL=https://mgmt.${base_domain}
-# NEXTAUTH_SECRET=$(openssl rand -base64 32 2>/dev/null || echo "bitte_ersetzen")
-# AUTHENTIK_CLIENT_ID=IHR_CLIENT_ID
-# AUTHENTIK_CLIENT_SECRET=IHR_CLIENT_SECRET
-# AUTHENTIK_ISSUER=https://auth.${base_domain}/application/o/gmz-webapp/
+# WEBAPP_OIDC_ISSUER=https://auth.${base_domain}/application/o/gmz-webapp/
+# WEBAPP_OIDC_AUDIENCE=IHR_CLIENT_ID_AUS_AUTHENTIK
 
 # ─── SMTP / Benachrichtigungen ───────────────────────────────────────────────
 # SMTP_HOST=smtp.example.com
@@ -509,6 +510,17 @@ step_start_services() {
           cd "$install_dir/platform/webapp" && npm run build >> "$LOGFILE" 2>&1
         fi
 
+        echo "55"; echo "XXX"; echo "55"; echo "Datenbank-Migration ausführen (falls DATABASE_URL gesetzt)..."; echo "XXX"
+        local env_file="$install_dir/platform/webapp/.env"
+        if grep -q "^DATABASE_URL=" "$env_file" 2>/dev/null; then
+          if id gmzadmin &>/dev/null; then
+            su -c "cd '$install_dir/platform/webapp' && npm run db:migrate" gmzadmin >> "$LOGFILE" 2>&1 || \
+              echo "[WARN] db:migrate fehlgeschlagen — bitte manuell ausführen" >> "$LOGFILE"
+          else
+            cd "$install_dir/platform/webapp" && npm run db:migrate >> "$LOGFILE" 2>&1 || true
+          fi
+        fi
+
         echo "65"; echo "XXX"; echo "65"; echo "Daten-Verzeichnis erstellen..."; echo "XXX"
         mkdir -p "$install_dir/data"
         if id gmzadmin &>/dev/null; then
@@ -530,6 +542,7 @@ Group=gmzadmin
 WorkingDirectory=${install_dir}/platform/webapp
 EnvironmentFile=${install_dir}/platform/webapp/.env
 ExecStart=/usr/bin/npm run start
+Environment=NODE_ENV=production
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -582,15 +595,15 @@ SVCEOF
     mgmt_ip=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
 
     whiptail --title "Monitoring Stack" \
-      --msgbox "Monitoring Stack gestartet!\n\nErreichbar unter:\n  Grafana:      http://$mgmt_ip:3001\n  Prometheus:   http://$mgmt_ip:9090\n  Alertmanager: http://$mgmt_ip:9093\n\nHinweis: Grafana-Passwort in infra/monitoring/.env setzen:\n  GRAFANA_ADMIN_PASSWORD=sicheres_passwort\n\nDann: docker compose restart grafana" \
-      15 68
+      --msgbox "Monitoring Stack gestartet!\n\nDie Services laufen im internen Docker-Netz (kein direkter Port-Zugriff).\nZugriff via Traefik-Routing nach dessen Deployment.\n\n  Grafana:      https://monitoring.$base_domain\n  Prometheus:   intern (http://prometheus:9090)\n  Alertmanager: intern (http://alertmanager:9093)\n\nFür temporären direkten Zugriff (Entwicklung):\n  docker exec -it prometheus sh  # oder ssh-tunnel\n\nGrafana-Passwort setzen (falls noch nicht in .env):\n  echo 'GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 24)' \\\\\n    >> $install_dir/infra/monitoring/.env\n  docker compose -f $install_dir/infra/monitoring/docker-compose.yml restart grafana\n\nAlertmanager-Config prüfen:\n  $install_dir/infra/monitoring/alertmanager/alertmanager.yml" \
+      20 76
   fi
 
   # ── Traefik-Hinweise ────────────────────────────────────────────────────
   if echo "$CHOICES" | grep -q "traefik"; then
     whiptail --title "Traefik — Deployment via Ansible" \
-      --msgbox "Traefik wird über Ansible deployed (nicht direkt in diesem Wizard).\n\nBefehl (als gmzadmin, KEIN sudo):\n\n  cd $install_dir/automation/ansible\n  ansible-playbook deploy-traefik.yml \\\\\n    -e acme_email=admin@IHRE_DOMAIN.de \\\\\n    -e ionos_api_key=PREFIX.SECRET \\\\\n    -i inventory/management.yml\n\nVorher benötigt:\n  • inventory/management.yml konfigurieren\n  • IONOS DNS API-Key beschaffen\n  • DNS-Wildcard-Eintrag setzen:\n    *.tenants.DOMAIN.de → A → IHRE_IP\n\nSiehe: docs/SETUP-GUIDE.md → Abschnitt 5" \
-      20 72
+      --msgbox "Traefik wird über Ansible deployed (nicht direkt in diesem Wizard).\n\nSchritt 1 — Inventory anlegen (einmalig):\n  cat > $install_dir/automation/ansible/inventory/management.ini << 'EOF'\n[management]\nlocalhost ansible_connection=local ansible_user=gmzadmin\nEOF\n\nSchritt 2 — Traefik deployen (als gmzadmin, KEIN sudo):\n  cd $install_dir\n  ansible-playbook automation/ansible/deploy-traefik.yml \\\\\n    -e acme_email=admin@IHRE_DOMAIN.de \\\\\n    -e ionos_api_key=PREFIX.SECRET \\\\\n    -i automation/ansible/inventory/management.ini\n\nVorher benötigt:\n  • IONOS DNS API-Key beschaffen\n  • DNS-Wildcard-Eintrag setzen:\n    *.tenants.DOMAIN.de → A → IHRE_IP\n\nSiehe: docs/SETUP-GUIDE.md → Abschnitt 5" \
+      24 76
   fi
 }
 
