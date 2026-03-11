@@ -190,10 +190,17 @@ export function getTrustedTokenHealthSummary(
 }
 
 function timingSafeTokenCompare(a: string, b: string): boolean {
+  // Pad both buffers to the same length before comparing so that
+  // differing token lengths do not create a timing side-channel.
+  // timingSafeEqual requires equal-length inputs — we always compare
+  // max(lenA, lenB) bytes, which means a length mismatch still returns
+  // false (padded bytes differ) without revealing which side is shorter.
   const bufA = Buffer.from(a, 'utf8');
   const bufB = Buffer.from(b, 'utf8');
-  if (bufA.length !== bufB.length) return false;
-  return timingSafeEqual(bufA, bufB);
+  const len = Math.max(bufA.length, bufB.length);
+  const padA = Buffer.concat([bufA, Buffer.alloc(len - bufA.length)]);
+  const padB = Buffer.concat([bufB, Buffer.alloc(len - bufB.length)]);
+  return timingSafeEqual(padA, padB);
 }
 
 function getBearerToken(request: Request): string | null {

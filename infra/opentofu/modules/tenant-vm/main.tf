@@ -1,5 +1,7 @@
 locals {
-  ip_cidr = "10.${var.vlan_id}.10.100/24"
+  # ip_host_suffix defaults to 100 — override when deploying multiple VMs per VLAN
+  # to avoid address conflicts (e.g. ip_host_suffix = 101 for a second VM).
+  ip_cidr = "10.${var.vlan_id}.10.${var.ip_host_suffix}/24"
   gw_ip   = "10.${var.vlan_id}.10.1"
 }
 

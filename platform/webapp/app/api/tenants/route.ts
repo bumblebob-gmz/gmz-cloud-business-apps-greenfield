@@ -1,3 +1,7 @@
+// Force Node.js runtime — this route uses node:crypto / node:fs (not Edge-compatible).
+// If this file is ever moved to Edge Middleware, migrate to the Web Crypto API.
+export const runtime = 'nodejs';
+
 import { NextResponse } from 'next/server';
 import { createTenant, listTenants } from '@/lib/data-store';
 import type { AuthMode, CreateTenantInput, TenantSize } from '@/lib/types';

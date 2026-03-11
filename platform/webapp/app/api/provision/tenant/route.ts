@@ -1,3 +1,7 @@
+// Force Node.js runtime — this route uses node:crypto / node:fs (not Edge-compatible).
+// If this file is ever moved to Edge Middleware, migrate to the Web Crypto API.
+export const runtime = 'nodejs';
+
 import { NextResponse } from 'next/server';
 import { createJob, getTenantById, updateJob } from '@/lib/data-store';
 import {
@@ -237,8 +241,10 @@ async function runProvisioningInBackground(
           logs: [{ at: new Date().toISOString(), level: 'error', message: `Background provisioning failed: ${err}` }]
         }
       });
-    } catch {
-      // best effort
+    } catch (updateErr) {
+      // The job-status update itself failed (e.g. DB unreachable after crash).
+      // Log a warning so ops can correlate a stuck job with the root cause.
+      console.warn('[provision-background] Could not persist Failed status for job', jobId, updateErr);
     }
   }
 }
@@ -333,12 +339,32 @@ export async function POST(request: Request) {
 
   const actor = { type: 'user' as const, id: authz.auth.userId, role: authz.auth.role };
 
-  // Fire-and-forget: schedule background execution without blocking the response
-  setImmediate(() => {
-    runProvisioningInBackground(job.id, tenant.id, correlationId, actor, dryRun).catch((err) => {
-      console.error('[provision-background] setImmediate catch for job', job.id, err);
+  // Fire-and-forget: schedule background execution without blocking the response.
+  //
+  // RUNTIME REQUIREMENT: This pattern relies on the Node.js process staying
+  // alive after the HTTP response is sent (self-hosted `next start`).
+  // It MUST NOT be used in serverless / edge environments (Vercel, Lambda, etc.)
+  // where the execution context freezes or terminates after the response.
+  // The `export const runtime = 'nodejs'` guard at the top of this file
+  // prevents Next.js from routing this to the Edge Runtime.
+  //
+  // For serverless deployments: replace with a message queue
+  // (BullMQ + Redis, AWS SQS, Inngest, etc.) and move runProvisioningInBackground
+  // to a dedicated worker process.
+  //
+  // Stuck-job recovery (crash between accepted + completion) is handled by
+  // lib/job-recovery.ts, which is called at application startup.
+  if (typeof setImmediate === 'undefined') {
+    // Defensive guard — should never happen with runtime = 'nodejs' but
+    // prevents silent failure if the runtime constraint is ever removed.
+    console.error('[provision-background] setImmediate is not available — provisioning job', job.id, 'will not run. Deploy with self-hosted Node.js runtime.');
+  } else {
+    setImmediate(() => {
+      runProvisioningInBackground(job.id, tenant.id, correlationId, actor, dryRun).catch((err) => {
+        console.error('[provision-background] setImmediate catch for job', job.id, err);
+      });
     });
-  });
+  }
 
   // Return 202 Accepted with jobId for polling
   return NextResponse.json({ jobId: job.id, correlationId }, { status: 202 });

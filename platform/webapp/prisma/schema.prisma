@@ -79,21 +79,21 @@ enum JobStatus {
 
 model Job {
   id            String    @id @default(uuid())
-  tenantName    String?
+  tenantId      String?
   task          String
   status        JobStatus @default(Queued)
-  startedAt     String    // kept as clock string for UI compatibility
-  updatedAt     String?
+  startedAt     DateTime  @default(now())
+  updatedAt     DateTime? @updatedAt
   correlationId String?
 
   // Complex nested details stored as JSON
   details       Json?
 
-  tenant        Tenant?   @relation(fields: [tenantName], references: [name], onDelete: SetNull)
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
   createdAt     DateTime  @default(now())
 
-  @@index([tenantName])
+  @@index([tenantId])
   @@index([status])
   @@index([createdAt])
   @@map("jobs")

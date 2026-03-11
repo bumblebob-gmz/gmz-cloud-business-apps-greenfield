@@ -98,11 +98,10 @@ export async function dbCreateTenant(input: CreateTenantInput): Promise<{ tenant
     db.job.create({
       data: {
         id: jobId,
-        tenantName: input.name,
+        tenantId: tenantId,
         task: 'Provision Tenant Environment',
-        status: 'Queued',
-        startedAt: clock,
-        updatedAt: clock
+        status: 'Queued'
+        // startedAt + updatedAt use Prisma @default(now()) / @updatedAt
       }
     })
   ]);
@@ -118,13 +117,21 @@ export async function dbCreateTenant(input: CreateTenantInput): Promise<{ tenant
 // ---------------------------------------------------------------------------
 
 function dbJobToJob(row: Record<string, unknown>): Job {
+  // startedAt / updatedAt are DateTime in DB — serialize to ISO string for the Job TS type.
+  const startedAt = row.startedAt instanceof Date
+    ? row.startedAt.toISOString()
+    : (row.startedAt as string | null | undefined) ?? new Date().toISOString();
+  const updatedAt = row.updatedAt instanceof Date
+    ? row.updatedAt.toISOString()
+    : (row.updatedAt as string | null | undefined) ?? undefined;
+
   return {
     id: row.id as string,
-    tenant: (row.tenantName as string) ?? '',
+    tenant: (row.tenantId as string) ?? '',
     task: row.task as string,
     status: row.status as Job['status'],
-    startedAt: row.startedAt as string,
-    updatedAt: (row.updatedAt as string) ?? undefined,
+    startedAt,
+    updatedAt,
     correlationId: (row.correlationId as string) ?? undefined,
     details: (row.details as Job['details']) ?? undefined
   };
@@ -150,11 +157,10 @@ export async function dbCreateJob(input: CreateJobInput): Promise<Job> {
   const row = await db.job.create({
     data: {
       id: `job-${randomUUID().slice(0, 8)}`,
-      tenantName: input.tenant,
+      tenantId: input.tenantId ?? null,
       task: input.task,
       status: input.status ?? 'Queued',
-      startedAt: clock,
-      updatedAt: clock,
+      // startedAt: @default(now()), updatedAt: @updatedAt — set by Prisma
       correlationId: input.correlationId,
       details: input.details ? (input.details as object) : undefined
     }
@@ -179,8 +185,8 @@ export async function dbUpdateJob(
     where: { id },
     data: {
       status: patch.status,
-      details: Object.keys(patchDetails).length > 0 ? patchDetails : undefined,
-      updatedAt: patch.updatedAt ?? nowIso()
+      details: Object.keys(patchDetails).length > 0 ? patchDetails : undefined
+      // updatedAt is managed by Prisma @updatedAt — do not set manually
     }
   });
 

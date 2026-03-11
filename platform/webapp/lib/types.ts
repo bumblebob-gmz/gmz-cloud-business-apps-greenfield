@@ -189,7 +189,8 @@ export type CreateTenantInput = {
 };
 
 export type CreateJobInput = {
-  tenant: string;
+  tenant: string;       // display name (used in file-store + UI)
+  tenantId?: string;    // UUID FK — used by DB store (schema.prisma Job.tenantId)
   task: string;
   status?: JobStatus;
   correlationId?: string;
