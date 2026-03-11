@@ -1,4 +1,10 @@
 ---
+# docker-runtime role
+#
+# Stellt sicher dass Docker + Docker Compose Plugin verfügbar sind.
+# Wenn Docker bereits installiert ist, werden nur fehlende Pakete nachinstalliert.
+# Debian 13 (Trixie): Paket heißt `docker-compose-plugin` (nicht docker-compose-v2)
+
 - name: Install docker prerequisites
   ansible.builtin.apt:
     name:
@@ -8,14 +14,58 @@
     state: present
     update_cache: true
 
-- name: Install docker packages
+- name: Check if Docker is already installed
+  ansible.builtin.command: docker --version
+  register: docker_check
+  changed_when: false
+  failed_when: false
+
+- name: Add Docker apt repository key (only if Docker not yet installed)
+  when: docker_check.rc != 0
+  block:
+    - name: Create keyrings dir
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Download Docker GPG key
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/debian/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+
+    - name: Add Docker apt repository
+      ansible.builtin.apt_repository:
+        repo: >-
+          deb [arch={{ ansible_architecture | replace('x86_64','amd64') }}
+          signed-by=/etc/apt/keyrings/docker.asc]
+          https://download.docker.com/linux/debian
+          {{ ansible_distribution_release }} stable
+        filename: docker
+        state: present
+        update_cache: true
+
+- name: Install Docker packages (official repo packages)
   ansible.builtin.apt:
     name:
-      - docker.io
-      - docker-compose-v2
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
     state: present
+  when: docker_check.rc != 0
 
-- name: Ensure docker service enabled
+- name: Ensure docker-compose-plugin is present (already-installed systems)
+  # Handles systems where Docker was installed via docker.io but compose plugin is missing
+  ansible.builtin.apt:
+    name: docker-compose-plugin
+    state: present
+  when: docker_check.rc == 0
+  ignore_errors: true
+
+- name: Ensure docker service enabled and started
   ansible.builtin.service:
     name: docker
     enabled: true
