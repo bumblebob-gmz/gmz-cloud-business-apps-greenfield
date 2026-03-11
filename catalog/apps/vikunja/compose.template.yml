@@ -8,6 +8,20 @@ services:
       POSTGRES_PASSWORD: ${VIKUNJA_DB_PASSWORD}
     volumes:
       - vikunja_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${VIKUNJA_DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   vikunja:
     image: vikunja/vikunja:${VIKUNJA_IMAGE_TAG}
@@ -22,14 +36,28 @@ services:
       VIKUNJA_SERVICE_PUBLICURL: https://${VIKUNJA_HOST}
       VIKUNJA_SERVICE_JWTSECRET: ${VIKUNJA_SERVICE_JWT_SECRET}
       VIKUNJA_SERVICE_TIMEZONE: ${VIKUNJA_SERVICE_TIMEZONE}
+    volumes:
+      - vikunja_files:/app/vikunja/files
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3456/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       traefik.enable: "true"
       traefik.http.routers.vikunja.rule: Host(`${VIKUNJA_HOST}`)
       traefik.http.routers.vikunja.entrypoints: websecure
       traefik.http.routers.vikunja.tls: "true"
       traefik.http.services.vikunja.loadbalancer.server.port: "3456"
-    volumes:
-      - vikunja_files:/app/vikunja/files
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
 volumes:
   vikunja_db:

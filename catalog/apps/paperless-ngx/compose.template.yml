@@ -4,6 +4,20 @@ services:
     restart: unless-stopped
     volumes:
       - paperless_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
 
   paperless-db:
     image: postgres:16-alpine
@@ -14,6 +28,20 @@ services:
       POSTGRES_PASSWORD: ${PAPERLESS_DB_PASSWORD}
     volumes:
       - paperless_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperless"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   paperless-webserver:
     image: ghcr.io/paperless-ngx/paperless-ngx:${PAPERLESS_VERSION}
@@ -39,12 +67,26 @@ services:
       - paperless_media:/usr/src/paperless/media
       - paperless_export:/usr/src/paperless/export
       - paperless_consume:/usr/src/paperless/consume
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       traefik.enable: "true"
       traefik.http.routers.paperless-ngx.rule: Host(`${PAPERLESS_HOST}`)
       traefik.http.routers.paperless-ngx.entrypoints: websecure
       traefik.http.routers.paperless-ngx.tls.certresolver: ionos
       traefik.http.services.paperless-ngx.loadbalancer.server.port: "8000"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
 volumes:
   paperless_redis_data:

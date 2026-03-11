@@ -9,6 +9,20 @@ services:
       MYSQL_PASSWORD: ${OHRM_DB_PASSWORD}
     volumes:
       - orangehrm_db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   orangehrm:
     image: orangehrm/orangehrm:${OHRM_IMAGE_TAG}
@@ -19,14 +33,28 @@ services:
       ORANGEHRM_DATABASE_NAME: ${OHRM_DB_NAME}
       ORANGEHRM_DATABASE_USER: ${OHRM_DB_USER}
       ORANGEHRM_DATABASE_PASSWORD: ${OHRM_DB_PASSWORD}
+    volumes:
+      - orangehrm_data:/var/www/html
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       traefik.enable: "true"
       traefik.http.routers.orangehrm.rule: Host(`${OHRM_HOST}`)
       traefik.http.routers.orangehrm.entrypoints: websecure
       traefik.http.routers.orangehrm.tls: "true"
       traefik.http.services.orangehrm.loadbalancer.server.port: "80"
-    volumes:
-      - orangehrm_data:/var/www/html
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
 volumes:
   orangehrm_db:

@@ -5,6 +5,20 @@ services:
     command: redis-server --save "" --appendonly no
     volumes:
       - searxng_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
 
   searxng:
     image: searxng/searxng:${SEARXNG_VERSION}
@@ -17,12 +31,26 @@ services:
       SEARXNG_REDIS_URL: redis://searxng-redis:6379/0
     volumes:
       - searxng_data:/etc/searxng
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     labels:
       traefik.enable: "true"
       traefik.http.routers.searxng.rule: Host(`${SEARXNG_HOST}`)
       traefik.http.routers.searxng.entrypoints: websecure
       traefik.http.routers.searxng.tls.certresolver: ionos
       traefik.http.services.searxng.loadbalancer.server.port: "8080"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
 
 volumes:
   searxng_redis_data:

@@ -8,6 +8,12 @@ services:
       OLLAMA_MAX_LOADED_MODELS: "2"
     volumes:
       - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:11434/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       traefik.enable: "true"
       traefik.http.routers.ollama.rule: Host(`${OLLAMA_HOST}`)
@@ -16,6 +22,14 @@ services:
       traefik.http.services.ollama.loadbalancer.server.port: "11434"
       traefik.http.middlewares.ollama-auth.basicauth.users: "${OLLAMA_BASIC_AUTH}"
       traefik.http.routers.ollama.middlewares: ollama-auth
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+        reservations:
+          cpus: "0.5"
+          memory: 512M
 
 volumes:
   ollama_data:

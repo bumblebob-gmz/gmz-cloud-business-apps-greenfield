@@ -9,15 +9,29 @@ services:
       SECURITY_INITIALLOGIN_PASSWORD: ${SPDF_ADMIN_PASSWORD}
       ALLOW_GOOGLE_VISIBILITY: ${SPDF_ALLOW_GOOGLE_VISIBILITY}
       APP_LOCALE: ${SPDF_DEFAULT_LOCALE}
+    volumes:
+      - stirling_configs:/configs
+      - stirling_logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     labels:
       traefik.enable: "true"
       traefik.http.routers.stirling-pdf.rule: Host(`${SPDF_HOST}`)
       traefik.http.routers.stirling-pdf.entrypoints: websecure
       traefik.http.routers.stirling-pdf.tls: "true"
       traefik.http.services.stirling-pdf.loadbalancer.server.port: "8080"
-    volumes:
-      - stirling_configs:/configs
-      - stirling_logs:/logs
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
 volumes:
   stirling_configs:

@@ -8,6 +8,20 @@ services:
       POSTGRES_PASSWORD: ${MM_DB_PASSWORD}
     volumes:
       - mattermost_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MM_DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   mattermost:
     image: mattermost/mattermost-team-edition:${MM_IMAGE_TAG}
@@ -19,17 +33,31 @@ services:
       MM_SERVICESETTINGS_SITEURL: https://${MM_HOST}
       MM_TEAMSETTINGS_SITENAME: ${MM_SITE_NAME}
       MM_SERVICESETTINGS_TRUSTEDPROXYIPHEADER: X-Forwarded-For
+    volumes:
+      - mattermost_data:/mattermost/data
+      - mattermost_logs:/mattermost/logs
+      - mattermost_plugins:/mattermost/plugins
+      - mattermost_client_plugins:/mattermost/client/plugins
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8065/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       traefik.enable: "true"
       traefik.http.routers.mattermost.rule: Host(`${MM_HOST}`)
       traefik.http.routers.mattermost.entrypoints: websecure
       traefik.http.routers.mattermost.tls: "true"
       traefik.http.services.mattermost.loadbalancer.server.port: "8065"
-    volumes:
-      - mattermost_data:/mattermost/data
-      - mattermost_logs:/mattermost/logs
-      - mattermost_plugins:/mattermost/plugins
-      - mattermost_client_plugins:/mattermost/client/plugins
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
 volumes:
   mattermost_db:

@@ -8,6 +8,20 @@ services:
       POSTGRES_PASSWORD: ${MB_DB_PASSWORD}
     volumes:
       - metabase_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MB_DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   metabase:
     image: metabase/metabase:${MB_IMAGE_TAG}
@@ -23,14 +37,28 @@ services:
       MB_ENCRYPTION_SECRET_KEY: ${MB_ENCRYPTION_SECRET_KEY}
       MB_SITE_NAME: ${MB_SITE_NAME}
       JAVA_TIMEZONE: ${MB_JAVA_TIMEZONE}
+    volumes:
+      - metabase_data:/metabase-data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       traefik.enable: "true"
       traefik.http.routers.metabase.rule: Host(`${MB_HOST}`)
       traefik.http.routers.metabase.entrypoints: websecure
       traefik.http.routers.metabase.tls: "true"
       traefik.http.services.metabase.loadbalancer.server.port: "3000"
-    volumes:
-      - metabase_data:/metabase-data
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+        reservations:
+          cpus: "0.5"
+          memory: 512M
 
 volumes:
   metabase_db:

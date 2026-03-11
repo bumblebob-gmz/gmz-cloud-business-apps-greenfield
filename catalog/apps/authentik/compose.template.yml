@@ -8,6 +8,20 @@ services:
       POSTGRES_PASSWORD: ${AUTHENTIK_DB_PASSWORD}
     volumes:
       - authentik_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUTHENTIK_DB_USER:-authentik}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   authentik-redis:
     image: redis:7-alpine
@@ -15,6 +29,20 @@ services:
     command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
     volumes:
       - authentik_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
 
   authentik-server:
     image: ghcr.io/goauthentik/server:${AUTHENTIK_IMAGE_TAG}
@@ -34,15 +62,29 @@ services:
       AUTHENTIK_REDIS__HOST: authentik-redis
       AUTHENTIK_REDIS__PORT: "6379"
       AUTHENTIK_COOKIE_DOMAIN: ${BASE_DOMAIN}
+    volumes:
+      - authentik_media:/media
+      - authentik_templates:/templates
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       traefik.enable: "true"
       traefik.http.routers.authentik.rule: Host(`${AUTHENTIK_HOST}`)
       traefik.http.routers.authentik.entrypoints: websecure
       traefik.http.routers.authentik.tls: "true"
       traefik.http.services.authentik.loadbalancer.server.port: "9000"
-    volumes:
-      - authentik_media:/media
-      - authentik_templates:/templates
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
   authentik-worker:
     image: ghcr.io/goauthentik/server:${AUTHENTIK_IMAGE_TAG}
@@ -69,6 +111,14 @@ services:
     networks:
       - authentik_net
       - proxy_net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   authentik-socket-proxy:
     image: tecnativa/docker-socket-proxy:0.1.2
@@ -82,6 +132,14 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - proxy_net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
 
 volumes:
   authentik_postgres_data:

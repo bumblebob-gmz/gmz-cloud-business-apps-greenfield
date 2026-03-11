@@ -8,12 +8,40 @@ services:
       POSTGRES_PASSWORD: ${AF_DB_PASSWORD}
     volumes:
       - appflowy_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AF_DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   appflowy-redis:
     image: redis:7-alpine
     restart: unless-stopped
     volumes:
       - appflowy_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
 
   appflowy-minio:
     image: minio/minio:latest
@@ -24,6 +52,20 @@ services:
       MINIO_ROOT_PASSWORD: ${AF_MINIO_ROOT_PASSWORD}
     volumes:
       - appflowy_minio:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/minio/health/live || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   appflowy-cloud:
     image: appflowyinc/appflowy-cloud:${AF_VERSION}
@@ -40,14 +82,28 @@ services:
       APPFLOWY_MINIO_ACCESS_KEY: ${AF_MINIO_ROOT_USER}
       APPFLOWY_MINIO_SECRET_KEY: ${AF_MINIO_ROOT_PASSWORD}
       APPFLOWY_MINIO_BUCKET: appflowy
+    volumes:
+      - appflowy_data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       traefik.enable: "true"
       traefik.http.routers.appflowy.rule: Host(`${AF_HOST}`)
       traefik.http.routers.appflowy.entrypoints: websecure
       traefik.http.routers.appflowy.tls: "true"
       traefik.http.services.appflowy.loadbalancer.server.port: "8000"
-    volumes:
-      - appflowy_data:/app/data
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
 volumes:
   appflowy_db:

@@ -8,12 +8,40 @@ services:
       POSTGRES_PASSWORD: ${DM_DB_PASSWORD}
     volumes:
       - docmost_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DM_DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   docmost-redis:
     image: redis:7-alpine
     restart: unless-stopped
     volumes:
       - docmost_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
 
   docmost:
     image: docmost/docmost:${DM_IMAGE_TAG}
@@ -26,14 +54,28 @@ services:
       APP_SECRET: ${DM_APP_SECRET}
       DATABASE_URL: postgresql://${DM_DB_USER}:${DM_DB_PASSWORD}@docmost-db:5432/${DM_DB_NAME}
       REDIS_URL: ${DM_REDIS_URL}
+    volumes:
+      - docmost_storage:/app/data/storage
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       traefik.enable: "true"
       traefik.http.routers.docmost.rule: Host(`${DM_HOST}`)
       traefik.http.routers.docmost.entrypoints: websecure
       traefik.http.routers.docmost.tls: "true"
       traefik.http.services.docmost.loadbalancer.server.port: "3000"
-    volumes:
-      - docmost_storage:/app/data/storage
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
 volumes:
   docmost_db:

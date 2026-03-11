@@ -8,6 +8,20 @@ services:
       POSTGRES_PASSWORD: ${PLANKA_DB_PASSWORD}
     volumes:
       - planka_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PLANKA_DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   planka:
     image: ghcr.io/plankanban/planka:${PLANKA_IMAGE_TAG}
@@ -22,16 +36,30 @@ services:
       DEFAULT_ADMIN_PASSWORD: ${PLANKA_DEFAULT_ADMIN_PASSWORD}
       DEFAULT_ADMIN_NAME: ${PLANKA_DEFAULT_ADMIN_NAME}
       DEFAULT_ADMIN_USERNAME: ${PLANKA_DEFAULT_ADMIN_USERNAME}
+    volumes:
+      - planka_user_avatars:/app/public/user-avatars
+      - planka_project_bg:/app/public/project-background-images
+      - planka_attachments:/app/private/attachments
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:1337/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       traefik.enable: "true"
       traefik.http.routers.planka.rule: Host(`${PLANKA_HOST}`)
       traefik.http.routers.planka.entrypoints: websecure
       traefik.http.routers.planka.tls: "true"
       traefik.http.services.planka.loadbalancer.server.port: "1337"
-    volumes:
-      - planka_user_avatars:/app/public/user-avatars
-      - planka_project_bg:/app/public/project-background-images
-      - planka_attachments:/app/private/attachments
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
 volumes:
   planka_db:

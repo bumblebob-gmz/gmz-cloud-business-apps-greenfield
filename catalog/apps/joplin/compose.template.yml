@@ -13,6 +13,14 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   joplin:
     image: joplin/server:${JOPLIN_VERSION}
@@ -35,12 +43,26 @@ services:
       MAILER_NOREPLY_EMAIL: ${SMTP_FROM}
     volumes:
       - joplin_data:/home/joplin/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:22300/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       traefik.enable: "true"
       traefik.http.routers.joplin.rule: Host(`${JOPLIN_HOST}`)
       traefik.http.routers.joplin.entrypoints: websecure
       traefik.http.routers.joplin.tls.certresolver: ionos
       traefik.http.services.joplin.loadbalancer.server.port: "22300"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
 volumes:
   joplin_db_data:

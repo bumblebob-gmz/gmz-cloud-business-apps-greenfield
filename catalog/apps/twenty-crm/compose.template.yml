@@ -8,12 +8,40 @@ services:
       POSTGRES_PASSWORD: ${TWENTY_DB_PASSWORD}
     volumes:
       - twenty_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TWENTY_DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   twenty-redis:
     image: redis:7-alpine
     restart: unless-stopped
     volumes:
       - twenty_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
 
   twenty-server:
     image: twentycrm/twenty:${TWENTY_VERSION}
@@ -27,14 +55,28 @@ services:
       APP_SECRET: ${TWENTY_SECRET_KEY}
       STORAGE_TYPE: local
       STORAGE_LOCAL_PATH: ${TWENTY_STORAGE_LOCAL_PATH}
+    volumes:
+      - twenty_data:/.local-storage
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       traefik.enable: "true"
       traefik.http.routers.twenty.rule: Host(`${TWENTY_HOST}`)
       traefik.http.routers.twenty.entrypoints: websecure
       traefik.http.routers.twenty.tls: "true"
       traefik.http.services.twenty.loadbalancer.server.port: "3000"
-    volumes:
-      - twenty_data:/.local-storage
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
   twenty-worker:
     image: twentycrm/twenty:${TWENTY_VERSION}
@@ -51,6 +93,14 @@ services:
       STORAGE_LOCAL_PATH: ${TWENTY_STORAGE_LOCAL_PATH}
     volumes:
       - twenty_data:/.local-storage
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
 volumes:
   twenty_db:

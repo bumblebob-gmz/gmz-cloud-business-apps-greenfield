@@ -3,7 +3,7 @@
   "title": "Huly tenant variables",
   "type": "object",
   "additionalProperties": false,
-  "required": ["HULY_HOST", "HULY_VERSION", "HULY_SECRET", "HULY_MINIO_ROOT_PASSWORD"],
+  "required": ["HULY_HOST", "HULY_VERSION", "HULY_SECRET", "HULY_MINIO_ROOT_PASSWORD", "HULY_MONGO_USER", "HULY_MONGO_PASSWORD", "HULY_ELASTIC_PASSWORD"],
   "properties": {
     "HULY_HOST": {
       "type": "string",
@@ -19,10 +19,23 @@
       "minLength": 32,
       "description": "Server secret for JWT signing and inter-service auth"
     },
+    "HULY_MONGO_USER": {
+      "type": "string",
+      "description": "MongoDB root username (used for MONGO_INITDB_ROOT_USERNAME)"
+    },
+    "HULY_MONGO_PASSWORD": {
+      "type": "string",
+      "minLength": 16,
+      "description": "MongoDB root password"
+    },
+    "HULY_ELASTIC_PASSWORD": {
+      "type": "string",
+      "minLength": 16,
+      "description": "Elasticsearch built-in elastic user password (xpack.security)"
+    },
     "HULY_DB_URL": {
       "type": "string",
-      "default": "mongodb://huly-mongo:27017",
-      "description": "MongoDB connection URL"
+      "description": "MongoDB connection URL (include credentials: mongodb://user:pass@huly-mongo:27017)"
     },
     "HULY_MINIO_ROOT_USER": {
       "type": "string",

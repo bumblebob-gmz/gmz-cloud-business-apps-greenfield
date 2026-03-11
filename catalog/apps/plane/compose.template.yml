@@ -8,12 +8,40 @@ services:
       POSTGRES_PASSWORD: ${PLANE_DB_PASSWORD}
     volumes:
       - plane_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PLANE_DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   plane-redis:
     image: redis:7-alpine
     restart: unless-stopped
     volumes:
       - plane_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
 
   plane-api:
     image: makeplane/plane-backend:${PLANE_VERSION}
@@ -27,6 +55,20 @@ services:
       WEB_URL: https://${PLANE_HOST}
       CORS_ALLOWED_ORIGINS: https://${PLANE_HOST}
       DJANGO_SETTINGS_MODULE: plane.settings.production
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
   plane-worker:
     image: makeplane/plane-backend:${PLANE_VERSION}
@@ -40,6 +82,14 @@ services:
       WEB_URL: https://${PLANE_HOST}
       CORS_ALLOWED_ORIGINS: https://${PLANE_HOST}
       DJANGO_SETTINGS_MODULE: plane.settings.production
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   plane-beat:
     image: makeplane/plane-backend:${PLANE_VERSION}
@@ -53,6 +103,14 @@ services:
       WEB_URL: https://${PLANE_HOST}
       CORS_ALLOWED_ORIGINS: https://${PLANE_HOST}
       DJANGO_SETTINGS_MODULE: plane.settings.production
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   plane-frontend:
     image: makeplane/plane-frontend:${PLANE_VERSION}
@@ -61,12 +119,26 @@ services:
     environment:
       NEXT_PUBLIC_API_BASE_URL: https://${PLANE_HOST}
       NEXT_PUBLIC_DEPLOY_URL: https://${PLANE_HOST}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       traefik.enable: "true"
       traefik.http.routers.plane.rule: Host(`${PLANE_HOST}`)
       traefik.http.routers.plane.entrypoints: websecure
       traefik.http.routers.plane.tls: "true"
       traefik.http.services.plane.loadbalancer.server.port: "3000"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
 volumes:
   plane_db:

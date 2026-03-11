@@ -9,6 +9,20 @@ services:
       MYSQL_PASSWORD: ${ESPO_DB_PASSWORD}
     volumes:
       - espocrm_db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   espocrm:
     image: espocrm/espocrm:${ESPO_IMAGE_TAG}
@@ -20,14 +34,28 @@ services:
       ESPOCRM_DATABASE_USER: ${ESPO_DB_USER}
       ESPOCRM_DATABASE_PASSWORD: ${ESPO_DB_PASSWORD}
       ESPOCRM_SITE_URL: https://${ESPO_HOST}
+    volumes:
+      - espocrm_data:/var/www/html
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       traefik.enable: "true"
       traefik.http.routers.espocrm.rule: Host(`${ESPO_HOST}`)
       traefik.http.routers.espocrm.entrypoints: websecure
       traefik.http.routers.espocrm.tls: "true"
       traefik.http.services.espocrm.loadbalancer.server.port: "80"
-    volumes:
-      - espocrm_data:/var/www/html
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
   espocrm-daemon:
     image: espocrm/espocrm:${ESPO_IMAGE_TAG}
@@ -42,6 +70,14 @@ services:
       ESPOCRM_SITE_URL: https://${ESPO_HOST}
     volumes:
       - espocrm_data:/var/www/html
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   espocrm-websocket:
     image: espocrm/espocrm:${ESPO_IMAGE_TAG}
@@ -58,6 +94,14 @@ services:
       ESPOCRM_CONFIG_WEB_SOCKET_URL: wss://${ESPO_HOST}
     volumes:
       - espocrm_data:/var/www/html
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
 volumes:
   espocrm_db:

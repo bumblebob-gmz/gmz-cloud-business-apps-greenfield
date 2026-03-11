@@ -8,6 +8,20 @@ services:
       POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD}
     volumes:
       - umami_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${UMAMI_DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   umami:
     image: ghcr.io/umami-software/umami:${UMAMI_IMAGE_TAG}
@@ -19,12 +33,26 @@ services:
       DATABASE_TYPE: postgresql
       HASH_SALT: ${UMAMI_HASH_SALT}
       APP_SECRET: ${UMAMI_HASH_SALT}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       traefik.enable: "true"
       traefik.http.routers.umami.rule: Host(`${UMAMI_HOST}`)
       traefik.http.routers.umami.entrypoints: websecure
       traefik.http.routers.umami.tls: "true"
       traefik.http.services.umami.loadbalancer.server.port: "3000"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
 volumes:
   umami_db:

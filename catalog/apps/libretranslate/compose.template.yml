@@ -11,12 +11,26 @@ services:
     volumes:
       - libretranslate_data:/home/libretranslate/.local/share
       - libretranslate_db:/app/db
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       traefik.enable: "true"
       traefik.http.routers.libretranslate.rule: Host(`${LIBRETRANSLATE_HOST}`)
       traefik.http.routers.libretranslate.entrypoints: websecure
       traefik.http.routers.libretranslate.tls.certresolver: ionos
       traefik.http.services.libretranslate.loadbalancer.server.port: "5000"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
 volumes:
   libretranslate_data:

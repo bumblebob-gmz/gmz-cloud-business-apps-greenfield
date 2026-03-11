@@ -8,6 +8,20 @@ services:
       POSTGRES_PASSWORD: ${PP_DB_PASSWORD}
     volumes:
       - peppermint_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PP_DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   peppermint:
     image: peppermint/peppermint:${PP_IMAGE_TAG}
@@ -22,14 +36,28 @@ services:
       DB_NAME: ${PP_DB_NAME}
       SECRET: a_super_secret_key_here
       BASE_URL: https://${PP_HOST}
+    volumes:
+      - peppermint_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       traefik.enable: "true"
       traefik.http.routers.peppermint.rule: Host(`${PP_HOST}`)
       traefik.http.routers.peppermint.entrypoints: websecure
       traefik.http.routers.peppermint.tls: "true"
       traefik.http.services.peppermint.loadbalancer.server.port: "3000"
-    volumes:
-      - peppermint_uploads:/app/uploads
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
 volumes:
   peppermint_db:

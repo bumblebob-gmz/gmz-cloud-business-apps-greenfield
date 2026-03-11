@@ -16,7 +16,7 @@ services:
       - outline_redis:/data
 
   outline-minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-01-16T16-07-38Z
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:

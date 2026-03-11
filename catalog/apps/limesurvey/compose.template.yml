@@ -8,6 +8,20 @@ services:
       POSTGRES_PASSWORD: ${LS_DB_PASSWORD}
     volumes:
       - limesurvey_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${LS_DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   limesurvey:
     image: martialblog/limesurvey:${LS_IMAGE_TAG}
@@ -27,14 +41,28 @@ services:
       ADMIN_NAME: ${LS_ADMIN_NAME}
       PUBLIC_URL: https://${LS_HOST}
       LISTEN_PORT: "8080"
+    volumes:
+      - limesurvey_upload:/var/www/html/upload
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     labels:
       traefik.enable: "true"
       traefik.http.routers.limesurvey.rule: Host(`${LS_HOST}`)
       traefik.http.routers.limesurvey.entrypoints: websecure
       traefik.http.routers.limesurvey.tls: "true"
       traefik.http.services.limesurvey.loadbalancer.server.port: "8080"
-    volumes:
-      - limesurvey_upload:/var/www/html/upload
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
 volumes:
   limesurvey_db:
