@@ -1,0 +1,36 @@
+---
+# catalog-deployer defaults
+# Override these per playbook or via -e.
+
+# Base directory where app stacks are placed on the tenant VM
+tenant_deploy_base: /opt/gmz/apps
+
+# Path to the catalog directory on the control node.
+# Resolved relative to the playbook's parent-parent (repo root).
+catalog_base: "{{ playbook_dir | dirname | dirname }}/catalog/apps"
+
+# Name of the compose file written to the tenant VM
+compose_filename: docker-compose.yml
+
+# Env file name inside each app directory
+env_filename: .env
+
+# Per-app variable overrides.
+# Format:
+#   app_configs:
+#     nextcloud:
+#       NEXTCLOUD_ADMIN_USER: admin
+#       NEXTCLOUD_ADMIN_PASSWORD: "{{ vault_nextcloud_admin_password }}"
+#       POSTGRES_PASSWORD: "{{ vault_nextcloud_db_password }}"
+#     vaultwarden:
+#       ADMIN_TOKEN: "{{ vault_vaultwarden_admin_token }}"
+#       DATABASE_URL: "{{ vault_vaultwarden_db_url }}"
+# If an app is not listed, an empty .env is written (stack uses image defaults
+# or previously deployed values are preserved).
+app_configs: {}
+
+# Whether to pull images before starting (adds latency, prevents stale images)
+catalog_pull_images: true
+
+# Timeout in seconds for docker compose up before marking as failed
+compose_up_timeout: 120

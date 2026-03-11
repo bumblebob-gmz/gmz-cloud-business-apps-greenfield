@@ -463,8 +463,10 @@ log('Wrote test-report.html');
 log('Running Python tests…');
 let pyResult = { passed: false, pass: 0, fail: 0, skip: 0, durationMs: 0 };
 try {
+  // Scope to catalog-only test: the full ops/tests/ suite is run by
+  // catalog-validator.yml; running it here too bloats the evidence job.
   const pyOut = execSync(
-    'python3 -m pytest ops/tests/ -v --tb=short 2>&1',
+    'python3 -m pytest ops/tests/test_validate_catalog.py -q --tb=line -x --no-header 2>&1',
     { cwd: REPO_ROOT, encoding: 'utf8', shell: true }
   );
   const passMatch = pyOut.match(/(\d+) passed/);

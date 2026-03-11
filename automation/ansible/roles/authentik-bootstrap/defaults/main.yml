@@ -1,0 +1,27 @@
+---
+# authentik-bootstrap defaults
+
+# Installation directory on the tenant VM
+authentik_dir: /opt/gmz/apps/authentik
+
+# Authentik version tag (should match catalog/apps/authentik/app.yaml)
+authentik_image_tag: "2026.3.0"
+
+# Base domain used for cookie scope and Traefik routing
+# Example: "irongeeks.eu" → authentik.kunde-a.irongeeks.eu
+base_domain: "irongeeks.eu"
+
+# Override credentials via vault or -e; auto-generated when empty.
+# Empty string → role generates a random value with openssl.
+authentik_secret_key: ""
+authentik_db_name: authentik
+authentik_db_user: authentik
+authentik_db_password: ""
+authentik_bootstrap_email: ""
+authentik_bootstrap_password: ""
+
+# Docker socket proxy settings (replaces direct docker.sock mount on worker)
+authentik_socket_proxy_image: "lscr.io/linuxserver/socket-proxy:latest"
+
+# How long to wait for authentik server to become healthy (seconds)
+authentik_startup_timeout: 120

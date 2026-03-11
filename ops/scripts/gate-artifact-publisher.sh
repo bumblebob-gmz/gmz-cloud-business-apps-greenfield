@@ -373,9 +373,15 @@ if [[ -d "${WEBAPP_DIR}" ]] && [[ -f "${WEBAPP_DIR}/package.json" ]]; then
 fi
 
 # Run catalog validator tests
+# Scope: only test_validate_catalog.py — the gate publisher runs as a sub-step of
+# the gate-artifact-publisher CI job, which is already lightweight. Running the full
+# ops/tests/ suite here is redundant (catalog-validator.yml handles the full pytest
+# run separately) and makes CI unnecessarily heavy/fragile.
+# -q --tb=line: concise output; -x: stop on first failure; --no-header: cleaner logs.
 if [[ -d "${TESTS_DIR}" ]]; then
-  log "  Running catalog validator tests..."
-  CATALOG_OUT=$(cd "${REPO_ROOT}" && python3 -m pytest ops/tests/ -v 2>&1 || true)
+  log "  Running catalog validator smoke test..."
+  CATALOG_OUT=$(cd "${REPO_ROOT}" && python3 -m pytest ops/tests/test_validate_catalog.py \
+    -q --tb=line -x --no-header 2>&1 || true)
   CATALOG_PASS=$(echo "${CATALOG_OUT}" | grep -oP '\d+(?= passed)' | tail -1 || echo 0)
   CATALOG_FAIL=$(echo "${CATALOG_OUT}" | grep -oP '\d+(?= failed)' | tail -1 || echo 0)
   CATALOG_TOTAL=$(( CATALOG_PASS + CATALOG_FAIL ))

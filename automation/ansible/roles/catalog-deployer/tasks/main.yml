@@ -1,4 +1,101 @@
 ---
-- name: TODO render selected app templates from GMZ app catalog
+# catalog-deployer — renders and starts app stacks from the GMZ catalog.
+#
+# Required variables (passed from playbook):
+#   tenant_slug  — URL-safe tenant identifier (used in labels / .env comments)
+#   apps         — list of app names matching catalog/apps/<name>/ directories
+#
+# Optional (see defaults/main.yml):
+#   tenant_deploy_base, catalog_base, app_configs, catalog_pull_images
+
+- name: Validate required variables
+  ansible.builtin.assert:
+    that:
+      - apps is defined
+      - apps | length > 0
+      - tenant_slug is defined and tenant_slug | length > 0
+    fail_msg: "catalog-deployer requires 'apps' (non-empty list) and 'tenant_slug'"
+
+- name: Ensure base deployment directory exists
+  ansible.builtin.file:
+    path: "{{ tenant_deploy_base }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Verify catalog entries exist on control node
+  ansible.builtin.stat:
+    path: "{{ catalog_base }}/{{ item }}/compose.template.yml"
+  delegate_to: localhost
+  become: false
+  loop: "{{ apps }}"
+  register: catalog_stat
+  failed_when: not catalog_stat.stat.exists
+  # Fail early: missing catalog entry = missing compose template → stack can never start
+
+- name: Create per-app deployment directories
+  ansible.builtin.file:
+    path: "{{ tenant_deploy_base }}/{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+  loop: "{{ apps }}"
+
+- name: Copy compose template for each app
+  ansible.builtin.copy:
+    src: "{{ catalog_base }}/{{ item }}/compose.template.yml"
+    dest: "{{ tenant_deploy_base }}/{{ item }}/{{ compose_filename }}"
+    owner: root
+    group: root
+    mode: '0640'
+  loop: "{{ apps }}"
+  # compose.template.yml uses Docker ${VAR} substitution — copied as-is,
+  # variables are supplied via the .env file written in the next step.
+
+- name: Write .env file for each app
+  ansible.builtin.template:
+    src: app-dotenv.j2
+    dest: "{{ tenant_deploy_base }}/{{ item }}/{{ env_filename }}"
+    owner: root
+    group: root
+    mode: '0600'
+  vars:
+    app_name: "{{ item }}"
+  loop: "{{ apps }}"
+
+- name: Pull Docker images (pre-fetch before start)
+  ansible.builtin.command:
+    cmd: docker compose pull --quiet
+    chdir: "{{ tenant_deploy_base }}/{{ item }}"
+  loop: "{{ apps }}"
+  when: catalog_pull_images | bool
+  changed_when: true
+  # Failures here are non-fatal (private registry may not be reachable from runner);
+  # docker compose up will pull on first start if image is not yet cached.
+  ignore_errors: true
+
+- name: Start app stacks via docker compose
+  ansible.builtin.command:
+    cmd: "docker compose up -d --remove-orphans --wait --wait-timeout {{ compose_up_timeout }}"
+    chdir: "{{ tenant_deploy_base }}/{{ item }}"
+  loop: "{{ apps }}"
+  changed_when: true
+  # --wait: blocks until all containers report healthy (requires healthchecks in compose)
+  # --remove-orphans: cleans up containers for removed services
+
+- name: Report running containers per app
+  ansible.builtin.command:
+    cmd: docker compose ps --format "table {{ '{{' }}.Name{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}"
+    chdir: "{{ tenant_deploy_base }}/{{ item }}"
+  loop: "{{ apps }}"
+  register: compose_ps_output
+  changed_when: false
+
+- name: Show compose ps output
   ansible.builtin.debug:
-    msg: "Catalog render + deploy pipeline follows (includes per-tenant variables and secrets)"
+    msg: |
+      === {{ item.item }} ===
+      {{ item.stdout }}
+  loop: "{{ compose_ps_output.results }}"

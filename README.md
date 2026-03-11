@@ -2,7 +2,7 @@
 
 > Interne Control-Plane für Multi-Tenant Hosting auf Proxmox — provisioniert, deployt und verwaltet Kunden-VMs vollautomatisch.
 
-[![CI](https://github.com/bumblebob-gmz/gmz-cloud-business-apps-greenfield/actions/workflows/ci.yml/badge.svg)](https://github.com/bumblebob-gmz/gmz-cloud-business-apps-greenfield/actions)
+[![CI](https://github.com/bumblebob-gmz/gmz-cloud-business-apps-greenfield/actions/workflows/gate-evidence.yml/badge.svg)](https://github.com/bumblebob-gmz/gmz-cloud-business-apps-greenfield/actions)
 [![Security](https://github.com/bumblebob-gmz/gmz-cloud-business-apps-greenfield/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/bumblebob-gmz/gmz-cloud-business-apps-greenfield/actions)
 
 ---
@@ -147,11 +147,14 @@ gmz-cloud-business-apps/
 │   └── bmad/                # BMAD Review Artefakte (REVIEW-001 bis REVIEW-025+)
 └── .github/
     └── workflows/           # CI/CD Pipelines
-        ├── ci.yml
-        ├── secret-scan.yml  # gitleaks
-        ├── iac-security-lint.yml  # checkov
-        ├── gate-evidence.yml
-        └── nightly-updates.yml
+        ├── gate-evidence.yml          # Haupt-CI: Gate-Evidence Bundle
+        ├── gate-artifact-publisher.yml # Build + Upload Gate Bundle on main
+        ├── catalog-validator.yml      # Katalog-Schema-Validierung
+        ├── authz-audit-regression.yml # Autorisierungs-Regressionstests
+        ├── infra-guards.yml           # Infrastruktur-Guards
+        ├── iac-security-lint.yml      # IaC Security Scan (checkov)
+        ├── secret-scan.yml            # Secret Scan (gitleaks)
+        └── nightly-updates.yml        # Nächtliche Tenant-Updates
 ```
 
 ---

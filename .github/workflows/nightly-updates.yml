@@ -50,10 +50,17 @@ jobs:
           HOST="${{ github.event.inputs.tenant_host }}"
           USER="${{ github.event.inputs.ssh_user || 'debian' }}"
           # When no host is given (scheduled run) fall back to the first host
-          # from the Ansible inventory. Extend this step for multi-tenant runs.
+          # found across all *.ini / *.yml / hosts files in the inventory directory.
+          # ANSIBLE_INVENTORY is a directory — must use grep -rh, not grep on the
+          # path directly (which would fail silently or emit "is a directory").
           if [[ -z "${HOST}" ]]; then
-            HOST=$(grep -E '^[a-zA-Z0-9]' "${ANSIBLE_INVENTORY}" \
-              | grep -v '^\[' | head -1 | awk '{print $1}' || true)
+            if [[ -d "${ANSIBLE_INVENTORY}" ]]; then
+              HOST=$(grep -rh -E '^[a-zA-Z0-9]' "${ANSIBLE_INVENTORY}" \
+                | grep -v '^\[' | head -1 | awk '{print $1}' || true)
+            else
+              HOST=$(grep -E '^[a-zA-Z0-9]' "${ANSIBLE_INVENTORY}" \
+                | grep -v '^\[' | head -1 | awk '{print $1}' || true)
+            fi
             echo "No tenant_host input; resolved from inventory: ${HOST}" >&2
           fi
           if [[ -z "${HOST}" ]]; then

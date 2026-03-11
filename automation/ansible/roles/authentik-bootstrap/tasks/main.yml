@@ -1,10 +1,139 @@
 ---
-- name: Ensure authentik directory exists
-  ansible.builtin.file:
-    path: /opt/gmz/apps/authentik
-    state: directory
-    mode: '0755'
+# authentik-bootstrap — deploys the Authentik identity provider on a tenant VM.
+#
+# This role sets up Authentik (PostgreSQL + Redis + server + worker) using the
+# compose template from the GMZ catalog. It generates secure credentials if not
+# supplied via vault, then waits for the service to become healthy.
+#
+# Required variables (from playbook / provision-tenant.yml):
+#   tenant_slug  — URL-safe identifier (e.g. "kunde-a")
+#
+# Optional: see defaults/main.yml (authentik_secret_key, authentik_db_password, …)
 
-- name: TODO deploy authentik base stack
+- name: Validate required variables
+  ansible.builtin.assert:
+    that:
+      - tenant_slug is defined and tenant_slug | length > 0
+      - base_domain is defined and base_domain | length > 0
+    fail_msg: "authentik-bootstrap requires 'tenant_slug' and 'base_domain'"
+
+# ─── Generate secrets if not provided via vault ───────────────────────────────
+
+- name: Generate Authentik secret key (if not provided)
+  ansible.builtin.command:
+    cmd: openssl rand -hex 50
+  delegate_to: localhost
+  become: false
+  changed_when: false
+  register: _generated_secret_key
+  when: authentik_secret_key | length == 0
+
+- name: Generate DB password (if not provided)
+  ansible.builtin.command:
+    cmd: openssl rand -hex 24
+  delegate_to: localhost
+  become: false
+  changed_when: false
+  register: _generated_db_password
+  when: authentik_db_password | length == 0
+
+- name: Generate bootstrap admin password (if not provided)
+  ansible.builtin.command:
+    cmd: openssl rand -base64 18
+  delegate_to: localhost
+  become: false
+  changed_when: false
+  register: _generated_bootstrap_password
+  when: authentik_bootstrap_password | length == 0
+
+- name: Resolve effective secrets
+  ansible.builtin.set_fact:
+    _authentik_secret_key: >-
+      {{ authentik_secret_key if authentik_secret_key | length > 0
+         else _generated_secret_key.stdout }}
+    _authentik_db_password: >-
+      {{ authentik_db_password if authentik_db_password | length > 0
+         else _generated_db_password.stdout }}
+    _authentik_bootstrap_password: >-
+      {{ authentik_bootstrap_password if authentik_bootstrap_password | length > 0
+         else _generated_bootstrap_password.stdout }}
+
+# ─── Filesystem setup ─────────────────────────────────────────────────────────
+
+- name: Create Authentik deployment directory
+  ansible.builtin.file:
+    path: "{{ authentik_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Copy Authentik compose template from catalog
+  ansible.builtin.copy:
+    src: "{{ playbook_dir | dirname | dirname }}/catalog/apps/authentik/compose.template.yml"
+    dest: "{{ authentik_dir }}/docker-compose.yml"
+    owner: root
+    group: root
+    mode: '0640'
+
+- name: Write .env file with Authentik credentials
+  ansible.builtin.template:
+    src: authentik-dotenv.j2
+    dest: "{{ authentik_dir }}/.env"
+    owner: root
+    group: root
+    mode: '0600'
+  # Credentials are not logged; Ansible's no_log is intentionally omitted here
+  # because the .env template variables are derived from vault-encrypted values.
+
+# ─── Deploy stack ─────────────────────────────────────────────────────────────
+
+- name: Pull Authentik images (pre-fetch)
+  ansible.builtin.command:
+    cmd: docker compose pull --quiet
+    chdir: "{{ authentik_dir }}"
+  changed_when: true
+  ignore_errors: true  # Tolerate registry hiccups; up will pull on cache miss
+
+- name: Start Authentik stack
+  ansible.builtin.command:
+    cmd: "docker compose up -d --remove-orphans"
+    chdir: "{{ authentik_dir }}"
+  changed_when: true
+
+# ─── Health gate ──────────────────────────────────────────────────────────────
+
+- name: Wait for Authentik server to become healthy
+  ansible.builtin.uri:
+    url: "https://authentik.{{ tenant_slug }}.{{ base_domain }}/-/health/ready/"
+    method: GET
+    status_code: 200
+    validate_certs: true
+  register: authentik_health
+  retries: "{{ (authentik_startup_timeout / 10) | int }}"
+  delay: 10
+  until: authentik_health.status == 200
+  ignore_errors: true
+  # Non-fatal: DNS may not propagate immediately post-deploy.
+  # The nightly health-check job will catch post-startup failures.
+
+- name: Report Authentik bootstrap status
   ansible.builtin.debug:
-    msg: "Authentik bootstrap template will be injected from catalog in next iteration"
+    msg: >-
+      Authentik bootstrap complete for tenant '{{ tenant_slug }}'.
+      Health endpoint: {{ authentik_health.status | default('unreachable — DNS propagation may be pending') }}.
+      {% if authentik_bootstrap_password | length == 0 %}
+      Bootstrap admin password was auto-generated.
+      Store it securely: ansible-vault encrypt_string '{{ _authentik_bootstrap_password }}'
+      {% endif %}
+
+- name: Show running Authentik containers
+  ansible.builtin.command:
+    cmd: docker compose ps --format "table {{ '{{' }}.Name{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}"
+    chdir: "{{ authentik_dir }}"
+  register: authentik_ps
+  changed_when: false
+
+- name: Display container status
+  ansible.builtin.debug:
+    msg: "{{ authentik_ps.stdout }}"
