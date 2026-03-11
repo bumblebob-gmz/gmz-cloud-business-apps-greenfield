@@ -60,7 +60,7 @@ services:
       - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
       - "traefik.http.routers.grafana.middlewares=mgmt-ipallowlist"
-      - "traefik.docker.network=traefik"
+      - "traefik.docker.network=traefik_traefik"
 
   loki:
     image: grafana/loki:3.1.0

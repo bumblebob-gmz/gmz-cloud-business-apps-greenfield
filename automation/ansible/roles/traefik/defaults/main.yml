@@ -14,6 +14,12 @@ traefik_acme_dir: /etc/traefik/acme
 # Management VM hostname (used for redirect and WebApp routing)
 traefik_mgmt_hostname: "mgmt.irongeeks.eu"
 
+# Docker network name that Traefik and backend containers share.
+# Compose prepends the project name: if the compose project is "traefik"
+# (= directory name of /etc/traefik) the actual network is "traefik_traefik".
+# Set this to match: docker network ls | grep traefik
+traefik_network_name: "traefik_traefik"
+
 # Dedicated subdomain for the Traefik dashboard.
 # Using a subdomain avoids the stripPrefix+SPA incompatibility where
 # the dashboard JS fetches /api/... at root level and breaks the path-prefix router.
