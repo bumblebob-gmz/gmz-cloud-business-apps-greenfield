@@ -556,17 +556,19 @@ ansible --version
 ansible-galaxy collection install community.docker community.general
 ```
 
-### 4.9 Node.js 20 LTS installieren
+### 4.9 Node.js 22 LTS installieren
 
-Die WebApp benötigt Node.js 20 LTS.
+Die WebApp benötigt Node.js **22 LTS** (Minimum). Node 22 wird für `--experimental-strip-types`
+(natives TypeScript-Ausführen ohne Build-Schritt) und die npm-Scripts in `package.json` benötigt.
+Node.js 20 reicht **nicht** aus.
 
 ```bash
 # Als gmzadmin:
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt install -y nodejs
 
 # Verifizieren:
-node --version   # → v20.x.x
+node --version   # → v22.x.x
 npm --version    # → 10.x.x
 ```
 
@@ -607,7 +609,7 @@ nano /opt/gmz/platform/webapp/.env
 WEBAPP_AUTH_MODE=trusted-bearer
 
 # Admin-API-Token (sicher generieren: openssl rand -hex 32)
-WEBAPP_TRUSTED_TOKENS_JSON='{"admin":{"role":"admin","token":"IHR_SICHERER_TOKEN_HIER"}}'
+WEBAPP_TRUSTED_TOKENS_JSON='[{"tokenId":"tok-admin","userId":"platform-admin","role":"admin","token":"IHR_SICHERER_TOKEN_HIER","expiresAt":"2027-01-01T00:00:00Z"}]'
 
 # ─── Sicherheit ─────────────────────────────────────────────────────
 # Verschlüsselungsschlüssel für Benachrichtigungen (32 Byte hex)
@@ -652,15 +654,17 @@ Traefik übernimmt TLS-Terminierung, HTTP→HTTPS-Weiterleitung und das Routing 
 # Als gmzadmin – KEIN sudo für Ansible:
 cd /opt/gmz
 
-# Inventory-Datei für die Management-VM prüfen/anlegen:
-cat automation/ansible/inventory/management.yml
-# → Muss localhost oder die Management-VM-IP enthalten
+# Inventory-Datei für die Management-VM anlegen (einmalig, nicht in Git):
+cat > automation/ansible/inventory/management.ini << 'EOF'
+[management]
+localhost ansible_connection=local ansible_user=gmzadmin
+EOF
 
 # Traefik deployen:
 ansible-playbook automation/ansible/deploy-traefik.yml \
   -e acme_email=admin@example.com \
   -e ionos_api_key=PREFIX.SECRET \
-  -i automation/ansible/inventory/management.yml
+  -i automation/ansible/inventory/management.ini
 ```
 
 **Was das Playbook macht:**
@@ -689,10 +693,13 @@ docker exec traefik cat /etc/traefik/acme.json | python3 -m json.tool | grep -A2
 
 Prometheus, Grafana und Loki werden als Docker-Compose-Stack auf der Management-VM betrieben.
 
-> **Wichtig:** Vor dem Start des Monitoring-Stacks `.env` aus `.env.example` erstellen und `GRAFANA_ADMIN_PASSWORD` setzen:
+> **Wichtig:** Vor dem Start des Monitoring-Stacks `.env` aus `.env.example` erstellen und alle Pflichtfelder setzen:
 > ```bash
 > cp infra/monitoring/.env.example infra/monitoring/.env
+> chmod 600 infra/monitoring/.env
 > nano infra/monitoring/.env
+> # Pflicht: GRAFANA_ADMIN_PASSWORD, ALERTMANAGER_OPS_EMAIL,
+> #          ALERTMANAGER_SMTP_HOST, ALERTMANAGER_SMTP_USER, ALERTMANAGER_SMTP_PASS
 > ```
 
 ```bash
@@ -743,7 +750,29 @@ npm run build
 
 > **Hinweis:** `npm run build` führt `next build` aus. Die Anwendung wird anschließend mit `npm run start` (= `next start`) gestartet. Es gibt **kein** `dist/server.js` – der Start erfolgt ausschließlich über `npm run start`.
 
-### 7.2 Daten-Verzeichnis erstellen
+### 7.2 Datenbank-Modus wählen
+
+Die WebApp unterstützt zwei Storage-Backends:
+
+| Modus | Wann | Konfiguration |
+|-------|------|---------------|
+| **Dateibasiert** (Standard) | Entwicklung / erste Einrichtung | `DATABASE_URL` nicht gesetzt → `.data/store.json` |
+| **PostgreSQL** (Produktion) | Mehrere Nutzer, persistente Daten | `DATABASE_URL=postgresql://user:pass@host:5432/db` |
+
+**Für Produktionsbetrieb: PostgreSQL einrichten**
+```bash
+# Als gmzadmin – KEIN sudo:
+# DATABASE_URL in .env setzen, dann Migration ausführen:
+cd /opt/gmz/platform/webapp
+npm run db:migrate        # Schema anlegen (ohne Seed-Daten)
+# oder:
+npm run db:migrate:seed   # Schema anlegen + Demo-Daten einspielen
+```
+
+> **Hinweis:** Ohne `DATABASE_URL` wird `.data/store.json` verwendet. Diese Datei ist
+> **nicht für Concurrent-Zugriffe unter Last geeignet** — nur für Einzelinstanz-Dev-Betrieb.
+
+### 7.3 Daten-Verzeichnis erstellen (nur Datei-Modus)
 
 ```bash
 # Als gmzadmin – KEIN sudo:
@@ -752,7 +781,7 @@ mkdir -p /opt/gmz/data
 chmod 750 /opt/gmz/data
 ```
 
-### 7.3 systemd-Service einrichten
+### 7.4 systemd-Service einrichten
 
 ```bash
 # Als gmzadmin (sudo für systemd):
@@ -769,6 +798,7 @@ Group=gmzadmin
 WorkingDirectory=/opt/gmz/platform/webapp
 EnvironmentFile=/opt/gmz/platform/webapp/.env
 ExecStart=/usr/bin/npm run start
+Environment=NODE_ENV=production
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -836,6 +866,10 @@ Was automatisch passiert:
    - Common Hardening (`roles/common-hardening`: SSH-Härtung, Updates)
    - Traefik-Konfiguration für Tenant-Subdomain
 4. DNS-Eintrag wird über IONOS API angelegt
+
+> **Crash-Recovery:** Beim Start der WebApp läuft automatisch `lib/job-recovery.ts` und
+> setzt Jobs, die länger als 30 Minuten im Status `Running` oder `Queued` hängen, auf
+> `Failed` zurück. So bleiben nach einem Server-Neustart keine Zombie-Jobs offen.
 
 ### 8.3 Job-Status verfolgen
 
@@ -1125,8 +1159,10 @@ Was gelöscht wird:
 ### VLAN- und IP-Verwaltung
 
 VLANs und IP-Bereiche werden automatisch vergeben:
-- VLAN-Range: 20–4094 (konfigurierbar in `.env`)
-- IP-Range: `10.20.0.0/16` (je Tenant ein `/24`-Subnetz)
+- VLAN-Range: 2–4094 (validiert in WebApp und Terraform)
+- IP-Schema: `10.<VLAN-ID>.10.<host-suffix>/24` — z.B. VLAN 120 → `10.120.10.100/24`
+- Der Host-Suffix (Standard: `100`) ist über `ip_host_suffix` im Terraform-Modul konfigurierbar,
+  um bei Bedarf mehrere VMs pro VLAN zu unterstützen
 
 Manuelle Anpassung möglich in: **Tenant** → **Netzwerk** → **Bearbeiten**
 
@@ -1228,11 +1264,11 @@ WebApp: App → **Aktionen** → **Löschen** → Bestätigen
 
 In `.env`:
 ```bash
-WEBAPP_TRUSTED_TOKENS_JSON='{
-  "admin-prod": {"role": "admin", "token": "IHR_ADMIN_TOKEN"},
-  "monitoring": {"role": "readonly", "token": "IHR_MONITORING_TOKEN"},
-  "cicd": {"role": "technician", "token": "IHR_CICD_TOKEN"}
-}'
+WEBAPP_TRUSTED_TOKENS_JSON='[
+  {"tokenId":"tok-admin","userId":"platform-admin","role":"admin","token":"IHR_ADMIN_TOKEN","expiresAt":"2027-01-01T00:00:00Z"},
+  {"tokenId":"tok-monitoring","userId":"monitoring-svc","role":"readonly","token":"IHR_MONITORING_TOKEN","expiresAt":"2027-01-01T00:00:00Z"},
+  {"tokenId":"tok-cicd","userId":"cicd-pipeline","role":"technician","token":"IHR_CICD_TOKEN","expiresAt":"2027-01-01T00:00:00Z"}
+]'
 ```
 
 Token generieren:
@@ -1991,12 +2027,9 @@ Datei: `/opt/gmz/platform/webapp/.env` | Berechtigungen: `chmod 600` | Besitzer:
 | Variable | Pflicht | Standard | Beschreibung |
 |----------|---------|----------|--------------|
 | `WEBAPP_AUTH_MODE` | ✅ | – | Auth-Modus: `trusted-bearer` (Produktion), `jwt` (OIDC), `none` (nur Dev) |
-| `WEBAPP_TRUSTED_TOKENS_JSON` | Wenn `trusted-bearer` | – | JSON-Objekt mit Tokens. Format: `{"name":{"role":"admin","token":"..."}}` |
-| `NEXTAUTH_URL` | Wenn `jwt` | – | Vollständige URL der WebApp, z.B. `https://mgmt.example.com` |
-| `NEXTAUTH_SECRET` | Wenn `jwt` | – | Zufälliger geheimer Schlüssel für NextAuth.js Sessions |
-| `AUTHENTIK_CLIENT_ID` | Wenn `jwt` | – | OAuth2 Client-ID aus Authentik |
-| `AUTHENTIK_CLIENT_SECRET` | Wenn `jwt` | – | OAuth2 Client-Secret aus Authentik |
-| `AUTHENTIK_ISSUER` | Wenn `jwt` | – | OIDC Issuer-URL, z.B. `https://auth.example.com/application/o/slug/` |
+| `WEBAPP_TRUSTED_TOKENS_JSON` | Wenn `trusted-bearer` | – | JSON-Array mit Token-Einträgen. Format: `[{"tokenId":"...","userId":"...","role":"admin","token":"...","expiresAt":"ISO-8601"}]` |
+| `WEBAPP_OIDC_ISSUER` | Wenn `jwt` | – | OIDC Issuer-URL, z.B. `https://auth.example.com/application/o/slug/` |
+| `WEBAPP_OIDC_AUDIENCE` | Wenn `jwt` | – | OAuth2 Audience (Client-ID aus Authentik) |
 
 ### Sicherheit
 
