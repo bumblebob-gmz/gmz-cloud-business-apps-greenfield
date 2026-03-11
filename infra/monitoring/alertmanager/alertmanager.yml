@@ -1,12 +1,7 @@
 global:
-  # Default SMTP settings — override via environment or .env mount
-  smtp_from: '${ALERTMANAGER_SMTP_FROM:-alerts@irongeeks.eu}'
-  smtp_smarthost: '${ALERTMANAGER_SMTP_HOST:-localhost}:${ALERTMANAGER_SMTP_PORT:-587}'
-  smtp_auth_username: '${ALERTMANAGER_SMTP_USER:-}'
-  smtp_auth_password: '${ALERTMANAGER_SMTP_PASS:-}'
-  smtp_require_tls: true
-
-  # Silence repeat alerts after initial fire
+  smtp_from: 'alerts@irongeeks.eu'
+  smtp_smarthost: 'localhost:25'
+  smtp_require_tls: false
   resolve_timeout: 5m
 
 route:
@@ -14,19 +9,19 @@ route:
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
-  receiver: 'ops-email'
+  receiver: 'ops-null'
 
   routes:
     - match:
         severity: critical
-      receiver: 'ops-email'
+      receiver: 'ops-null'
       repeat_interval: 1h
 
 receivers:
-  - name: 'ops-email'
-    email_configs:
-      - to: '${ALERTMANAGER_OPS_EMAIL:-ops@irongeeks.eu}'
-        send_resolved: true
+  - name: 'ops-null'
+    # Alerts werden über die GMZ WebApp Alert-Channels (Teams/E-Mail) verteilt.
+    # Alertmanager dient als Kollektor; WebApp POST /api/auth/alerts/dispatch
+    # übernimmt das Routing zu Teams und SMTP.
 
 inhibit_rules:
   - source_match:
