@@ -1480,6 +1480,108 @@ checkov -d infra/ --framework terraform
 checkov -d catalog/apps/ --framework dockerfile,docker_compose
 ```
 
+### Container-Sicherheit: Non-Root User & Privilege Escalation
+
+Alle App-Stacks im Katalog sind mit zwei Schutzebenen gehärtet:
+
+#### Schutzebene 1: `no-new-privileges` (universell, alle Services)
+
+Jeder Container im Katalog hat `security_opt: [no-new-privileges:true]` gesetzt.
+Das verhindert Privilege Escalation via `setuid`/`setgid`-Bits, selbst wenn ein Prozess
+initial als root läuft.
+
+```yaml
+# Beispiel — gilt für jeden Service:
+services:
+  my-app:
+    image: example/app:1.0
+    security_opt:
+      - no-new-privileges:true
+```
+
+#### Schutzebene 2: Expliziter `user:` pro Image-Typ
+
+Je nach Image-Design gibt es drei Kategorien:
+
+**Kategorie A — Expliziter `user:` in Compose (UID fest gesetzt):**
+
+| Image | UID:GID | Basis |
+|-------|---------|-------|
+| `vaultwarden/server` | `1000:1000` | offizielle Doku |
+| `outlinewiki/outline` | `1000:1000` | nodejs-User im Image |
+| `docmost/docmost` | `1000:1000` | nodejs-User |
+| `joplin/server` | `1000:1000` | nodejs-User |
+| `ghcr.io/plankanban/planka` | `1000:1000` | nodejs-User |
+| `vikunja/vikunja` | `1000:1000` | offizielle Doku |
+| `ghcr.io/requarks/wiki` | `1000:1000` | nodejs-User |
+| `ghcr.io/umami-software/umami` | `1000:1000` | nextjs-User |
+| `peppermint/peppermint` | `1000:1000` | nodejs-User |
+| `stirlingtools/stirling-pdf` | `1000:1000` | offizielle Doku |
+| `mattermost/mattermost-team-edition` | `2000:2000` | `mattermost`-User |
+| `metabase/metabase` | `2000:2000` | `metabase`-User |
+| `postgres:*` | `999:999` | `postgres`-User |
+| `redis:*` | `999:999` | `redis`-User |
+| `mariadb:*` / `mysql:*` | `999:999` | `mysql`-User |
+| `mongo:*` | `999:999` | `mongodb`-User |
+
+> **Volumes:** Wenn ein Container mit explizitem `user:` auf ein Volume schreibt,
+> muss das Volume-Verzeichnis auf dem Host dem gleichen UID gehören.
+> Die Ansible-Rollen (`catalog-deployer`, `authentik-bootstrap`) legen Verzeichnisse
+> mit korrekten Berechtigungen an — **manuell erstellte Volumes** müssen entsprechend
+> `chown`-ed werden:
+> ```bash
+> # Beispiel für UID 1000:
+> sudo chown -R 1000:1000 /opt/gmz/apps/vikunja/
+> ```
+
+**Kategorie B — Privilege-Drop via Umgebungsvariablen:**
+
+Diese Images starten als root und wechseln intern den User. Statt `user:` werden
+spezielle Env-Variablen gesetzt:
+
+| Image | Methode | Env-Variablen |
+|-------|---------|---------------|
+| `lscr.io/linuxserver/bookstack` | PUID/PGID | `PUID: "1000"`, `PGID: "1000"` |
+| `ghcr.io/paperless-ngx/paperless-ngx` | USERMAP | `USERMAP_UID: "1000"`, `USERMAP_GID: "1000"` |
+
+> Die entsprechenden Env-Vars sind in den `compose.template.yml`-Dateien bereits
+> gesetzt. Bei Deployment über `catalog-deployer` werden sie via `app_configs` übergeben.
+
+**Kategorie C — Root erforderlich oder intern geregelt (kein `user:` Override):**
+
+| Image / App | Grund |
+|-------------|-------|
+| `nextcloud` | Startet als root, setzt Volume-Permissions, wechselt zu `www-data` (UID 33) |
+| `ollama/ollama` | Root/Privileged für GPU-Hardware-Zugriff ggf. nötig |
+| `ghcr.io/goauthentik/server` | Drops intern zu UID 1000 — `user:` Override würde Init brechen |
+| `ghcr.io/open-webui/open-webui` | Root für Initialisierung, danach Drop |
+| `tecnativa/docker-socket-proxy` | Root für Docker-Socket-Zugriff erforderlich |
+| `taigaio/*`, `makeplane/*` | Multi-Process-Init als root, interne Drops |
+| `hardcoreeng/*` (Huly) | Komplexer Startup, interner User-Switch |
+| PHP-Apps (espocrm, orangehrm, akaunting, invoiceninja, opencats, limesurvey, leantime) | Apache/PHP-FPM braucht root für Port-Binding, wechselt zu `www-data` |
+| `appflowyinc/appflowy-cloud` | Rust-Service, root für Init |
+| `twentycrm/twenty` | Init als root |
+| `searxng/searxng` | Searxng-User intern, Override würde Config-Read brechen |
+| `corentinth/it-tools` | Nginx-User intern (UID 101) |
+
+> Alle Kategorie-C-Container profitieren trotzdem von `no-new-privileges:true` (Schutzebene 1).
+
+#### Härtungs-Status prüfen
+
+```bash
+# Alle Container ohne security_opt finden:
+grep -rL "no-new-privileges" catalog/apps/*/compose.template.yml
+
+# Alle root-laufenden Container auf einem Tenant prüfen:
+ssh debian@<TENANT_IP> \
+  "docker ps -q | xargs docker inspect --format '{{.Name}}: User={{.Config.User}}'"
+
+# Effektiven UID eines laufenden Containers prüfen:
+docker exec <container> id
+```
+
+---
+
 ### Sicherheits-Checkliste (vor Go-Live)
 
 - [ ] SSH: Root-Login deaktiviert (`PermitRootLogin no`)
@@ -1495,6 +1597,9 @@ checkov -d catalog/apps/ --framework dockerfile,docker_compose
 - [ ] Backup: Proxmox-Backup-Job aktiv und getestet
 - [ ] gitleaks: Pre-commit Hook installiert
 - [ ] unattended-upgrades: Aktiv für Sicherheitsupdates
+- [ ] Container: `no-new-privileges:true` in allen Stacks gesetzt (via Katalog-Templates)
+- [ ] Container: `user:` korrekt für DB-Sidecars (999:999) und App-Services (1000:1000 / 2000:2000)
+- [ ] SSH: `ssh_allowed_source` in Ansible-Inventory auf Management-VM-IP gesetzt
 
 ---
 
