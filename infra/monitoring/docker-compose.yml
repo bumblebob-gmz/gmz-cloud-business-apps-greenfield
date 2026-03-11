@@ -54,13 +54,9 @@ services:
       - prometheus
       - loki
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.grafana.rule=Host(`${MONITORING_DOMAIN:-monitoring.irongeeks.eu}`)"
-      - "traefik.http.routers.grafana.entrypoints=websecure"
-      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
-      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
-      - "traefik.http.routers.grafana.middlewares=mgmt-ipallowlist@file"
-      - "traefik.docker.network=traefik_traefik"
+      # Routing is handled via Traefik file provider (traefik/dynamic/monitoring.yml).
+      # Docker label routing is disabled to avoid cross-provider middleware issues.
+      - "traefik.enable=false"
 
   loki:
     image: grafana/loki:3.1.0
