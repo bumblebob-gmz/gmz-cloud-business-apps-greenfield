@@ -45,3 +45,9 @@ providers:
   file:
     directory: {{ traefik_dynamic_dir }}
     watch: true
+  docker:
+    # Read container labels via socket proxy (not directly from Docker socket).
+    # Socket proxy runs on the internal socket-proxy network, port 2375.
+    endpoint: "tcp://socket-proxy:2375"
+    exposedByDefault: false   # only containers with traefik.enable=true are routed
+    network: traefik          # default network for backend containers

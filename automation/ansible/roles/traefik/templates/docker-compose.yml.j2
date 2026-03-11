@@ -1,8 +1,30 @@
 # Managed by: automation/ansible/roles/traefik
 services:
+  # Docker socket proxy — gives Traefik read-only label discovery without
+  # exposing the full Docker socket. Only CONTAINERS endpoint is enabled.
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.1.2
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1   # allow: read container list + inspect (for label discovery)
+      SERVICES: 0
+      TASKS: 0
+      NETWORKS: 0
+      VOLUMES: 0
+      INFO: 0
+      POST: 0         # deny: no write operations
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - socket-proxy
+    security_opt:
+      - no-new-privileges:true
+
   traefik:
     image: {{ traefik_image }}
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "80:80"
       - "443:443"
@@ -16,7 +38,13 @@ services:
       - {{ traefik_acme_dir }}:/etc/traefik/acme
     networks:
       - traefik
+      - socket-proxy
+    depends_on:
+      - socket-proxy
 
 networks:
   traefik:
     external: false
+  socket-proxy:
+    driver: bridge
+    internal: true   # socket-proxy network is not reachable from outside
