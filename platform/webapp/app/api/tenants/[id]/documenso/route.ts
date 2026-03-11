@@ -8,7 +8,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const correlationId = getCorrelationIdFromRequest(request);
-  const authz = await requireProtectedOperation(request, 'GET /api/tenants/[id]/documenso');
+  const authz = await requireProtectedOperation(request, 'GET /api/tenants/:id/documenso');
   if (!authz.ok) return authz.response;
 
   const tenant = await getTenantById(params.id);
@@ -33,7 +33,7 @@ export async function GET(
       action: 'documenso.accessed',
       resource: 'documenso',
       outcome: 'success',
-      source: { service: 'webapp', operation: 'GET /api/tenants/[id]/documenso' },
+      source: { service: 'webapp', operation: 'GET /api/tenants/:id/documenso' },
       details: { tenantId: tenant.id, status }
     })
   );

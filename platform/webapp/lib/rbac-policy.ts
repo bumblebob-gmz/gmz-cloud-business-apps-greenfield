@@ -19,6 +19,7 @@ export const RBAC_POLICY = {
   'GET /api/tenants/:id/traefik-config': 'admin',
   'GET /api/tenants/:id/ansible-inventory': 'admin',
   'GET /api/jobs': 'readonly',
+  'GET /api/jobs/:id': 'readonly',
   'POST /api/jobs': 'technician',
   'GET /api/deployments': 'readonly',
   'POST /api/deployments': 'technician',
@@ -39,7 +40,8 @@ export const RBAC_POLICY = {
   'POST /api/alerts/test': 'admin',
   'POST /api/alerts/preview-routing': 'admin',
   'POST /api/auth/alerts/dispatch': 'admin',
-  'GET /api/monitoring/status': 'admin'
+  'GET /api/monitoring/status': 'admin',
+  'GET /api/tenants/:id/documenso': 'readonly',
 } as const satisfies Record<string, UserRole>;
 
 /**
