@@ -1,0 +1,36 @@
+global:
+  # Default SMTP settings — override via environment or .env mount
+  smtp_from: '${ALERTMANAGER_SMTP_FROM:-alerts@irongeeks.eu}'
+  smtp_smarthost: '${ALERTMANAGER_SMTP_HOST:-localhost}:${ALERTMANAGER_SMTP_PORT:-587}'
+  smtp_auth_username: '${ALERTMANAGER_SMTP_USER:-}'
+  smtp_auth_password: '${ALERTMANAGER_SMTP_PASS:-}'
+  smtp_require_tls: true
+
+  # Silence repeat alerts after initial fire
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'tenant', 'instance']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'ops-email'
+
+  routes:
+    - match:
+        severity: critical
+      receiver: 'ops-email'
+      repeat_interval: 1h
+
+receivers:
+  - name: 'ops-email'
+    email_configs:
+      - to: '${ALERTMANAGER_OPS_EMAIL:-ops@irongeeks.eu}'
+        send_resolved: true
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['instance', 'tenant']

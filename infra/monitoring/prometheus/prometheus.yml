@@ -2,11 +2,40 @@ global:
   scrape_interval: 30s
   evaluation_interval: 30s
 
+# Send alerts to Alertmanager
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+# Load alerting rules from the rules/ directory
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
 scrape_configs:
+  # ── Management VM ──────────────────────────────────────────────────────────
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
 
-  - job_name: 'node_exporter'
+  - job_name: 'node_exporter_mgmt'
     static_configs:
-      - targets: ['host.docker.internal:9100'] # Assuming node_exporter on management vm
+      - targets: ['host.docker.internal:9100']
+    relabel_configs:
+      - target_label: instance
+        replacement: management-vm
+
+  # ── Tenant VMs (file-based service discovery) ────────────────────────────
+  # Each tenant gets a JSON targets file written to ./prometheus/targets/
+  # by the provisioning workflow when a new tenant is created.
+  # File format: [{"targets": ["10.X.Y.Z:9100"], "labels": {"tenant": "slug"}}]
+  - job_name: 'node_exporter_tenants'
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/*.json
+        refresh_interval: 60s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - source_labels: [tenant]
+        target_label: tenant

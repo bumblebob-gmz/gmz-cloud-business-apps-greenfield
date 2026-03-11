@@ -409,7 +409,7 @@ export default function SetupWizardPage() {
             <header>
               <h2 className="text-lg font-semibold text-ink">Generated Setup Plan</h2>
               <p className="text-xs text-slate-500">
-                Dry-run only · generated at {new Date(plan.generatedAt).toLocaleString()} · environment {plan.environmentLabel}
+                Dry-run only · generated at {new Date(plan.generatedAt).toISOString().replace('T', ' ').slice(0, 19)} UTC · environment {plan.environmentLabel}
               </p>
             </header>
 

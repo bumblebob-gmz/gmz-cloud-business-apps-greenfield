@@ -93,6 +93,9 @@ model Job {
 
   createdAt     DateTime  @default(now())
 
+  @@index([tenantName])
+  @@index([status])
+  @@index([createdAt])
   @@map("jobs")
 }
 

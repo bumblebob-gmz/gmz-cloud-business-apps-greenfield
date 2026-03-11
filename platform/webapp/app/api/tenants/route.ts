@@ -13,8 +13,28 @@ export async function GET(request: Request) {
   const authz = await requireProtectedOperation(request, 'GET /api/tenants');
   if (!authz.ok) return authz.response;
 
-  const items = await listTenants();
-  return NextResponse.json({ items });
+  const url = new URL(request.url);
+  const page  = Math.max(1, parseInt(url.searchParams.get('page')  ?? '1', 10)  || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') ?? '50', 10) || 50));
+
+  const all   = await listTenants();
+  const total = all.length;
+  const items = all.slice((page - 1) * limit, page * limit);
+
+  await appendAuditEvent(
+    buildAuditEvent({
+      correlationId: getCorrelationIdFromRequest(request),
+      actor: { type: 'user', id: authz.auth.userId, role: authz.auth.role },
+      tenantId: 'system',
+      action: 'tenant.list',
+      resource: 'tenant',
+      outcome: 'success',
+      source: { service: 'webapp', operation: 'GET /api/tenants' },
+      details: { page, limit, total },
+    })
+  );
+
+  return NextResponse.json({ items, meta: { page, limit, total, pages: Math.ceil(total / limit) } });
 }
 
 export async function POST(request: Request) {
@@ -22,7 +42,12 @@ export async function POST(request: Request) {
   if (!authz.ok) return authz.response;
 
   const correlationId = getCorrelationIdFromRequest(request);
-  const body = (await request.json()) as Partial<CreateTenantInput>;
+  let body: Partial<CreateTenantInput>;
+  try {
+    body = (await request.json()) as Partial<CreateTenantInput>;
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
+  }
 
   await appendAuditEvent(
     buildAuditEvent({

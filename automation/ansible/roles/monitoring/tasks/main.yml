@@ -1,23 +1,40 @@
 ---
-- name: Create monitoring directories
+- name: Create monitoring base directory (root-owned, group-readable)
+  ansible.builtin.file:
+    path: /opt/monitoring
+    state: directory
+    owner: root
+    group: docker
+    mode: '0750'
+
+- name: Create monitoring sub-directories
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
-    mode: '0755'
+    owner: root
+    group: docker
+    mode: '0750'
   loop:
-    - /opt/monitoring
     - /opt/monitoring/prometheus
+    - /opt/monitoring/prometheus/rules
+    - /opt/monitoring/prometheus/targets
     - /opt/monitoring/grafana/provisioning/datasources
     - /opt/monitoring/grafana/provisioning/dashboards
     - /opt/monitoring/promtail
+    - /opt/monitoring/alertmanager
 
 - name: Template monitoring files
   ansible.builtin.copy:
     src: "{{ playbook_dir }}/../../infra/monitoring/{{ item }}"
     dest: "/opt/monitoring/{{ item }}"
+    owner: root
+    group: docker
+    mode: '0640'
   loop:
     - docker-compose.yml
     - prometheus/prometheus.yml
+    - prometheus/rules/node-alerts.yml
+    - alertmanager/alertmanager.yml
     - grafana/provisioning/datasources/datasources.yaml
     - grafana/provisioning/dashboards/dashboards.yaml
     - promtail/config.yml

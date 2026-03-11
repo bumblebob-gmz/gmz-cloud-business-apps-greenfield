@@ -515,7 +515,7 @@ export default function AdminSecurityPage() {
               <tbody>
                 {events.map((event) => (
                   <tr key={event.eventId} className="bg-slate-50 text-slate-700">
-                    <td className="px-3 py-2 whitespace-nowrap">{new Date(event.timestamp).toLocaleString()}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">{new Date(event.timestamp).toISOString().replace('T', ' ').slice(0, 19)} UTC</td>
                     <td className="px-3 py-2 font-mono text-xs">{event.action}</td>
                     <td className="px-3 py-2"><span className={`rounded-full px-3 py-1 text-xs font-semibold ${outcomeTone(event.outcome)}`}>{event.outcome}</span></td>
                     <td className="px-3 py-2">{event.actor?.id ?? 'n/a'}</td>

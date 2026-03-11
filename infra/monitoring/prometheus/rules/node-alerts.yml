@@ -1,0 +1,39 @@
+groups:
+  - name: node-alerts
+    interval: 60s
+    rules:
+      - alert: NodeDown
+        expr: up{job=~"node_exporter.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node exporter unreachable: {{ $labels.instance }}"
+          description: "Host {{ $labels.instance }} (tenant: {{ $labels.tenant }}) has been unreachable for >2 minutes."
+
+      - alert: HighCpuLoad
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU load on {{ $labels.instance }}"
+          description: "CPU usage > 85% for 10+ minutes on {{ $labels.instance }} (tenant: {{ $labels.tenant }})."
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage > 90% on {{ $labels.instance }} (tenant: {{ $labels.tenant }})."
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Filesystem {{ $labels.mountpoint }} on {{ $labels.instance }} has <15% free."

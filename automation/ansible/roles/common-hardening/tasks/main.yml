@@ -17,11 +17,20 @@
     name: ufw
     state: present
 
-- name: Allow SSH
+- name: Allow SSH from management source (restricted)
   community.general.ufw:
     rule: allow
     port: '22'
     proto: tcp
+    src: "{{ ssh_allowed_source }}"
+  when: ssh_allowed_source | length > 0
+
+- name: Allow SSH from anywhere (fallback — set ssh_allowed_source to restrict)
+  community.general.ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+  when: ssh_allowed_source | length == 0
 
 - name: Allow HTTP (Port 80)
   community.general.ufw:
