@@ -1,0 +1,38 @@
+# GMZ Cloud Business Apps – Ansible Inventory: Management-VM
+#
+# Kopiere diese Datei zu management.ini und passe die Werte an:
+#   cp management.ini.example management.ini
+#
+# Die Datei management.ini ist in .gitignore, da sie hostspezifische
+# Konfigurationen und ggf. Pfade zu Key-Dateien enthält.
+#
+# WICHTIG – sudo (become):
+# Das Playbook deploy-traefik.yml und deploy-monitoring.yml benötigen
+# Root-Rechte (become: true). Für den Betrieb auf localhost gibt es
+# zwei Optionen:
+#
+# Option A – Passwortlos-sudo einrichten (empfohlen für Automation):
+#   echo "DEINUSER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/10-DEINUSER
+#   chmod 440 /etc/sudoers.d/10-DEINUSER
+#
+# Option B – Passwort beim Ausführen angeben:
+#   ansible-playbook deploy-traefik.yml ... --ask-become-pass
+#   (fragt einmalig nach dem sudo-Passwort)
+#
+# ─────────────────────────────────────────────────────────────────────────
+# LOKALER BETRIEB (Playbook läuft direkt auf der Management-VM, empfohlen)
+# ─────────────────────────────────────────────────────────────────────────
+
+[management]
+localhost ansible_connection=local ansible_user=gmzadmin
+
+# ─────────────────────────────────────────────────────────────────────────
+# REMOTE-BETRIEB (Playbook läuft von einem anderen Host aus – auskommentiert)
+# ─────────────────────────────────────────────────────────────────────────
+# [management]
+# mgmt-vm ansible_host=10.10.10.10 ansible_user=gmzadmin ansible_ssh_private_key_file=~/.ssh/id_ed25519
+
+[management:vars]
+# Beim Einsatz von passwordless-sudo diese Zeile so lassen:
+ansible_become=true
+# Wenn sudo-Passwort benötigt wird, stattdessen --ask-become-pass beim Aufruf nutzen.

@@ -650,21 +650,51 @@ openssl rand -hex 32
 
 Traefik übernimmt TLS-Terminierung, HTTP→HTTPS-Weiterleitung und das Routing zu den Tenant-Apps. Die Konfiguration erfolgt über Ansible.
 
+### 5.1 Sudo-Berechtigung einrichten (einmalig, Pflicht!)
+
+Das Ansible-Playbook setzt Datei-Eigentümer und Berechtigungen als `root` (z. B. `acme.json` mit `0600`). Dafür braucht Ansible `become: true` (sudo-Eskalation). **Das muss einmalig eingerichtet werden:**
+
 ```bash
-# Als gmzadmin – KEIN sudo für Ansible:
+# Als gmzadmin – einmalig passwordless-sudo einrichten:
+echo "gmzadmin ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/10-gmzadmin
+chmod 440 /etc/sudoers.d/10-gmzadmin
+
+# Prüfen:
+sudo id
+# → uid=0(root) ...
+```
+
+> **Alternativ** (ohne passwordless-sudo): `--ask-become-pass` an jeden `ansible-playbook`-Befehl anhängen — dann wird das sudo-Passwort einmalig pro Aufruf abgefragt.
+
+### 5.2 Inventory-Datei anlegen
+
+```bash
+# Als gmzadmin:
 cd /opt/gmz
 
 # Inventory-Datei für die Management-VM anlegen (einmalig, nicht in Git):
-cat > automation/ansible/inventory/management.ini << 'EOF'
-[management]
-localhost ansible_connection=local ansible_user=gmzadmin
-EOF
+cp automation/ansible/inventory/management.ini.example \
+   automation/ansible/inventory/management.ini
 
-# Traefik deployen:
+# Datei prüfen / ggf. Benutzer anpassen:
+cat automation/ansible/inventory/management.ini
+```
+
+### 5.3 Traefik deployen
+
+```bash
+# Als gmzadmin (passwordless-sudo muss konfiguriert sein):
 ansible-playbook automation/ansible/deploy-traefik.yml \
   -e acme_email=admin@example.com \
   -e ionos_api_key=PREFIX.SECRET \
   -i automation/ansible/inventory/management.ini
+
+# Alternativ mit Passwort-Prompt (wenn kein passwordless-sudo):
+ansible-playbook automation/ansible/deploy-traefik.yml \
+  -e acme_email=admin@example.com \
+  -e ionos_api_key=PREFIX.SECRET \
+  -i automation/ansible/inventory/management.ini \
+  --ask-become-pass
 ```
 
 **Was das Playbook macht:**
@@ -1821,6 +1851,40 @@ Folgende Informationen bereithalten:
 # Teil IV: Referenz
 
 ## 22. Troubleshooting (technisch)
+
+### Ansible: `sudo: Ein Passwort ist notwendig` / `Premature end of stream`
+
+**Symptom:**
+```
+fatal: [localhost]: FAILED! => {"msg": "Premature end of stream waiting for become success.\n>>> Standard Error\nsudo: Ein Passwort ist notwendig"}
+```
+
+**Ursache:** Das Playbook verwendet `become: true` (Root-Eskalation). Der Ansible-User hat kein passwordless-sudo eingerichtet und das Passwort wurde nicht übergeben.
+
+**Lösung A – Passwordless-sudo einrichten (empfohlen, einmalig):**
+```bash
+echo "gmzadmin ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/10-gmzadmin
+chmod 440 /etc/sudoers.d/10-gmzadmin
+# Test:
+sudo id  # → uid=0(root)
+```
+
+**Lösung B – Passwort pro Aufruf angeben:**
+```bash
+ansible-playbook automation/ansible/deploy-traefik.yml \
+  -e acme_email=admin@example.com \
+  -e ionos_api_key=PREFIX.SECRET \
+  -i automation/ansible/inventory/management.ini \
+  --ask-become-pass   # ← Passwort wird einmalig abgefragt
+```
+
+**Wichtig:** `management.ini` muss existieren (aus Vorlage erstellen):
+```bash
+cp automation/ansible/inventory/management.ini.example \
+   automation/ansible/inventory/management.ini
+```
+
+---
 
 ### Traefik: Kein TLS-Zertifikat
 

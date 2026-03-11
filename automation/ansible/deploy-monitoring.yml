@@ -1,4 +1,13 @@
 ---
+# Deploy Monitoring Stack to the management VM
+#
+# Voraussetzungen: sudo-Berechtigung (become: true)
+#   Option A (einmalig): echo "gmzadmin ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/10-gmzadmin && chmod 440 /etc/sudoers.d/10-gmzadmin
+#   Option B (pro Aufruf): --ask-become-pass anhängen
+#
+# Aufruf:
+#   ansible-playbook automation/ansible/deploy-monitoring.yml \
+#     -i automation/ansible/inventory/management.ini
 - name: Deploy Monitoring Stack
   hosts: management
   become: yes

@@ -1,16 +1,32 @@
 ---
 # Deploy Traefik to the management VM
 #
-# Usage:
-#   ansible-playbook deploy-traefik.yml \
+# Voraussetzungen:
+#   1. Inventory vorbereiten:
+#        cp automation/ansible/inventory/management.ini.example \
+#           automation/ansible/inventory/management.ini
+#      → Datei ggf. anpassen (Benutzer, Host)
+#
+#   2. Sudo-Berechtigung für den Ansible-User sicherstellen.
+#      Das Playbook benötigt Root-Rechte (become: true).
+#
+#      Option A – Passwortlos-sudo (empfohlen, einmalig einrichten):
+#        echo "gmzadmin ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/10-gmzadmin
+#        chmod 440 /etc/sudoers.d/10-gmzadmin
+#
+#      Option B – Passwort beim Aufruf angeben:
+#        ansible-playbook deploy-traefik.yml ... --ask-become-pass
+#
+# Aufruf (lokale Ausführung auf der Management-VM):
+#   ansible-playbook automation/ansible/deploy-traefik.yml \
 #     -e acme_email=ops@irongeeks.eu \
-#     -e ionos_api_key=<public>.<secret>
+#     -e ionos_api_key=<public>.<secret> \
+#     -i automation/ansible/inventory/management.ini
 #
-# Or use Ansible Vault for secrets:
-#   ansible-playbook deploy-traefik.yml --vault-password-file vault-pass.txt
-#
-# Inventory: ensure [management] group exists in your inventory
-# with the management VM IP and SSH access configured.
+# Mit Vault (empfohlen für Produktion):
+#   ansible-playbook automation/ansible/deploy-traefik.yml \
+#     --vault-password-file vault-pass.txt \
+#     -i automation/ansible/inventory/management.ini
 
 - name: Deploy Traefik on management VM
   hosts: management
