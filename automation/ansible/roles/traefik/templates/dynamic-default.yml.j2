@@ -8,11 +8,6 @@ http:
         scheme: https
         permanent: true
 
-    strip-traefik-prefix:
-      stripPrefix:
-        prefixes:
-          - "/traefik"
-
     mgmt-ipallowlist:
       ipAllowList:
         sourceRange:
@@ -22,12 +17,13 @@ http:
 
   routers:
     traefik-dashboard:
-      rule: "Host({{ bq }}{{ traefik_mgmt_hostname }}{{ bq }}) && (PathPrefix({{ bq }}/traefik/api{{ bq }}) || PathPrefix({{ bq }}/traefik/dashboard{{ bq }}))"
+      # Dedicated subdomain — avoids stripPrefix+SPA incompatibility.
+      # Dashboard available at: https://{{ traefik_dashboard_hostname }}/dashboard/
+      rule: "Host({{ bq }}{{ traefik_dashboard_hostname }}{{ bq }})"
       entryPoints:
         - websecure
       service: api@internal
       middlewares:
         - mgmt-ipallowlist
-        - strip-traefik-prefix
       tls:
         certResolver: letsencrypt

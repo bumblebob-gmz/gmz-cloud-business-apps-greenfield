@@ -11,10 +11,16 @@ traefik_config_dir: /etc/traefik
 traefik_dynamic_dir: /etc/traefik/dynamic
 traefik_acme_dir: /etc/traefik/acme
 
-# Management VM hostname for dashboard router rule
+# Management VM hostname (used for redirect and WebApp routing)
 traefik_mgmt_hostname: "mgmt.irongeeks.eu"
 
-# Internal IP ranges allowed to access the dashboard
+# Dedicated subdomain for the Traefik dashboard.
+# Using a subdomain avoids the stripPrefix+SPA incompatibility where
+# the dashboard JS fetches /api/... at root level and breaks the path-prefix router.
+traefik_dashboard_hostname: "traefik.mgmt.irongeeks.eu"
+
+# IP ranges allowed to access the dashboard (RFC-1918 by default).
+# Add your office/home CIDR here if accessing externally without VPN.
 traefik_dashboard_allowed_cidrs:
   - "10.0.0.0/8"
   - "172.16.0.0/12"
