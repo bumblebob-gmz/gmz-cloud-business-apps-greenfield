@@ -2,6 +2,9 @@ services:
   wiki-js-db:
     image: postgres:16-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     environment:
       POSTGRES_DB: wikijs
       POSTGRES_USER: wikijs
@@ -25,6 +28,9 @@ services:
   wiki-js:
     image: ghcr.io/requarks/wiki:${WIKIJS_VERSION}
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"
     depends_on:
       wiki-js-db:
         condition: service_healthy

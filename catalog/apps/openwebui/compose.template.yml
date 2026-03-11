@@ -1,7 +1,10 @@
 services:
   openwebui:
     image: ghcr.io/open-webui/open-webui:${OPENWEBUI_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       OLLAMA_BASE_URL: https://${OLLAMA_HOST}
       WEBUI_SECRET_KEY: ${OPENWEBUI_SECRET_KEY}

@@ -2,6 +2,9 @@ services:
   mattermost-db:
     image: postgres:16-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     environment:
       POSTGRES_DB: ${MM_DB_NAME}
       POSTGRES_USER: ${MM_DB_USER}
@@ -26,6 +29,9 @@ services:
   mattermost:
     image: mattermost/mattermost-team-edition:${MM_IMAGE_TAG}
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "2000:2000"
     depends_on: [mattermost-db]
     environment:
       MM_SQLSETTINGS_DRIVERNAME: postgres

@@ -2,6 +2,9 @@ services:
   peppermint-db:
     image: postgres:16-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     environment:
       POSTGRES_DB: ${PP_DB_NAME}
       POSTGRES_USER: ${PP_DB_USER}
@@ -26,6 +29,9 @@ services:
   peppermint:
     image: peppermint/peppermint:${PP_IMAGE_TAG}
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"
     depends_on:
       - peppermint-db
     environment:

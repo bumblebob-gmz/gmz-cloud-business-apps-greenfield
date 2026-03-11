@@ -2,6 +2,9 @@ services:
   plane-db:
     image: postgres:16-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     environment:
       POSTGRES_DB: ${PLANE_DB_NAME}
       POSTGRES_USER: ${PLANE_DB_USER}
@@ -26,6 +29,9 @@ services:
   plane-redis:
     image: redis:7-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     volumes:
       - plane_redis:/data
     healthcheck:
@@ -45,7 +51,10 @@ services:
 
   plane-api:
     image: makeplane/plane-backend:${PLANE_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     entrypoint: python manage.py runserver 0.0.0.0:8000
     depends_on: [plane-db, plane-redis]
     environment:
@@ -72,7 +81,10 @@ services:
 
   plane-worker:
     image: makeplane/plane-backend:${PLANE_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     entrypoint: celery -A plane worker -l info
     depends_on: [plane-db, plane-redis]
     environment:
@@ -93,7 +105,10 @@ services:
 
   plane-beat:
     image: makeplane/plane-backend:${PLANE_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     entrypoint: celery -A plane beat -l info
     depends_on: [plane-db, plane-redis]
     environment:
@@ -114,7 +129,10 @@ services:
 
   plane-frontend:
     image: makeplane/plane-frontend:${PLANE_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on: [plane-api]
     environment:
       NEXT_PUBLIC_API_BASE_URL: https://${PLANE_HOST}

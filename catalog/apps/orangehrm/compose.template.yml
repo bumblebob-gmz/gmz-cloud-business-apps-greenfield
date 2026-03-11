@@ -2,6 +2,9 @@ services:
   orangehrm-db:
     image: mysql:8
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     environment:
       MYSQL_ROOT_PASSWORD: ${OHRM_DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${OHRM_DB_NAME}
@@ -26,7 +29,10 @@ services:
 
   orangehrm:
     image: orangehrm/orangehrm:${OHRM_IMAGE_TAG}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on: [orangehrm-db]
     environment:
       ORANGEHRM_DATABASE_HOST: orangehrm-db

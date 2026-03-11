@@ -2,6 +2,9 @@ services:
   invoiceninja-db:
     image: mysql:8
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     environment:
       MYSQL_ROOT_PASSWORD: ${IN_DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${IN_DB_NAME}
@@ -26,7 +29,10 @@ services:
 
   invoiceninja:
     image: invoiceninja/invoiceninja:${IN_IMAGE_TAG}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on: [invoiceninja-db]
     environment:
       APP_URL: https://${IN_HOST}

@@ -2,6 +2,9 @@ services:
   leantime-db:
     image: mysql:8.0
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
       MYSQL_DATABASE: ${LT_DB_NAME}
@@ -27,7 +30,10 @@ services:
 
   leantime:
     image: leantime/leantime:${LT_IMAGE_TAG}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on: [leantime-db]
     environment:
       LEAN_APP_URL: https://${LT_HOST}

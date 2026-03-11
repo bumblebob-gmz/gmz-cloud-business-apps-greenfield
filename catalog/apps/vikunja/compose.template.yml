@@ -2,6 +2,9 @@ services:
   vikunja-db:
     image: postgres:16-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     environment:
       POSTGRES_DB: ${VIKUNJA_DB_NAME}
       POSTGRES_USER: ${VIKUNJA_DB_USER}
@@ -26,6 +29,9 @@ services:
   vikunja:
     image: vikunja/vikunja:${VIKUNJA_IMAGE_TAG}
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"
     depends_on: [vikunja-db]
     environment:
       VIKUNJA_DATABASE_TYPE: postgres

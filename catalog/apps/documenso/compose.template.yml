@@ -3,6 +3,8 @@ services:
     image: documenso/documenso:${DOCUMENSO_IMAGE_TAG:-1.5.6}
     container_name: documenso
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     user: "1000:1000"
     depends_on:
       documenso-db:
@@ -53,6 +55,8 @@ services:
   documenso-db:
     image: postgres:16-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     user: "999:999"
     environment:
       POSTGRES_DB: documenso

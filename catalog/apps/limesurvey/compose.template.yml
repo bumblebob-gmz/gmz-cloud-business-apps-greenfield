@@ -2,6 +2,9 @@ services:
   limesurvey-db:
     image: postgres:16-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     environment:
       POSTGRES_DB: ${LS_DB_NAME}
       POSTGRES_USER: ${LS_DB_USER}
@@ -25,7 +28,10 @@ services:
 
   limesurvey:
     image: martialblog/limesurvey:${LS_IMAGE_TAG}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - limesurvey-db
     environment:

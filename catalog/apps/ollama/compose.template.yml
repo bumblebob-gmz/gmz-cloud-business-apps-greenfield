@@ -1,7 +1,10 @@
 services:
   ollama:
     image: ollama/ollama:${OLLAMA_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       OLLAMA_HOST: "0.0.0.0"
       OLLAMA_KEEP_ALIVE: "24h"

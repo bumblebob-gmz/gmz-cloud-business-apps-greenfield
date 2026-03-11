@@ -2,6 +2,9 @@ services:
   twenty-db:
     image: postgres:16-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     environment:
       POSTGRES_DB: ${TWENTY_DB_NAME}
       POSTGRES_USER: ${TWENTY_DB_USER}
@@ -26,6 +29,9 @@ services:
   twenty-redis:
     image: redis:7-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     volumes:
       - twenty_redis:/data
     healthcheck:
@@ -45,7 +51,10 @@ services:
 
   twenty-server:
     image: twentycrm/twenty:${TWENTY_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on: [twenty-db, twenty-redis]
     environment:
       SERVER_URL: https://${TWENTY_HOST}
@@ -80,7 +89,10 @@ services:
 
   twenty-worker:
     image: twentycrm/twenty:${TWENTY_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     command: ["node", "dist/src/queue-worker/queue-worker.js"]
     depends_on: [twenty-server]
     environment:

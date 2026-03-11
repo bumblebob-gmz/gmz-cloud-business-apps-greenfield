@@ -2,6 +2,9 @@ services:
   bookstack-db:
     image: mariadb:11
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     environment:
       MYSQL_ROOT_PASSWORD: ${BOOKSTACK_DB_ROOT_PASSWORD}
       MYSQL_DATABASE: bookstack
@@ -25,7 +28,10 @@ services:
 
   bookstack:
     image: lscr.io/linuxserver/bookstack:${BOOKSTACK_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       bookstack-db:
         condition: service_healthy

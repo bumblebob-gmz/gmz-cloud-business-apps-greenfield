@@ -2,6 +2,9 @@ services:
   searxng-redis:
     image: redis:7-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     command: redis-server --save "" --appendonly no
     volumes:
       - searxng_redis_data:/data
@@ -22,7 +25,10 @@ services:
 
   searxng:
     image: searxng/searxng:${SEARXNG_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - searxng-redis
     environment:

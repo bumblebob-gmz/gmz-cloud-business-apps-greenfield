@@ -1,7 +1,10 @@
 services:
   it-tools:
     image: corentinth/it-tools:${IT_TOOLS_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:80/ || exit 1"]
       interval: 30s

@@ -1,7 +1,10 @@
 services:
   libretranslate:
     image: libretranslate/libretranslate:${LIBRETRANSLATE_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       LT_API_KEYS: "true"
       LT_API_KEYS_DB_PATH: /app/db/api_keys.db

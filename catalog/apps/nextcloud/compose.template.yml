@@ -2,6 +2,9 @@ services:
   nextcloud-db:
     image: mariadb:11
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
     environment:
       MYSQL_DATABASE: ${NEXTCLOUD_DB_NAME}
@@ -28,6 +31,9 @@ services:
   nextcloud-redis:
     image: redis:7-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
     volumes:
       - nextcloud_redis_data:/data
@@ -48,7 +54,10 @@ services:
 
   nextcloud-app:
     image: nextcloud:${NEXTCLOUD_IMAGE_TAG}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - nextcloud-db
       - nextcloud-redis
@@ -93,7 +102,10 @@ services:
 
   nextcloud-cron:
     image: nextcloud:${NEXTCLOUD_IMAGE_TAG}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - nextcloud-db
       - nextcloud-redis

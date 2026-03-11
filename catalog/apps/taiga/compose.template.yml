@@ -2,6 +2,9 @@ services:
   taiga-db:
     image: postgres:15-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     environment:
       POSTGRES_DB: ${TAIGA_DB_NAME}
       POSTGRES_USER: ${TAIGA_DB_USER}
@@ -26,6 +29,9 @@ services:
   taiga-redis:
     image: redis:6-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     volumes:
       - taiga_redis:/data
     healthcheck:
@@ -45,7 +51,10 @@ services:
 
   taiga-rabbitmq:
     image: taigaio/taiga-async-rabbitmq:${TAIGA_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       RABBITMQ_DEFAULT_USER: ${TAIGA_RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${TAIGA_RABBITMQ_PASSWORD}
@@ -63,7 +72,10 @@ services:
 
   taiga-back:
     image: taigaio/taiga-back:${TAIGA_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on: [taiga-db, taiga-redis, taiga-rabbitmq]
     environment:
       POSTGRES_DB: ${TAIGA_DB_NAME}
@@ -91,7 +103,10 @@ services:
 
   taiga-async:
     image: taigaio/taiga-async:${TAIGA_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on: [taiga-db, taiga-redis, taiga-rabbitmq]
     environment:
       POSTGRES_DB: ${TAIGA_DB_NAME}
@@ -119,7 +134,10 @@ services:
 
   taiga-events:
     image: taigaio/taiga-events:${TAIGA_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on: [taiga-rabbitmq]
     environment:
       RABBITMQ_URL: amqp://${TAIGA_RABBITMQ_USER}:${TAIGA_RABBITMQ_PASSWORD}@taiga-rabbitmq:5672/${TAIGA_RABBITMQ_VHOST}
@@ -135,7 +153,10 @@ services:
 
   taiga-protected:
     image: taigaio/taiga-protected:${TAIGA_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       MAX_AGE: "360"
       SECRET_KEY: ${TAIGA_SECRET_KEY}
@@ -150,7 +171,10 @@ services:
 
   taiga-front:
     image: taigaio/taiga-front:${TAIGA_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on: [taiga-back, taiga-events]
     environment:
       TAIGA_URL: https://${TAIGA_HOST}

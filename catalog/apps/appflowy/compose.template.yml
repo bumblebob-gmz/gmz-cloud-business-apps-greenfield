@@ -2,6 +2,9 @@ services:
   appflowy-db:
     image: postgres:16-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     environment:
       POSTGRES_DB: ${AF_DB_NAME}
       POSTGRES_USER: ${AF_DB_USER}
@@ -26,6 +29,9 @@ services:
   appflowy-redis:
     image: redis:7-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     volumes:
       - appflowy_redis:/data
     healthcheck:
@@ -45,7 +51,10 @@ services:
 
   appflowy-minio:
     image: minio/minio:latest
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${AF_MINIO_ROOT_USER}
@@ -69,7 +78,10 @@ services:
 
   appflowy-cloud:
     image: appflowyinc/appflowy-cloud:${AF_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - appflowy-db
       - appflowy-redis

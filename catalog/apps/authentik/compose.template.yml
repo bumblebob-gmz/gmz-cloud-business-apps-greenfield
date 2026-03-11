@@ -2,6 +2,9 @@ services:
   authentik-postgresql:
     image: postgres:16-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     environment:
       POSTGRES_DB: ${AUTHENTIK_DB_NAME}
       POSTGRES_USER: ${AUTHENTIK_DB_USER}
@@ -26,6 +29,9 @@ services:
   authentik-redis:
     image: redis:7-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
     volumes:
       - authentik_redis_data:/data
@@ -46,7 +52,10 @@ services:
 
   authentik-server:
     image: ghcr.io/goauthentik/server:${AUTHENTIK_IMAGE_TAG}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     command: server
     depends_on:
       - authentik-postgresql
@@ -88,7 +97,10 @@ services:
 
   authentik-worker:
     image: ghcr.io/goauthentik/server:${AUTHENTIK_IMAGE_TAG}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     command: worker
     depends_on:
       - authentik-postgresql
@@ -122,7 +134,10 @@ services:
 
   authentik-socket-proxy:
     image: tecnativa/docker-socket-proxy:0.1.2
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       CONTAINERS: 1
       NETWORKS: 0

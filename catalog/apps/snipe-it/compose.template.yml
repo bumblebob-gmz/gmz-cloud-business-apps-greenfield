@@ -2,6 +2,9 @@ services:
   snipe-it-db:
     image: mariadb:11
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     environment:
       MYSQL_ROOT_PASSWORD: ${SNIPEIT_DB_ROOT_PASSWORD}
       MYSQL_DATABASE: snipeit
@@ -25,7 +28,10 @@ services:
 
   snipe-it:
     image: snipe/snipe-it:${SNIPEIT_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       snipe-it-db:
         condition: service_healthy

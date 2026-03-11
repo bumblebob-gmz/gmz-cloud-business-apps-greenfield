@@ -2,6 +2,9 @@ services:
   paperless-broker:
     image: redis:7-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     volumes:
       - paperless_redis_data:/data
     healthcheck:
@@ -22,6 +25,9 @@ services:
   paperless-db:
     image: postgres:16-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     environment:
       POSTGRES_DB: paperless
       POSTGRES_USER: paperless
@@ -45,7 +51,10 @@ services:
 
   paperless-webserver:
     image: ghcr.io/paperless-ngx/paperless-ngx:${PAPERLESS_VERSION}
+    # security: image drops privileges internally; no user: override required
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - paperless-db
       - paperless-broker
@@ -62,6 +71,8 @@ services:
       PAPERLESS_ADMIN_USER: ${PAPERLESS_ADMIN_USER}
       PAPERLESS_ADMIN_PASSWORD: ${PAPERLESS_ADMIN_PASSWORD}
       PAPERLESS_ADMIN_MAIL: ${PAPERLESS_ADMIN_MAIL}
+      USERMAP_UID: "1000"
+      USERMAP_GID: "1000"
     volumes:
       - paperless_data:/usr/src/paperless/data
       - paperless_media:/usr/src/paperless/media

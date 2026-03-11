@@ -2,6 +2,9 @@ services:
   docmost-db:
     image: postgres:16-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     environment:
       POSTGRES_DB: ${DM_DB_NAME}
       POSTGRES_USER: ${DM_DB_USER}
@@ -26,6 +29,9 @@ services:
   docmost-redis:
     image: redis:7-alpine
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "999:999"
     volumes:
       - docmost_redis:/data
     healthcheck:
@@ -46,6 +52,9 @@ services:
   docmost:
     image: docmost/docmost:${DM_IMAGE_TAG}
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"
     depends_on:
       - docmost-db
       - docmost-redis
