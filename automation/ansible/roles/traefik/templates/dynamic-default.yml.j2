@@ -1,6 +1,6 @@
 # Traefik dynamic config — default
 # Managed by: automation/ansible/roles/traefik
-
+{% set bq = '`' %}
 http:
   middlewares:
     redirect-to-https:
@@ -22,7 +22,7 @@ http:
 
   routers:
     traefik-dashboard:
-      rule: "Host(`{{ traefik_mgmt_hostname }}`) && (PathPrefix(`/traefik/api`) || PathPrefix(`/traefik/dashboard`))"
+      rule: "Host({{ bq }}{{ traefik_mgmt_hostname }}{{ bq }}) && (PathPrefix({{ bq }}/traefik/api{{ bq }}) || PathPrefix({{ bq }}/traefik/dashboard{{ bq }}))"
       entryPoints:
         - websecure
       service: api@internal
