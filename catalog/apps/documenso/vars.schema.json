@@ -2,89 +2,99 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Documenso App Variables",
   "type": "object",
-  "required": ["domain", "smtp_host", "smtp_port", "smtp_user", "smtp_pass", "smtp_from", "secret_key", "encryption_key", "db_password"],
+  "required": [
+    "DOCUMENSO_HOST",
+    "DOCUMENSO_SECRET_KEY",
+    "DOCUMENSO_DB_PASSWORD",
+    "DOCUMENSO_ENCRYPTION_KEY",
+    "DOCUMENSO_SMTP_HOST",
+    "DOCUMENSO_SMTP_PORT",
+    "DOCUMENSO_SMTP_USER",
+    "DOCUMENSO_SMTP_PASS",
+    "DOCUMENSO_SMTP_FROM"
+  ],
   "additionalProperties": false,
   "properties": {
-    "domain": {
+    "DOCUMENSO_HOST": {
       "type": "string",
       "description": "Public FQDN for Documenso (e.g. sign.kunde.irongeeks.eu)",
       "pattern": "^[a-z0-9.-]+\\.[a-z]{2,}$"
     },
-    "db_password": {
+    "DOCUMENSO_DB_PASSWORD": {
       "type": "string",
       "description": "PostgreSQL password for the documenso database user",
       "minLength": 16
     },
-    "secret_key": {
+    "DOCUMENSO_SECRET_KEY": {
       "type": "string",
       "description": "NextAuth secret — random 32+ char string (openssl rand -hex 32)",
       "minLength": 32
     },
-    "encryption_key": {
+    "DOCUMENSO_ENCRYPTION_KEY": {
       "type": "string",
       "description": "AES encryption key for document data — must be exactly 32 chars",
       "minLength": 32,
       "maxLength": 32
     },
-    "encryption_key_secondary": {
+    "DOCUMENSO_ENCRYPTION_KEY_SECONDARY": {
       "type": "string",
-      "description": "Secondary encryption key for key rotation (optional, defaults to encryption_key)",
+      "description": "Secondary encryption key for key rotation (optional, defaults to DOCUMENSO_ENCRYPTION_KEY)",
       "minLength": 32,
       "maxLength": 32
     },
-    "smtp_host": {
+    "DOCUMENSO_SMTP_HOST": {
       "type": "string",
       "description": "SMTP server hostname (e.g. smtp.office365.com)"
     },
-    "smtp_port": {
+    "DOCUMENSO_SMTP_PORT": {
       "type": "string",
       "description": "SMTP port (587 for STARTTLS, 465 for SSL, 25 for plain)",
       "enum": ["25", "465", "587", "2525"],
       "default": "587"
     },
-    "smtp_user": {
+    "DOCUMENSO_SMTP_USER": {
       "type": "string",
       "description": "SMTP authentication username / email address"
     },
-    "smtp_pass": {
+    "DOCUMENSO_SMTP_PASS": {
       "type": "string",
       "description": "SMTP authentication password or app password"
     },
-    "smtp_from": {
+    "DOCUMENSO_SMTP_FROM": {
       "type": "string",
       "description": "From address for outgoing emails (e.g. sign@kunde.irongeeks.eu)",
       "format": "email"
     },
-    "smtp_from_name": {
+    "DOCUMENSO_SMTP_FROM_NAME": {
       "type": "string",
       "description": "Display name for outgoing emails",
       "default": "Documenso"
     },
-    "smtp_secure": {
+    "DOCUMENSO_SMTP_SECURE": {
       "type": "string",
       "description": "Use SSL/TLS (true for port 465, false for STARTTLS on 587)",
       "enum": ["true", "false"],
       "default": "false"
     },
-    "documenso_port": {
+    "DOCUMENSO_PORT": {
       "type": "string",
       "description": "Host port to bind Documenso to (only needed without Traefik)",
       "default": "3000"
     },
-    "oidc_well_known": {
+    "DOCUMENSO_OIDC_WELL_KNOWN": {
       "type": "string",
       "description": "Authentik OIDC well-known URL (optional, for SSO)",
       "format": "uri"
     },
-    "oidc_client_id": {
+    "DOCUMENSO_OIDC_CLIENT_ID": {
       "type": "string",
       "description": "OIDC client ID from Authentik application"
     },
-    "oidc_client_secret": {
+    "DOCUMENSO_OIDC_CLIENT_SECRET": {
       "type": "string",
       "description": "OIDC client secret from Authentik application"
     },
-    "version": {
+    "DOCUMENSO_IMAGE_TAG": {
       "type": "string",
       "description": "Documenso image tag to deploy",
       "default": "1.5.6"

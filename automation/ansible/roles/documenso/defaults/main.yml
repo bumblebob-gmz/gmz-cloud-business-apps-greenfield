@@ -1,9 +1,22 @@
 ---
-documenso_version: "1.5.6"
-documenso_port: 3000
-documenso_compose_dir: "/opt/documenso"
-documenso_data_dir: "/opt/documenso/data"
-documenso_image: "documenso/documenso"
-documenso_db_image: "postgres:16-alpine"
-documenso_health_retries: 12
+# documenso role defaults
+
+documenso_compose_dir: /opt/gmz/apps/documenso
+documenso_data_dir: /opt/gmz/data/documenso
+
+documenso_image_tag: "1.5.6"
+documenso_port: "3000"
+
+# SMTP defaults
+documenso_smtp_port: "587"
+documenso_smtp_secure: "false"
+documenso_smtp_from_name: "Documenso"
+
+# OIDC / SSO (optional, set to "" to disable)
+documenso_oidc_well_known: ""
+documenso_oidc_client_id: ""
+documenso_oidc_client_secret: ""
+
+# Health-check
+documenso_health_retries: 18
 documenso_health_delay: 10

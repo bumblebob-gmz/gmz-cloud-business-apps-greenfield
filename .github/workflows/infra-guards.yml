@@ -19,9 +19,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Validate prod TLS default stays secure
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4- name: Validate prod TLS default stays secure
         run: bash ops/scripts/check_prod_tfvars_secure.sh
 
   lab-tls-override-audit:
@@ -30,9 +28,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Ensure lab tfvars.example uses proxmox_tls_insecure (not proxmox_insecure)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4- name: Ensure lab tfvars.example uses proxmox_tls_insecure (not proxmox_insecure)
         shell: bash
         run: |
           LAB_EXAMPLE="infra/opentofu/environments/lab/terraform.tfvars.example"

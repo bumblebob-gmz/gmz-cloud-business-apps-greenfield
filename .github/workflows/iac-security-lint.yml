@@ -18,11 +18,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Run checkov on infra/opentofu/
-        uses: bridgecrewio/checkov-action@v12
-        with:
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4- name: Run checkov on infra/opentofu/
+        uses: bridgecrewio/checkov-action@f9b0a2206b0401cad02ac0a66be2a7934a5be838 # v12with:
           directory: infra/opentofu
           framework: terraform
           # Fail the job on HIGH or CRITICAL severity findings only
@@ -37,7 +34,6 @@ jobs:
 
       - name: Upload SARIF to GitHub Security tab
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
+        uses: github/codeql-action/upload-sarif@820e3160e279568db735cee8ed8f8e77a6da7818 # v3with:
           sarif_file: checkov-results.sarif
           category: checkov-iac

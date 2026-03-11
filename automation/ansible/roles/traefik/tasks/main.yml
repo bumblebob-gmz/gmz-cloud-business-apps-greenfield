@@ -6,44 +6,8 @@
       - ionos_api_key | length > 0
     fail_msg: "acme_email and ionos_api_key must be set (never committed — pass via -e or vault)"
 
-- name: Install prerequisites
-  ansible.builtin.apt:
-    name:
-      - apt-transport-https
-      - ca-certificates
-      - curl
-      - gnupg
-      - python3-docker
-    state: present
-    update_cache: true
-
-- name: Add Docker GPG key
-  ansible.builtin.get_url:
-    url: https://download.docker.com/linux/debian/gpg
-    dest: /etc/apt/keyrings/docker.asc
-    mode: '0644'
-    force: false
-
-- name: Add Docker repository
-  ansible.builtin.apt_repository:
-    repo: "deb [arch={{ ansible_architecture | replace('x86_64', 'amd64') }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
-    state: present
-
-- name: Install Docker CE
-  ansible.builtin.apt:
-    name:
-      - docker-ce
-      - docker-ce-cli
-      - containerd.io
-      - docker-compose-plugin
-    state: present
-    update_cache: true
-
-- name: Ensure Docker is started and enabled
-  ansible.builtin.systemd:
-    name: docker
-    state: started
-    enabled: true
+# Docker installation is handled by the docker-runtime role dependency
+# declared in meta/main.yml — no duplicate install here.
 
 - name: Create Traefik config directories
   ansible.builtin.file:
