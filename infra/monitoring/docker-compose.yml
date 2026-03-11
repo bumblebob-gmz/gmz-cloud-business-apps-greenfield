@@ -40,6 +40,7 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme_please}
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=https://${MONITORING_DOMAIN:-monitoring.irongeeks.eu}
     volumes:
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
@@ -47,10 +48,19 @@ services:
       - grafana_data:/var/lib/grafana
     networks:
       - monitoring_net
+      - traefik
     restart: always
     depends_on:
       - prometheus
       - loki
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`${MONITORING_DOMAIN:-monitoring.irongeeks.eu}`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+      - "traefik.http.routers.grafana.middlewares=mgmt-ipallowlist"
+      - "traefik.docker.network=traefik"
 
   loki:
     image: grafana/loki:3.1.0
@@ -77,6 +87,9 @@ services:
 networks:
   monitoring_net:
     driver: bridge
+  traefik:
+    external: true
+    name: traefik_traefik
 
 volumes:
   prometheus_data:
